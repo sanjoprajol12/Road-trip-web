@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 01: Foundation | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --crimson:#a51d2d; --ok:#2e6a3c; --warn:#8a5a00; --bad:#b42318; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui, sans-serif; }
+  main { max-width: 64rem; margin: 0 auto; padding: 3rem 1rem 5rem; }
+  h1 { font-size: clamp(2rem, 1.4rem + 3vw, 3.2rem); line-height:1.05; text-transform:uppercase; letter-spacing:-.01em; margin:.3rem 0 1rem; }
+  h2 { font-size:1.4rem; text-transform:uppercase; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:3rem; }
+  h3 { font-size:1.05rem; margin:1.5rem 0 .4rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  .label { font-size:.75rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--crimson); }
+  table { width:100%; border-collapse:collapse; font-size:.9rem; margin:.8rem 0; display:block; overflow-x:auto; }
+  th, td { text-align:left; vertical-align:top; padding:.5rem .6rem; border-bottom:1px solid var(--line); }
+  th { font-size:.75rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+  code { font-size:.85em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; }
+  .pass { color:var(--ok); font-weight:700; } .warn { color:var(--warn); font-weight:700; } .fail { color:var(--bad); font-weight:700; }
+  .shots { display:grid; gap:1.2rem; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); align-items:start; }
+  figure { margin:0; } figure img { width:100%; height:auto; border:1px solid var(--line); border-radius:4px; display:block; }
+  figcaption { font-size:.8rem; color:var(--muted); margin-top:.3rem; }
+  ul { padding-left: 1.2rem; }
+</style>
+</head>
+<body>
+<main>
+<p class="label">My Ride Nepal · Session report</p>
+<h1>Session 01: inspection, documentation and foundation</h1>
+<p class="meta">2026-11-18 · Claude Code (Opus 5.5) · Repos: <code>Road-trip-web</code>, <code>Road-trip-admin</code> · Nothing committed (owner rule)</p>
+
+<h2>Objective</h2>
+<p>Follow the master brief and the "Mandatory Application Separation" addendum: inspect, reuse the Travel toolkit where it helps, write the documentation set, and deliver milestone M1, a secure and documented foundation with a working visual direction, with web and admin as separate applications.</p>
+
+<h2>Initial state</h2>
+<ul>
+  <li><code>/var/www/html/Road-trip/</code> held two empty git repos (<code>Road-trip-web</code>, <code>Road-trip-admin</code>, branch <code>main</code>, no commits, remotes on GitHub). No CLAUDE.md, no docs, no Supabase config.</li>
+  <li>No saved "Project Creation &amp; Final Audit Master Standard" file exists. The closest record is Travel's <code>PROJECT_AUDIT_CHECKLIST.md</code>; categories A–M were taken from the brief itself.</li>
+</ul>
+
+<h2>Inspection performed</h2>
+<table>
+<tr><th>Looked at</th><th>Found</th></tr>
+<tr><td><code>~/.claude/settings.json</code>, <code>installed_plugins.json</code></td><td>ui-ux-pro-max, ponytail, agent-skills, impeccable enabled at user scope</td></tr>
+<tr><td>Travel <code>.claude/</code>, <code>web/docs/PROJECT_TOOL_INVENTORY.md</code>, <code>PROJECT_AUDIT_CHECKLIST.md</code></td><td>tool decisions (OmniRoute rejected, Strix pending), audit format, evidence rule</td></tr>
+<tr><td>Travel memories (session rules, design rules, tooling)</td><td>owner rules: no commits/attribution, ask before risky installs, no invented data, CC0 photos only for the exact place</td></tr>
+<tr><td>Machine</td><td>Node 24.18, pnpm 12.16, Docker 29, psql, Pillow; no Supabase CLI; graphify/uv no longer on PATH; Playwright Chromium 1248 cached</td></tr>
+<tr><td>Wikimedia Commons (search API, no personal data sent)</td><td>CC0 "Parked Motorcycle", Kathmandu (hero) and Bandipur Balabazar; a CC0 "Lhakpa La" road photo was rejected because it is in Tibet</td></tr>
+</table>
+<p>Full tool table: <code>docs/TOOLKIT_INSPECTION.md</code>.</p>
+
+<h2>Architecture decisions</h2>
+<ul>
+  <li><strong>Existing repos used as /web and /admin</strong> rather than renaming the owner's folders. Root <code>CLAUDE.md</code> and <code>handoff.md</code> are symlinks into <code>Road-trip-web</code>, which also owns <code>supabase/</code> and <code>docs/</code> (the root is not versioned).</li>
+  <li><strong>No /shared yet:</strong> two separate repos cannot import a root folder without a third repo or package. DB types will be generated per app by the Supabase CLI; tokens are a commented copy. Owner decision recorded.</li>
+  <li><strong>Authorization in the database:</strong> RLS on every table, revoke-then-grant (Supabase grants everything by default), column-level update grants, <code>security definer</code> helpers with empty <code>search_path</code>, triggers for the verification state machine, no-self-review and audit logging.</li>
+  <li><strong>One verification table</strong> covers identity, trip contributor, expert reviewer (per scope) and organizer applications, with pending/approved/rejected/suspended/revoked.</li>
+  <li><strong>Dependencies deferred:</strong> Pinia, GSAP/motion-v, Leaflet, PWA plugin, zod: each waits for the milestone that needs it.</li>
+</ul>
+
+<h2>Changes made</h2>
+<table>
+<tr><th>Area</th><th>Files</th></tr>
+<tr><td>Web app</td><td>scaffold, <code>src/app/router</code>, <code>assets/styles/main.css</code>, <code>features/{home,explore,authentication,profiles}</code>, <code>components/{ui,navigation}</code>, <code>lib/{supabase,motion,format,useAsync}</code>, 2 unit test files</td></tr>
+<tr><td>Admin app</td><td>scaffold, router with staff guard, <code>AdminLayout</code>, sign-in, no-access, overview, <code>staffAccess.ts</code> + test</td></tr>
+<tr><td>Database</td><td>2 migrations, seed, <code>supabase/tests/{auth_stub.sql, rls.test.sql, run.sh}</code></td></tr>
+<tr><td>Photos</td><td>4 places as WebP + <code>LICENSES.md</code></td></tr>
+<tr><td>Docs</td><td>PRODUCT_VISION, PRODUCT_SPECIFICATION, FEATURE_SCOPE, USER_JOURNEYS, EVENT_SYSTEM, USER_ROLES_AND_PERMISSIONS, CONTRIBUTION_TRUST_POLICY, SYSTEM_ARCHITECTURE, DATABASE_DESIGN, DEVELOPMENT_ROADMAP, DESIGN_SYSTEM, REDESIGN_PROGRESS, handoff, TOOLKIT_INSPECTION, PROJECT_AUDIT_CHECKLIST; README + CLAUDE.md in both repos</td></tr>
+</table>
+
+<h2>Screenshots</h2>
+<p class="meta">Production builds served by <code>vite preview</code>, data from a throwaway Postgres + PostgREST harness through the real RLS policies (guest role). Taken after the fixes listed below.</p>
+<div class="shots">
+  <figure><img src="assets/2026-11-18-s01/home-1440.webp" alt="Home page at 1440 pixels wide" loading="lazy"><figcaption>Home, 1440px</figcaption></figure>
+  <figure><img src="assets/2026-11-18-s01/home-390.webp" alt="Home page at 390 pixels wide" loading="lazy"><figcaption>Home, 390px</figcaption></figure>
+  <figure><img src="assets/2026-11-18-s01/explore-1440.webp" alt="Explore page with four destinations" loading="lazy"><figcaption>Explore, 1440px (Mustang has no CC0 photo, so a typographic plate)</figcaption></figure>
+  <figure><img src="assets/2026-11-18-s01/destination-1440.webp" alt="Pokhara destination page" loading="lazy"><figcaption>Destination, 1440px: dev-seed and "never confirmed" notices</figcaption></figure>
+  <figure><img src="assets/2026-11-18-s01/admin-signin-768.webp" alt="Admin staff sign-in" loading="lazy"><figcaption>Admin: signed-out visit to / redirected to staff sign-in</figcaption></figure>
+</div>
+
+<h2>Tests performed</h2>
+<table>
+<tr><th>Check</th><th>Result</th></tr>
+<tr><td>web <code>pnpm type-check</code>, <code>pnpm lint</code>, <code>pnpm build</code></td><td class="pass">pass (0 errors)</td></tr>
+<tr><td>web <code>pnpm test:unit</code></td><td class="pass">5/5 (date formatting, open-redirect guard)</td></tr>
+<tr><td>admin type-check, lint, build</td><td class="pass">pass</td></tr>
+<tr><td>admin <code>pnpm test:unit</code></td><td class="pass">3/3 (access decision)</td></tr>
+<tr><td><code>pnpm test:db</code>: migrations + seed + RLS suite on postgres:17-alpine</td><td class="pass">all assertions pass</td></tr>
+<tr><td>Mutation check: destinations read policy loosened to <code>using (true)</code> in a temp copy</td><td class="pass">suite failed as it should ("guest sees the 4 published seed destinations, not the draft")</td></tr>
+<tr><td>Browser sweep, web: 9 routes × 390/768/1440</td><td class="pass">27/27: 0 horizontal overflow, exactly 1 h1, 0 console errors</td></tr>
+<tr><td>Browser sweep, admin: / and /no-access × 3 widths</td><td class="pass">6/6, signed-out / redirects to sign-in</td></tr>
+<tr><td>Contrast of token pairs (computed, WCAG)</td><td class="pass">muted 6.22, crimson 6.56, white-on-crimson 7.09, marigold-on-night 8.30</td></tr>
+<tr><td>Sign-up, sign-in, reset, profile save, staff overview with data</td><td class="warn">NOT TESTED: no Supabase Auth available (no project, no CLI)</td></tr>
+<tr><td>axe / screen reader / Lighthouse / <code>pnpm audit</code></td><td class="warn">NOT RUN</td></tr>
+</table>
+
+<h2>Problems and failed attempts</h2>
+<ul>
+  <li>RLS test helper order (<code>tests.login</code> before <code>tests.uid</code>) failed at creation; reordered.</li>
+  <li>A test wrongly expected guests to read 0 staff roles; guests correctly get "permission denied". Test fixed, policy unchanged.</li>
+  <li>Vite dev server answered 504 "Outdated Optimize Dep" in headless Chromium; switched to production builds + <code>vite preview</code>.</li>
+  <li>Playwright default headless shell 1247 missing; used cached Chromium 1248 via <code>executablePath</code>.</li>
+  <li>First screenshots showed blank lazy images; the script now waits for every image.</li>
+  <li>Design review of the first screenshots found: headline running into the motorcycle at 1440px, weak hero contrast on phones, the dark freshness band merging into the dark footer. All three fixed and re-checked.</li>
+  <li>Admin overview: a generic typed count helper failed type-check; replaced with plain queries.</li>
+  <li>An <code>rm</code> of an old scratch screenshot folder was blocked by a safety check; nothing was deleted.</li>
+</ul>
+
+<h2>Security considerations</h2>
+<ul>
+  <li>Only the anon key is read from <code>VITE_</code> variables; <code>.env*.local</code> is git-ignored; no secrets in either repo.</li>
+  <li>Tested refusals: guest writes, guest audit/roles reads, rider editing another profile or protected columns, self-promotion to admin, applying for someone else, self-approval, two open claims, moderator deciding organizer claims, admin approving own claim, illegal status jumps. Suspension removes organizer rights immediately.</li>
+  <li>Post-login redirects accept same-site paths only. Password reset answers the same for unknown addresses.</li>
+  <li>Docker images pulled this session: <code>postgres:17-alpine</code>, <code>postgrest/postgrest:v12.2.12</code>. Harness containers and network removed at session end.</li>
+</ul>
+
+<h2>Remaining issues</h2>
+<ul>
+  <li>Live auth flows unverified; hand-written row types until <code>supabase gen types</code>.</li>
+  <li>No CI, no backups, no monitoring, no privacy policy or account deletion yet (see audit checklist).</li>
+  <li>Open owner decisions: folder names, shared-code approach, Supabase CLI approval, approval of the visual direction.</li>
+</ul>
+
+<h2>Next steps</h2>
+<ol>
+  <li>Owner decisions above.</li>
+  <li>M1.5: Supabase CLI local stack, generated types, real auth journeys, pgTAP, GitHub Actions.</li>
+  <li>M2: verification and organizer review workflow in both apps.</li>
+</ol>
+</main>
+</body>
+</html>

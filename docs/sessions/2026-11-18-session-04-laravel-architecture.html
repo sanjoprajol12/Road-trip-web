@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 04: Laravel Architecture | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; --bad:#b42318; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui, sans-serif; }
+  main { max-width: 66rem; margin: 0 auto; padding: 3rem 1rem 5rem; }
+  h1 { font-size: clamp(2rem, 1.4rem + 3vw, 3.1rem); line-height:1.08; margin:0 0 .6rem; }
+  h2 { font-size:1.3rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.6rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  table { width:100%; border-collapse:collapse; font-size:.9rem; margin:.8rem 0; display:block; overflow-x:auto; }
+  th, td { text-align:left; vertical-align:top; padding:.5rem .6rem; border-bottom:1px solid var(--line); }
+  th { font-size:.75rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+  code { font-size:.85em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; }
+  .pass { color:var(--ok); font-weight:700; } .warn { color:var(--warn); font-weight:700; }
+  .shots { display:grid; gap:1.2rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); align-items:start; }
+  figure { margin:0; } figure img { width:100%; height:auto; border:1px solid var(--line); border-radius:4px; display:block; }
+  figcaption { font-size:.8rem; color:var(--muted); margin-top:.3rem; }
+  ul, ol { padding-left: 1.2rem; }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 04: Laravel 12 architecture and all agreed product areas</h1>
+<p class="meta">2026-11-18 · Claude Code (Opus 5.5) · Local only: no remote database touched, nothing committed</p>
+
+<h2>Objective</h2>
+<p>Replace the Supabase-client architecture with a Laravel 12 backend (Fortify, Sanctum, Scribe; axios in the SPAs), keep Supabase as local PostgreSQL only, and implement every previously agreed product area (destinations, routes, rider experiences, road reports, organizer verification, events and rides, preparation and safety, private and group trips, moderation, audit), with tests and documentation. Owner instructions: do not stop between stages; stop only for remote access, destructive operations, credentials, money, irreversible actions or unresolvable architecture conflicts.</p>
+
+<h2>Initial state</h2>
+<p><code>web</code> held the public Vue SPA using Supabase directly; <code>admin</code> the staff Vue SPA using Supabase; database rules in Supabase RLS. Both repos had been pushed by the owner. <code>admin/.env</code> held a remote database password and was not ignored; the owner had already added the ignore rule when it was checked (verified: never committed, never staged).</p>
+
+<h2>Architecture decisions</h2>
+<ul>
+  <li><strong>Laravel 12 (12.73)</strong> in <code>web</code>, as instructed (not 13). Fortify 1.43 with its routes registered manually under <code>/api/v1/auth</code>; custom sign-up and email-link sign-in to keep the existing flow (no session until confirmed). Sanctum 4.5 SPA cookie sessions. Scribe 5.11 docs (no response calls).</li>
+  <li><strong>Frontend placement:</strong> the first brief put all Vue code in <code>admin</code>. Mid-session a peer Claude session ("road-trip-87") reported an owner decision to the contrary. It contradicted an explicit instruction, so the owner was asked directly and chose: public site in <code>web</code> (own Vite build, no Inertia), <code>admin</code> staff-only. The merged structure was reversed from a snapshot.</li>
+  <li><strong>Database:</strong> new databases <code>myridenepal</code> / <code>myridenepal_test</code> beside the untouched Supabase <code>postgres</code> database; roles <code>mrn_owner</code> (migrations) and <code>mrn_app</code> (requests: DML only, no RLS bypass, cannot change audit rows). Laravel migrations are the single authority; Supabase SQL archived.</li>
+  <li><strong>No RLS</strong> (owner decision): policies and actions in Laravel; integrity in constraints (checks, FKs, partial unique index for open claims, restrict-delete for reported segments).</li>
+  <li><strong>Serving:</strong> Laravel serves the built SPA and the API on one origin; Vite dev servers proxy <code>/api</code>; the admin build is to be served behind a proxy to the same API.</li>
+  <li><strong>Supabase services:</strong> auth, API gateway (Kong), PostgREST disabled; only Postgres and Mailpit run (~65 MB RAM).</li>
+  <li><strong>Not added:</strong> Pinia, Redis, GSAP, Spatie permissions (not needed yet; documented as future options).</li>
+</ul>
+
+<h2>Built</h2>
+<table>
+<tr><th>Area</th><th>Backend</th><th>Web SPA</th><th>Admin SPA</th></tr>
+<tr><td>Auth</td><td>sign-up, email link, login, logout, forgot/reset, change password, confirm password, sessions list/revoke, idle + absolute expiry, rate limits</td><td>sign in/up, forgot/reset, account security</td><td>staff sign-in, no-access</td></tr>
+<tr><td>Verification</td><td>apply, decide (state machine, reasons, no self-review), notifications, audit</td><td>apply, claim list with reasons</td><td>queue, claim detail with history</td></tr>
+<tr><td>Explore / Routes</td><td>destinations, routes, segments, service points, staff CRUD, freshness dates</td><td>explore, destination, routes list, route with Leaflet map and per-stretch reports</td><td>destinations, routes, segment editor, service points</td></tr>
+<tr><td>Experiences / road reports</td><td>8 contribution kinds, progressive fields, photos (validated, re-encoded), reports and auto-flagging, moderation</td><td>library with search and filters, detail, contribute form, rider profiles</td><td>moderation queue</td></tr>
+<tr><td>Events and rides</td><td>organizer-only hosting, public/private, instant/approval joining, invitations, capacity lock, waitlist promotion, updates, postponement/cancellation notices, attendance, staff cancellation</td><td>list, detail, host form, organizer workspace</td><td>events oversight</td></tr>
+<tr><td>Preparation and safety</td><td>guides with sources; safety categories need a matching expert review; edits clear it; emergency contacts</td><td>guides, guide detail with expert review action, emergency contacts</td><td>guides editor and publish</td></tr>
+<tr><td>My Rides</td><td>personal and group trips: members (owner/editor/viewer), stops, expenses, checklist</td><td>trip list and workspace</td><td>no access (private)</td></tr>
+<tr><td>Staff</td><td>roles (admin + password confirmation, last admin kept), suspension, audit log, overview</td><td></td><td>people, audit log, overview</td></tr>
+</table>
+
+<h2>Screenshots</h2>
+<p class="meta">Production builds against the local Laravel API and Postgres. Admin screens use throwaway <code>@e2e.test</code> accounts, deleted afterwards.</p>
+<div class="shots">
+  <figure><img src="assets/2026-11-18-s04/home-1440.webp" alt="Home page" loading="lazy"><figcaption>Home, 1440px</figcaption></figure>
+  <figure><img src="assets/2026-11-18-s04/routes-1440.webp" alt="Routes page" loading="lazy"><figcaption>Routes (empty state: no routes published yet)</figcaption></figure>
+  <figure><img src="assets/2026-11-18-s04/experiences-1440.webp" alt="Experiences library" loading="lazy"><figcaption>Rider experiences</figcaption></figure>
+  <figure><img src="assets/2026-11-18-s04/events-1440.webp" alt="Events page" loading="lazy"><figcaption>Events and rides</figcaption></figure>
+  <figure><img src="assets/2026-11-18-s04/preparation-390.webp" alt="Preparation page on a phone" loading="lazy"><figcaption>Preparation, 390px, with the phone menu</figcaption></figure>
+  <figure><img src="assets/2026-11-18-s04/admin-overview-1440.webp" alt="Admin overview" loading="lazy"><figcaption>Admin overview</figcaption></figure>
+  <figure><img src="assets/2026-11-18-s04/admin-route-editor-1440.webp" alt="Admin route editor" loading="lazy"><figcaption>Admin route and segment editor</figcaption></figure>
+  <figure><img src="assets/2026-11-18-s04/admin-people-1440.webp" alt="Admin people page" loading="lazy"><figcaption>Admin people</figcaption></figure>
+</div>
+
+<h2>Tests (final run)</h2>
+<table>
+<tr><th>Check</th><th>Result</th></tr>
+<tr><td>Laravel feature tests on PostgreSQL (<code>php artisan test</code>)</td><td class="pass">55 passed, 381 assertions</td></tr>
+<tr><td><code>composer audit</code></td><td class="pass">no advisories</td></tr>
+<tr><td>Web SPA: vue-tsc, oxlint, eslint, Vitest, build</td><td class="pass">pass, 6/6 unit tests</td></tr>
+<tr><td>Admin SPA: vue-tsc, oxlint, eslint, Vitest, build</td><td class="pass">pass, 12/12 unit tests</td></tr>
+<tr><td><code>pnpm audit --prod</code> (both)</td><td class="pass">clean except 1 documented build-time advisory with no upstream fix (not in bundles)</td></tr>
+<tr><td>Web E2E (auth, verification, road report, events with waitlist, group trip) in Chromium, Firefox, Pixel 7</td><td class="pass">27 passed (9 tests × 3 projects)</td></tr>
+<tr><td>Admin E2E (access, verification decisions, roles with password confirmation, audit, moderation) in Chromium, Firefox</td><td class="pass">16 passed (8 tests × 2 projects), twice in a row. A first full run had 1 Firefox failure, traced to the auth rate limiter sharing one bucket for all password confirmations from one IP; now keyed per account</td></tr>
+<tr><td>Browser sweep: 13 public pages × 390/768/1440, 10 admin pages × 390/1440</td><td class="pass">0 overflow, 1 h1 each, no console errors except one real 404</td></tr>
+<tr><td>Supabase bcrypt compatibility with a real GoTrue hash (disposable local accounts, deleted)</td><td class="pass">verifies; re-hashed to Argon2id on first login</td></tr>
+<tr><td>App DB role cannot change schema or audit rows</td><td class="pass">tested</td></tr>
+<tr><td>WebKit, screen reader, axe, Lighthouse, CI on GitHub</td><td class="warn">not run (system libraries need sudo; manual/owner steps)</td></tr>
+</table>
+
+<h2>Problems and failed attempts</h2>
+<ul>
+  <li><code>web/.env.local</code> (old Vite file) replaced <code>.env</code> under <code>APP_ENV=local</code>: Laravel fell back to SQLite. Moved into the SPA folder.</li>
+  <li>Reset-link endpoint leaked account existence ("We can't find a user…"): Fortify resolves its response with arguments, so the override needed a class binding. Fixed and tested.</li>
+  <li>Email confirmation link failed when opened from a mail client (no SPA headers, no session): given the <code>web</code> middleware; regression test added.</li>
+  <li>Deleting a route segment with road reports violated a database check (500): now refused with a clear message; FK changed to restrict.</li>
+  <li>Production build: CSP blocked the SPA page and Vite prefixed public images with <code>/app/</code>; both fixed and verified in a browser.</li>
+  <li>Smaller: <code>whereILike</code> does not exist; base controller lacked <code>AuthorizesRequests</code>; a route name prefix; test-harness guard switching; a <code>&lt;script setup&gt;</code> export; pnpm 12 audit config location; Kong still starting.</li>
+</ul>
+
+<h2>Security considerations</h2>
+<ul>
+  <li>Remote Supabase project never contacted. Database passwords live only in git-ignored <code>web/.env</code>; the owner's existing remote lines there were kept untouched.</li>
+  <li>Cookie sessions only (no tokens in localStorage), CSRF on every state change, exact-origin CORS, security headers, Argon2id, generic auth answers, rate limits, policy checks on every endpoint, parent-scoped lookups against IDOR, upload content validation and EXIF stripping, append-only audit, least-privilege DB role.</li>
+  <li>Open: CAPTCHA, staff MFA, account deletion/export, external security review, production HTTPS settings.</li>
+</ul>
+
+<h2>Remaining</h2>
+<ul>
+  <li>Offline Ride Pack (PWA) not built (not in this session's scope list; recommended for approval).</li>
+  <li>No real content (destinations beyond 4 dev seeds, routes, guides) by design: it must come from qualified people.</li>
+  <li>Verification track and deployment items in <code>docs/architecture/DEPLOYMENT_READINESS.md</code>.</li>
+</ul>
+</main>
+</body>
+</html>
