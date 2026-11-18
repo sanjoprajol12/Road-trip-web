@@ -1,0 +1,1821 @@
+openapi: 3.0.3
+info:
+  title: 'My Ride Nepal API Documentation'
+  description: 'REST API of My Ride Nepal (/api/v1). The web SPA and the admin SPA authenticate with Laravel Sanctum cookie sessions: GET /sanctum/csrf-cookie, then send the X-XSRF-TOKEN header on every state-changing request. Errors are JSON: {message, errors?}. Validation errors use HTTP 422; unauthenticated 401; forbidden 403; password confirmation required 423; rate limited 429.'
+  version: 1.0.0
+servers:
+  -
+    url: 'http://127.0.0.1:5180'
+tags:
+  -
+    name: Endpoints
+    description: ''
+paths:
+  /api/v1/health:
+    get:
+      summary: ''
+      operationId: getApiV1Health
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+  /api/v1/auth/register:
+    post:
+      summary: ''
+      operationId: postApiV1AuthRegister
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                display_name:
+                  type: string
+                  description: 'Must be at least 2 characters. Must not be greater than 60 characters.'
+                  example: b
+                email:
+                  type: string
+                  description: 'Must be a valid email address. Must not be greater than 255 characters.'
+                  example: zbailey@example.net
+                password:
+                  type: string
+                  description: ''
+                  example: '|]|{+-'
+              required:
+                - display_name
+                - email
+                - password
+      security: []
+  '/api/v1/auth/verify-email/{id}/{hash}':
+    get:
+      summary: ''
+      operationId: getApiV1AuthVerifyEmailIdHash
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    parameters:
+      -
+        in: path
+        name: id
+        description: 'The ID of the verify email.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+      -
+        in: path
+        name: hash
+        description: ''
+        example: architecto
+        required: true
+        schema:
+          type: string
+  /api/v1/auth/email/resend:
+    post:
+      summary: ''
+      operationId: postApiV1AuthEmailResend
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  description: 'Must be a valid email address.'
+                  example: gbailey@example.net
+              required:
+                - email
+      security: []
+  /api/v1/auth/login:
+    post:
+      summary: 'Attempt to authenticate a new session.'
+      operationId: attemptToAuthenticateANewSession
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  description: ''
+                  example: gbailey@example.net
+                password:
+                  type: string
+                  description: ''
+                  example: '|]|{+-'
+                remember:
+                  type: string
+                  description: ''
+                  example: null
+              required:
+                - email
+                - password
+      security: []
+  /api/v1/auth/logout:
+    post:
+      summary: 'Destroy an authenticated session.'
+      operationId: destroyAnAuthenticatedSession
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+  /api/v1/auth/forgot-password:
+    post:
+      summary: 'Send a reset link to the given user.'
+      operationId: sendAResetLinkToTheGivenUser
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  description: 'Must be a valid email address.'
+                  example: gbailey@example.net
+              required:
+                - email
+      security: []
+  /api/v1/auth/reset-password:
+    post:
+      summary: "Reset the user's password."
+      operationId: resetTheUsersPassword
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                  description: ''
+                  example: architecto
+                password:
+                  type: string
+                  description: ''
+                  example: architecto
+              required:
+                - token
+                - password
+      security: []
+  /api/v1/auth/password:
+    put:
+      summary: "Update the user's password."
+      operationId: updateTheUsersPassword
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+  /api/v1/auth/confirm-password:
+    post:
+      summary: "Confirm the user's password."
+      operationId: confirmTheUsersPassword
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+                  description: ''
+                  example: '|]|{+-'
+                  nullable: true
+      security: []
+  /api/v1/auth/confirmed-password-status:
+    get:
+      summary: 'Get the password confirmation status.'
+      operationId: getThePasswordConfirmationStatus
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+  /api/v1/destinations:
+    get:
+      summary: ''
+      operationId: getApiV1Destinations
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+  '/api/v1/destinations/{slug}':
+    get:
+      summary: ''
+      operationId: getApiV1DestinationsSlug
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    parameters:
+      -
+        in: path
+        name: slug
+        description: 'The slug of the destination.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  /api/v1/routes:
+    get:
+      summary: ''
+      operationId: getApiV1Routes
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+  '/api/v1/routes/{slug}':
+    get:
+      summary: ''
+      operationId: getApiV1RoutesSlug
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    parameters:
+      -
+        in: path
+        name: slug
+        description: 'The slug of the route.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  /api/v1/contributions:
+    get:
+      summary: ''
+      operationId: getApiV1Contributions
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                kind:
+                  type: string
+                  description: ''
+                  example: trip
+                  enum:
+                    - trip
+                    - road_report
+                    - accommodation
+                    - fuel
+                    - mechanic
+                    - recommendation
+                    - unexpected
+                    - observation
+                  nullable: true
+                per_page:
+                  type: integer
+                  description: 'Must be between 1 and 50.'
+                  example: 2
+                  nullable: true
+      security: []
+    post:
+      summary: ''
+      operationId: postApiV1Contributions
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+  '/api/v1/contributions/{contribution_id}':
+    get:
+      summary: ''
+      operationId: getApiV1ContributionsContribution_id
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    patch:
+      summary: ''
+      operationId: patchApiV1ContributionsContribution_id
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    parameters:
+      -
+        in: path
+        name: contribution_id
+        description: 'The ID of the contribution.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  '/api/v1/media/{media_id}':
+    get:
+      summary: 'Photos are served only when their contribution may be seen by this person.'
+      operationId: photosAreServedOnlyWhenTheirContributionMayBeSeenByThisPerson
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    parameters:
+      -
+        in: path
+        name: media_id
+        description: 'The ID of the media.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  /api/v1/events:
+    get:
+      summary: ''
+      operationId: getApiV1Events
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    post:
+      summary: ''
+      operationId: postApiV1Events
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+  '/api/v1/events/{event_id}':
+    get:
+      summary: ''
+      operationId: getApiV1EventsEvent_id
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    patch:
+      summary: ''
+      operationId: patchApiV1EventsEvent_id
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    parameters:
+      -
+        in: path
+        name: event_id
+        description: 'The ID of the event.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  /api/v1/guides:
+    get:
+      summary: ''
+      operationId: getApiV1Guides
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+  '/api/v1/guides/{slug}':
+    get:
+      summary: ''
+      operationId: getApiV1GuidesSlug
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    parameters:
+      -
+        in: path
+        name: slug
+        description: 'The slug of the guide.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  '/api/v1/riders/{username}':
+    get:
+      summary: ''
+      operationId: getApiV1RidersUsername
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    parameters:
+      -
+        in: path
+        name: username
+        description: ''
+        example: architecto
+        required: true
+        schema:
+          type: string
+  /api/v1/users/me:
+    get:
+      summary: ''
+      operationId: getApiV1UsersMe
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    patch:
+      summary: 'Riders edit only these four fields; email, roles and verification are not writable here.'
+      operationId: ridersEditOnlyTheseFourFieldsEmailRolesAndVerificationAreNotWritableHere
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                display_name:
+                  type: string
+                  description: 'Must be at least 2 characters. Must not be greater than 60 characters.'
+                  example: b
+                username:
+                  type: string
+                  description: 'Must match the regex /^[a-z0-9_]{3,30}$/.'
+                  example: 0cljska6z34deltvi
+                  nullable: true
+                bio:
+                  type: string
+                  description: 'Must not be greater than 500 characters.'
+                  example: m
+                  nullable: true
+                home_city:
+                  type: string
+                  description: 'Must not be greater than 80 characters.'
+                  example: 'y'
+                  nullable: true
+              required:
+                - display_name
+      security: []
+  /api/v1/users/me/sessions:
+    get:
+      summary: ''
+      operationId: getApiV1UsersMeSessions
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+  /api/v1/users/me/sessions/others:
+    delete:
+      summary: ''
+      operationId: deleteApiV1UsersMeSessionsOthers
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+  /api/v1/users/me/verifications:
+    get:
+      summary: ''
+      operationId: getApiV1UsersMeVerifications
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    post:
+      summary: ''
+      operationId: postApiV1UsersMeVerifications
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                kind:
+                  type: string
+                  description: ''
+                  example: architecto
+                scope:
+                  type: string
+                  description: 'This field is required when <code>kind</code> is <code>expert_reviewer</code>.'
+                  example: medical
+                  enum:
+                    - mechanical
+                    - medical
+                    - road_safety
+                  nullable: true
+                statement:
+                  type: string
+                  description: 'Must be at least 20 characters. Must not be greater than 2000 characters.'
+                  example: 'n'
+              required:
+                - kind
+                - statement
+      security: []
+  /api/v1/users/me/contributions:
+    get:
+      summary: ''
+      operationId: getApiV1UsersMeContributions
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+  /api/v1/users/me/events:
+    get:
+      summary: 'Events I organize, and events I am registered for or invited to.'
+      operationId: eventsIOrganizeAndEventsIAmRegisteredForOrInvitedTo
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+  /api/v1/users/me/notifications:
+    get:
+      summary: ''
+      operationId: getApiV1UsersMeNotifications
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+  /api/v1/users/me/notifications/read:
+    post:
+      summary: ''
+      operationId: postApiV1UsersMeNotificationsRead
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+  /api/v1/users/me/emergency-contacts:
+    get:
+      summary: ''
+      operationId: getApiV1UsersMeEmergencyContacts
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    post:
+      summary: ''
+      operationId: postApiV1UsersMeEmergencyContacts
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+  '/api/v1/users/me/emergency-contacts/{contact}':
+    put:
+      summary: ''
+      operationId: putApiV1UsersMeEmergencyContactsContact
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    delete:
+      summary: ''
+      operationId: deleteApiV1UsersMeEmergencyContactsContact
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    parameters:
+      -
+        in: path
+        name: contact
+        description: ''
+        example: architecto
+        required: true
+        schema:
+          type: string
+  '/api/v1/contributions/{contribution_id}/media':
+    post:
+      summary: ''
+      operationId: postApiV1ContributionsContribution_idMedia
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                photo:
+                  type: string
+                  format: binary
+                  description: 'Must be a file.'
+                alt:
+                  type: string
+                  description: 'Must be at least 5 characters. Must not be greater than 200 characters.'
+                  example: b
+              required:
+                - photo
+                - alt
+      security: []
+    parameters:
+      -
+        in: path
+        name: contribution_id
+        description: 'The ID of the contribution.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  '/api/v1/contributions/{contribution_id}/reports':
+    post:
+      summary: ''
+      operationId: postApiV1ContributionsContribution_idReports
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: 'Must be at least 10 characters. Must not be greater than 1000 characters.'
+                  example: b
+              required:
+                - reason
+      security: []
+    parameters:
+      -
+        in: path
+        name: contribution_id
+        description: 'The ID of the contribution.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  '/api/v1/events/{event_id}/status':
+    post:
+      summary: ''
+      operationId: postApiV1EventsEvent_idStatus
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  description: ''
+                  example: architecto
+                message:
+                  type: string
+                  description: 'This field is required when <code>status</code> is <code>postponed</code> or <code>cancelled</code>. Must be at least 10 characters. Must not be greater than 2000 characters.'
+                  example: 'n'
+                  nullable: true
+                summary:
+                  type: string
+                  description: 'Must not be greater than 5000 characters.'
+                  example: g
+                  nullable: true
+              required:
+                - status
+      security: []
+    parameters:
+      -
+        in: path
+        name: event_id
+        description: 'The ID of the event.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  '/api/v1/events/{event_id}/join':
+    post:
+      summary: ''
+      operationId: postApiV1EventsEvent_idJoin
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    parameters:
+      -
+        in: path
+        name: event_id
+        description: 'The ID of the event.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  '/api/v1/events/{event_id}/leave':
+    post:
+      summary: ''
+      operationId: postApiV1EventsEvent_idLeave
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    parameters:
+      -
+        in: path
+        name: event_id
+        description: 'The ID of the event.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  '/api/v1/events/{event_id}/registrations':
+    get:
+      summary: 'The participant list: organizer only (private details never leave this endpoint).'
+      operationId: theParticipantListOrganizerOnlyprivateDetailsNeverLeaveThisEndpoint
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    parameters:
+      -
+        in: path
+        name: event_id
+        description: 'The ID of the event.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  '/api/v1/events/{event_id}/registrations/{registration_id}':
+    post:
+      summary: ''
+      operationId: postApiV1EventsEvent_idRegistrationsRegistration_id
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  description: ''
+                  example: architecto
+              required:
+                - status
+      security: []
+    parameters:
+      -
+        in: path
+        name: event_id
+        description: 'The ID of the event.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+      -
+        in: path
+        name: registration_id
+        description: 'The ID of the registration.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  '/api/v1/events/{event_id}/invitations':
+    post:
+      summary: ''
+      operationId: postApiV1EventsEvent_idInvitations
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  description: 'Must match an existing stored value.'
+                  example: architecto
+              required:
+                - username
+      security: []
+    parameters:
+      -
+        in: path
+        name: event_id
+        description: 'The ID of the event.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  '/api/v1/events/{event_id}/updates':
+    post:
+      summary: ''
+      operationId: postApiV1EventsEvent_idUpdates
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                body:
+                  type: string
+                  description: 'Must be at least 5 characters. Must not be greater than 2000 characters.'
+                  example: b
+              required:
+                - body
+      security: []
+    parameters:
+      -
+        in: path
+        name: event_id
+        description: 'The ID of the event.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  /api/v1/trips:
+    get:
+      summary: ''
+      operationId: getApiV1Trips
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    post:
+      summary: ''
+      operationId: postApiV1Trips
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+  '/api/v1/trips/{trip_id}':
+    get:
+      summary: ''
+      operationId: getApiV1TripsTrip_id
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    patch:
+      summary: ''
+      operationId: patchApiV1TripsTrip_id
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    delete:
+      summary: ''
+      operationId: deleteApiV1TripsTrip_id
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    parameters:
+      -
+        in: path
+        name: trip_id
+        description: 'The ID of the trip.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  '/api/v1/trips/{trip_id}/members':
+    post:
+      summary: ''
+      operationId: postApiV1TripsTrip_idMembers
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  description: 'Must match an existing stored value.'
+                  example: architecto
+                role:
+                  type: string
+                  description: ''
+                  example: architecto
+              required:
+                - username
+                - role
+      security: []
+    parameters:
+      -
+        in: path
+        name: trip_id
+        description: 'The ID of the trip.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  '/api/v1/trips/{trip_id}/members/{user_id}':
+    patch:
+      summary: ''
+      operationId: patchApiV1TripsTrip_idMembersUser_id
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role:
+                  type: string
+                  description: ''
+                  example: architecto
+              required:
+                - role
+      security: []
+    delete:
+      summary: 'Owners remove members; any member can leave. The owner cannot leave their own trip.'
+      operationId: ownersRemoveMembersAnyMemberCanLeaveTheOwnerCannotLeaveTheirOwnTrip
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    parameters:
+      -
+        in: path
+        name: trip_id
+        description: 'The ID of the trip.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+      -
+        in: path
+        name: user_id
+        description: 'The ID of the user.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  '/api/v1/trips/{trip_id}/{part}':
+    post:
+      summary: ''
+      operationId: postApiV1TripsTrip_idPart
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    parameters:
+      -
+        in: path
+        name: trip_id
+        description: 'The ID of the trip.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+      -
+        in: path
+        name: part
+        description: ''
+        example: stops|expenses|checklist
+        required: true
+        schema:
+          type: string
+  '/api/v1/trips/{trip_id}/{part}/{id}':
+    patch:
+      summary: ''
+      operationId: patchApiV1TripsTrip_idPartId
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    delete:
+      summary: ''
+      operationId: deleteApiV1TripsTrip_idPartId
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    parameters:
+      -
+        in: path
+        name: trip_id
+        description: 'The ID of the trip.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+      -
+        in: path
+        name: part
+        description: ''
+        example: stops|expenses|checklist
+        required: true
+        schema:
+          type: string
+      -
+        in: path
+        name: id
+        description: 'The ID of the {part}.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  '/api/v1/guides/{guide_id}/expert-review':
+    post:
+      summary: "A verified expert in the guide's field confirms the content; staff can then publish it."
+      operationId: aVerifiedExpertInTheGuidesFieldConfirmsTheContentStaffCanThenPublishIt
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    parameters:
+      -
+        in: path
+        name: guide_id
+        description: 'The ID of the guide.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  /api/v1/admin/overview:
+    get:
+      summary: ''
+      operationId: getApiV1AdminOverview
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+  /api/v1/admin/verifications:
+    get:
+      summary: ''
+      operationId: getApiV1AdminVerifications
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  description: ''
+                  example: null
+                  nullable: true
+                kind:
+                  type: string
+                  description: ''
+                  example: null
+                  nullable: true
+      security: []
+  '/api/v1/admin/verifications/{claim_id}':
+    get:
+      summary: ''
+      operationId: getApiV1AdminVerificationsClaim_id
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    parameters:
+      -
+        in: path
+        name: claim_id
+        description: 'The ID of the claim.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  '/api/v1/admin/verifications/{claim_id}/decision':
+    post:
+      summary: ''
+      operationId: postApiV1AdminVerificationsClaim_idDecision
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  description: ''
+                  example: pending
+                  enum:
+                    - pending
+                    - approved
+                    - rejected
+                    - suspended
+                    - revoked
+                review_note:
+                  type: string
+                  description: 'Must not be greater than 2000 characters.'
+                  example: b
+                  nullable: true
+              required:
+                - status
+      security: []
+    parameters:
+      -
+        in: path
+        name: claim_id
+        description: 'The ID of the claim.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  /api/v1/admin/contributions:
+    get:
+      summary: ''
+      operationId: getApiV1AdminContributions
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+  '/api/v1/admin/contributions/{contribution_id}/decision':
+    post:
+      summary: ''
+      operationId: postApiV1AdminContributionsContribution_idDecision
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  description: ''
+                  example: architecto
+                moderation_note:
+                  type: string
+                  description: 'Must not be greater than 2000 characters.'
+                  example: 'n'
+                  nullable: true
+                source_url:
+                  type: string
+                  description: 'Must be a valid URL. Must not be greater than 500 characters.'
+                  example: 'http://crooks.biz/et-fugiat-sunt-nihil-accusantium'
+                  nullable: true
+              required:
+                - status
+      security: []
+    parameters:
+      -
+        in: path
+        name: contribution_id
+        description: 'The ID of the contribution.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  /api/v1/admin/events:
+    get:
+      summary: ''
+      operationId: getApiV1AdminEvents
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+  '/api/v1/admin/events/{event_id}/cancel':
+    post:
+      summary: ''
+      operationId: postApiV1AdminEventsEvent_idCancel
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: 'Must be at least 10 characters. Must not be greater than 2000 characters.'
+                  example: b
+              required:
+                - reason
+      security: []
+    parameters:
+      -
+        in: path
+        name: event_id
+        description: 'The ID of the event.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  /api/v1/admin/destinations:
+    get:
+      summary: ''
+      operationId: getApiV1AdminDestinations
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    post:
+      summary: ''
+      operationId: postApiV1AdminDestinations
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+  '/api/v1/admin/destinations/{id}':
+    put:
+      summary: ''
+      operationId: putApiV1AdminDestinationsId
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    delete:
+      summary: 'Soft delete only: contributions and trips keep their reference.'
+      operationId: softDeleteOnlyContributionsAndTripsKeepTheirReference
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    parameters:
+      -
+        in: path
+        name: id
+        description: 'The ID of the destination.'
+        example: 01a1edd8-2689-7028-8bcc-4ff0bae329ac
+        required: true
+        schema:
+          type: string
+  /api/v1/admin/routes:
+    get:
+      summary: ''
+      operationId: getApiV1AdminRoutes
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    post:
+      summary: ''
+      operationId: postApiV1AdminRoutes
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+  '/api/v1/admin/routes/{id}':
+    put:
+      summary: ''
+      operationId: putApiV1AdminRoutesId
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    delete:
+      summary: ''
+      operationId: deleteApiV1AdminRoutesId
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    parameters:
+      -
+        in: path
+        name: id
+        description: 'The ID of the route.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  '/api/v1/admin/routes/{route}':
+    get:
+      summary: ''
+      operationId: getApiV1AdminRoutesRoute
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    parameters:
+      -
+        in: path
+        name: route
+        description: 'The route.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  '/api/v1/admin/routes/{route}/segments':
+    put:
+      summary: "Replaces the ordered segment list. Existing segments (sent with their id) keep their id, so\nroad reports filed against them stay attached; segments left out are removed."
+      operationId: replacesTheOrderedSegmentListExistingSegmentssentWithTheirIdKeepTheirIdSoRoadReportsFiledAgainstThemStayAttachedSegmentsLeftOutAreRemoved
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                segments:
+                  type: array
+                  description: 'Must not have more than 60 items.'
+                  example: null
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        description: 'Must be a valid UUID.'
+                        example: 6ff8f7f6-1eb3-3525-be4a-3932c805afed
+                        nullable: true
+                      start_name:
+                        type: string
+                        description: 'Must not be greater than 80 characters.'
+                        example: g
+                      end_name:
+                        type: string
+                        description: 'Must not be greater than 80 characters.'
+                        example: z
+                      start_lat:
+                        type: number
+                        description: 'Must be between 26 and 31.'
+                        example: 26
+                        nullable: true
+                      start_lng:
+                        type: number
+                        description: 'Must be between 80 and 89.'
+                        example: 80
+                        nullable: true
+                      end_lat:
+                        type: number
+                        description: 'Must be between 26 and 31.'
+                        example: 26
+                        nullable: true
+                      end_lng:
+                        type: number
+                        description: 'Must be between 80 and 89.'
+                        example: 81
+                        nullable: true
+                      distance_km:
+                        type: number
+                        description: 'Must be between 0.1 and 1000.'
+                        example: 1
+                        nullable: true
+                      surface:
+                        type: string
+                        description: ''
+                        example: architecto
+                      notes:
+                        type: string
+                        description: 'Must not be greater than 2000 characters.'
+                        example: 'n'
+                        nullable: true
+                    required:
+                      - start_name
+                      - end_name
+                      - surface
+      security: []
+    parameters:
+      -
+        in: path
+        name: route
+        description: 'The route.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  /api/v1/admin/service-points:
+    get:
+      summary: ''
+      operationId: getApiV1AdminServicePoints
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    post:
+      summary: ''
+      operationId: postApiV1AdminServicePoints
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+  '/api/v1/admin/service-points/{point}':
+    put:
+      summary: ''
+      operationId: putApiV1AdminServicePointsPoint
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    delete:
+      summary: ''
+      operationId: deleteApiV1AdminServicePointsPoint
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    parameters:
+      -
+        in: path
+        name: point
+        description: ''
+        example: architecto
+        required: true
+        schema:
+          type: string
+  /api/v1/admin/guides:
+    get:
+      summary: ''
+      operationId: getApiV1AdminGuides
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    post:
+      summary: ''
+      operationId: postApiV1AdminGuides
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+  '/api/v1/admin/guides/{id}':
+    put:
+      summary: 'Any change to the text clears an earlier expert review: the expert approved the old words.'
+      operationId: anyChangeToTheTextClearsAnEarlierExpertReviewTheExpertApprovedTheOldWords
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    delete:
+      summary: ''
+      operationId: deleteApiV1AdminGuidesId
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    parameters:
+      -
+        in: path
+        name: id
+        description: 'The ID of the guide.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  '/api/v1/admin/guides/{guide_id}/publish':
+    post:
+      summary: ''
+      operationId: postApiV1AdminGuidesGuide_idPublish
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    parameters:
+      -
+        in: path
+        name: guide_id
+        description: 'The ID of the guide.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  /api/v1/admin/users:
+    get:
+      summary: 'Staff find riders by name or username; only administrators see email addresses and can search by them.'
+      operationId: staffFindRidersByNameOrUsernameOnlyAdministratorsSeeEmailAddressesAndCanSearchByThem
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+  '/api/v1/admin/users/{user_id}/suspension':
+    post:
+      summary: ''
+      operationId: postApiV1AdminUsersUser_idSuspension
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                until:
+                  type: string
+                  description: 'Must be a valid date. Must be a date after <code>now</code>. Must be a date before <code>+5 years</code>.'
+                  example: '2022-12-12'
+                reason:
+                  type: string
+                  description: 'Must be at least 10 characters. Must not be greater than 500 characters.'
+                  example: 'n'
+              required:
+                - until
+                - reason
+      security: []
+    delete:
+      summary: ''
+      operationId: deleteApiV1AdminUsersUser_idSuspension
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    parameters:
+      -
+        in: path
+        name: user_id
+        description: 'The ID of the user.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  '/api/v1/admin/users/{user_id}/roles':
+    post:
+      summary: ''
+      operationId: postApiV1AdminUsersUser_idRoles
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role:
+                  type: string
+                  description: ''
+                  example: admin
+                  enum:
+                    - moderator
+                    - admin
+              required:
+                - role
+      security: []
+    parameters:
+      -
+        in: path
+        name: user_id
+        description: 'The ID of the user.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  '/api/v1/admin/users/{user_id}/roles/{role}':
+    delete:
+      summary: ''
+      operationId: deleteApiV1AdminUsersUser_idRolesRole
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []
+    parameters:
+      -
+        in: path
+        name: user_id
+        description: 'The ID of the user.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+      -
+        in: path
+        name: role
+        description: 'The role.'
+        example: architecto
+        required: true
+        schema:
+          type: string
+  /api/v1/admin/audit-logs:
+    get:
+      summary: ''
+      operationId: getApiV1AdminAuditLogs
+      description: ''
+      parameters: []
+      responses: {  }
+      tags:
+        - Endpoints
+      security: []

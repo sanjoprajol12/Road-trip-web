@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 03: No Shared Package | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui, sans-serif; }
+  main { max-width: 56rem; margin: 0 auto; padding: 3rem 1rem 5rem; }
+  h1 { font-size: clamp(1.8rem, 1.3rem + 2.4vw, 2.8rem); line-height:1.1; margin:0 0 .5rem; }
+  h2 { font-size:1.25rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.5rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  table { width:100%; border-collapse:collapse; font-size:.9rem; margin:.8rem 0; display:block; overflow-x:auto; }
+  th, td { text-align:left; vertical-align:top; padding:.5rem .6rem; border-bottom:1px solid var(--line); }
+  th { font-size:.75rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+  code { font-size:.85em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; }
+  .pass { color:var(--ok); font-weight:700; } .warn { color:var(--warn); font-weight:700; }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 03: remove the shared package</h1>
+<p class="meta">2026-11-18 · Claude Code (Opus 5.5) · Nothing committed · No remote database touched</p>
+
+<h2>Objective</h2>
+<p>Owner instruction: do not use shared packages. <code>web</code> and <code>admin</code> are different git repositories, so anything both need is created in each app, and tools each needs are installed in each app.</p>
+
+<h2>Initial state</h2>
+<p><code>@mrn/shared</code> (from session 2) was linked into both apps with <code>link:../shared</code>; CI checked out a <code>Road-trip-shared</code> repo that does not exist.</p>
+
+<h2>Changes</h2>
+<table>
+<tr><th>Item</th><th>web</th><th>admin</th></tr>
+<tr><td>Database types</td><td><code>src/types/database.types.ts</code>, <code>pnpm db:types</code> via its Supabase CLI and config</td><td><code>src/types/database.types.ts</code>, <code>pnpm db:types</code> via its <strong>own</strong> Supabase CLI 3.2.0 (new dev dependency), from the local DB URL</td></tr>
+<tr><td>Dates</td><td><code>src/lib/format.ts</code>: formatDay, ageInWords</td><td><code>src/lib/format.ts</code>: formatDay, formatDayTime</td></tr>
+<tr><td>Redirect guard</td><td><code>src/lib/safeNext.ts</code></td><td><code>src/lib/safeNext.ts</code></td></tr>
+<tr><td>Verification rules</td><td><code>features/verification/rules.ts</code>: applicable kinds, expert fields, statement limits, labels</td><td><code>features/verification/rules.ts</code>: transitions, who reviews, reasons, decision labels, labels incl. staff roles</td></tr>
+<tr><td>Tests</td><td>6 unit tests (format, safeNext, statement rules)</td><td>12 unit tests (format, safeNext, review rules, access)</td></tr>
+<tr><td>Removed</td><td colspan="2"><code>@mrn/shared</code> dependency, Vite <code>fs.allow</code> for <code>../shared</code>, every <code>@mrn/shared</code> import, shared checkouts in both CI workflows</td></tr>
+<tr><td>CI</td><td>Single-repo checkout; types diffed against <code>src/types</code></td><td>Single-repo checks; E2E job checks out Road-trip-web only to start the backend, regenerates and diffs its own types</td></tr>
+<tr><td>Docs</td><td colspan="2">Architecture §4 rewritten ("no shared code"), local development, scope, database, roadmap, audit checklist, toolkit, handoff, CLAUDE.md and READMEs of both repos</td></tr>
+</table>
+
+<h2>Tests performed</h2>
+<table>
+<tr><th>Check</th><th>Result</th></tr>
+<tr><td>No <code>@mrn/shared</code> import left (grep)</td><td class="pass">none</td></tr>
+<tr><td>web: vue-tsc, oxlint, eslint, Vitest, build</td><td class="pass">pass, 6/6</td></tr>
+<tr><td>admin: vue-tsc, oxlint, eslint, Vitest, build</td><td class="pass">pass, 12/12</td></tr>
+<tr><td>Both apps generate the same database types from the local DB</td><td class="pass">identical</td></tr>
+<tr><td>web E2E (Chromium, Firefox, Pixel 7)</td><td class="pass">18/18</td></tr>
+<tr><td>admin E2E (Chromium, Firefox)</td><td class="pass">14/14</td></tr>
+<tr><td>Workflow YAML parses; no reference to shared</td><td class="pass">ok</td></tr>
+<tr><td>RLS suites</td><td class="warn">not re-run: no database change this session (passed in session 2)</td></tr>
+<tr><td>CI on GitHub, WebKit</td><td class="warn">not run (unchanged)</td></tr>
+</table>
+
+<h2>Problems</h2>
+<ul><li>None blocking. Multi-line imports were missed by a first grep; the full import list was taken from the files before rewriting.</li></ul>
+
+<h2>Security considerations</h2>
+<p>No change to authorization: the database remains the single authority; the per-app rule copies only explain refusals in the UI.</p>
+
+<h2>Remaining</h2>
+<ul>
+  <li>The old <code>/var/www/html/Road-trip/shared/</code> folder is unused and still on disk (owner to decide; deletion is not reversible because it was never committed).</li>
+  <li>Rule copies in two apps must be kept in step with migrations: each app's CI fails on stale types, but label and rule copies are checked only by their own unit tests.</li>
+</ul>
+
+<h2>Next steps</h2>
+<ol><li>Owner: decide on the old shared folder; push repos to run CI; WebKit dependencies.</li><li>Verification track, then M3 (routes and road reports).</li></ol>
+</main>
+</body>
+</html>

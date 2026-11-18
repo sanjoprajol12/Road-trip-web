@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 02: Supabase, Auth, Verification | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --crimson:#a51d2d; --ok:#2e6a3c; --warn:#8a5a00; --bad:#b42318; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui, sans-serif; }
+  main { max-width: 64rem; margin: 0 auto; padding: 3rem 1rem 5rem; }
+  h1 { font-size: clamp(2rem, 1.4rem + 3vw, 3.2rem); line-height:1.05; text-transform:uppercase; letter-spacing:-.01em; margin:.3rem 0 1rem; }
+  h2 { font-size:1.4rem; text-transform:uppercase; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:3rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  .label { font-size:.75rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--crimson); }
+  table { width:100%; border-collapse:collapse; font-size:.9rem; margin:.8rem 0; display:block; overflow-x:auto; }
+  th, td { text-align:left; vertical-align:top; padding:.5rem .6rem; border-bottom:1px solid var(--line); }
+  th { font-size:.75rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+  code { font-size:.85em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; }
+  .pass { color:var(--ok); font-weight:700; } .warn { color:var(--warn); font-weight:700; }
+  .shots { display:grid; gap:1.2rem; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); align-items:start; }
+  figure { margin:0; } figure img { width:100%; height:auto; border:1px solid var(--line); border-radius:4px; display:block; }
+  figcaption { font-size:.8rem; color:var(--muted); margin-top:.3rem; }
+  ul, ol { padding-left: 1.2rem; }
+</style>
+</head>
+<body>
+<main>
+<p class="label">My Ride Nepal · Session report</p>
+<h1>Session 02: local Supabase, real auth, design refinements, verification workflow</h1>
+<p class="meta">2026-11-18 · Claude Code (Opus 5.5) · Folders: <code>web</code>, <code>admin</code>, <code>shared</code> · Nothing committed (owner rule) · No remote database touched</p>
+
+<h2>Objective</h2>
+<p>Apply the owner's four decisions (rename folders, minimal shared package, Supabase CLI + Docker, visual direction with refinements), complete milestone 1.5 (local Supabase, real registration/login/logout/session persistence, protected routes and roles, RLS on real Supabase, CI), then milestone 2 (organizer applications, verification review, approval/rejection, suspension, audit history).</p>
+
+<h2>Initial state</h2>
+<p>End of session 1: two scaffolded apps, two migrations, RLS tests on a stubbed Postgres, no Supabase CLI, auth flows never run. The owner had a dev server running in the old <code>Road-trip-web</code> folder; renaming the folder broke it (restart it from <code>web/</code>).</p>
+
+<h2>Decisions</h2>
+<ul>
+  <li><strong>Shared package</strong> <code>@mrn/shared</code> linked with <code>link:../shared</code>: generated DB types, enum labels, verification rules, date formatting, redirect guard. No UI, no clients. Local git repo without remote; CI expects <code>Road-trip-shared</code> on GitHub.</li>
+  <li><strong>Supabase CLI</strong> pinned as a dev dependency of web (3.2.0). Studio, Realtime, Storage, Edge Runtime and Analytics disabled: the machine has 6.5 GB RAM. Stack: ≈1.4 GB images, ≈170 MB RAM idle.</li>
+  <li><strong>Local auth settings</strong>: email confirmation on, minimum password 8, secure password change, email rate limit 60/hour (local only).</li>
+  <li><strong>RLS suite</strong> became one rolled-back transaction, so it runs safely against the local Supabase database as well as a throwaway container.</li>
+  <li><strong>@playwright/test pinned to 1.63.0</strong> so the cached browsers are used (no download).</li>
+  <li><strong>Verification rules</strong>: negative decisions need a new reason of at least 10 characters; riders see the decision and reason but not the reviewer; moderators decide identity and trip contributor, admins also organizer and expert; nobody reviews their own claim; the last admin cannot be removed.</li>
+  <li><strong>No video</strong>: Commons had no usable Nepal riding footage; a spec for owner footage is in <code>DESIGN_SYSTEM.md</code>.</li>
+</ul>
+
+<h2>Changes made</h2>
+<table>
+<tr><th>Area</th><th>What</th></tr>
+<tr><td>Structure</td><td>Renamed folders, root symlinks, <code>shared/</code> package, typed Supabase clients in both apps</td></tr>
+<tr><td>Database</td><td><code>config.toml</code>; migration <code>20261118000003_verification_review.sql</code>; RLS suite rewritten + M2 tests</td></tr>
+<tr><td>Web</td><td>Verification section on Account (claims, statuses, reviewer's note, application form); auth error codes; Explore editorial index; crimson reduced; route line draw-in; header fix; E2E <code>auth.spec.ts</code>, <code>verification.spec.ts</code></td></tr>
+<tr><td>Admin</td><td>Sidebar nav, verification queue (filters in the URL), claim detail with decision flow and history, roles (search, grant/remove with confirmation), audit log (filter, pages, changed fields), <code>adminOnly</code> guard, <code>StatusLine</code>, <code>ConfirmDialog</code> (native dialog); E2E <code>access.spec.ts</code>, <code>verification.spec.ts</code></td></tr>
+<tr><td>CI</td><td><code>.github/workflows/ci.yml</code> in web and admin</td></tr>
+<tr><td>Docs</td><td>New <code>LOCAL_DEVELOPMENT.md</code>; rewritten architecture; updated database, roles, design system, scope, roadmap (verification track), audit checklist, toolkit, progress, handoff, READMEs, CLAUDE.md</td></tr>
+</table>
+
+<h2>Screenshots</h2>
+<p class="meta">Production builds via <code>vite preview</code> against the local Supabase stack. Admin screens use throwaway <code>@e2e.test</code> accounts, deleted afterwards.</p>
+<div class="shots">
+  <figure><img src="assets/2026-11-18-s02/explore-index-1440.webp" alt="Explore page as an editorial index" loading="lazy"><figcaption>Explore index, 1440px</figcaption></figure>
+  <figure><img src="assets/2026-11-18-s02/explore-index-390.webp" alt="Explore index on a phone" loading="lazy"><figcaption>Explore index, 390px</figcaption></figure>
+  <figure><img src="assets/2026-11-18-s02/web-account-390.webp" alt="Account page with verification claims" loading="lazy"><figcaption>Account with verification, 390px</figcaption></figure>
+  <figure><img src="assets/2026-11-18-s02/admin-claim-1440.webp" alt="Admin claim detail" loading="lazy"><figcaption>Admin claim detail, 1440px</figcaption></figure>
+  <figure><img src="assets/2026-11-18-s02/admin-queue-390.webp" alt="Admin verification queue on a phone" loading="lazy"><figcaption>Admin queue, 390px (before the sidebar fix)</figcaption></figure>
+  <figure><img src="assets/2026-11-18-s02/admin-roles-1440.webp" alt="Admin roles page" loading="lazy"><figcaption>Admin roles, 1440px</figcaption></figure>
+  <figure><img src="assets/2026-11-18-s02/admin-audit-1440.webp" alt="Admin audit log" loading="lazy"><figcaption>Admin audit log, 1440px</figcaption></figure>
+</div>
+
+<h2>Tests performed (final run)</h2>
+<table>
+<tr><th>Check</th><th>Result</th></tr>
+<tr><td>shared: <code>tsc</code>, Vitest</td><td class="pass">pass, 11/11</td></tr>
+<tr><td>web: vue-tsc, oxlint + eslint (no autofix), build</td><td class="pass">pass</td></tr>
+<tr><td>web: <code>test:db</code> (plain Postgres) and <code>test:db:local</code> (real Supabase)</td><td class="pass">all assertions pass in both</td></tr>
+<tr><td>Generated types match the local schema</td><td class="pass">current</td></tr>
+<tr><td>web E2E: auth (6 scenarios) + verification application, in Chromium, Firefox, Pixel 7</td><td class="pass">18/18 (and 15/15 twice earlier)</td></tr>
+<tr><td>admin: types, lint, build, Vitest</td><td class="pass">pass, 3/3</td></tr>
+<tr><td>admin E2E: access (4) + verification/roles/audit (3), in Chromium, Firefox</td><td class="pass">14/14 (also 14/14 twice before)</td></tr>
+<tr><td>Mutation checks: loosened read policy; removed last-admin trigger</td><td class="pass">suite fails as expected</td></tr>
+<tr><td>Overflow sweep: web home/explore/destination/account, admin overview/queue/claim/roles/audit at 390 and 1440</td><td class="pass">0 px after fixes</td></tr>
+<tr><td>WebKit</td><td class="warn">NOT RUN: missing system libraries (needs sudo)</td></tr>
+<tr><td>CI on GitHub</td><td class="warn">NOT RUN: <code>Road-trip-shared</code> repo does not exist yet</td></tr>
+<tr><td>Screen reader, Lighthouse, axe, <code>pnpm audit</code></td><td class="warn">NOT RUN (verification track)</td></tr>
+</table>
+
+<h2>Problems and failed attempts</h2>
+<ul>
+  <li>Sign-in showed "wrong password" for unconfirmed accounts (all 400s were treated alike). Fixed with Supabase error codes in both apps.</li>
+  <li>The suspension-reason rule accepted an old approval note. Caught by the RLS test, fixed before leaving the machine.</li>
+  <li>Admin showed the raw role enum ("moderator") styled with CSS; replaced with shared labels.</li>
+  <li>Admin layout on phones: page 52 px too wide (nav), an empty stretched header row, then 44 px from a visually hidden table header escaping its scroll container. All fixed and re-measured.</li>
+  <li>E2E authoring errors (URL pattern, ambiguous selectors, a sign-out race, a self-calling helper) fixed; suites then passed repeatedly.</li>
+  <li>TS2589 "excessively deep" from the generated <code>Json</code> type in templates; replaced with plain object types.</li>
+  <li>Playwright 1.65 wanted new browsers; WebKit libraries missing; local email limit of 2/hour.</li>
+</ul>
+
+<h2>Security considerations</h2>
+<ul>
+  <li>Only the anon key in <code>.env.local</code> (git-ignored). E2E never uses the service key: users are created through the public sign-up API and confirmed with local <code>psql</code>. Both suites refuse to start unless the URL is the local stack.</li>
+  <li>No remote Supabase project linked or touched.</li>
+  <li>New database protections tested: reviewer privacy, required reasons, history access limited to verification records, admin-only user search with literal wildcards, last-admin protection, moderator/admin split, role loss locks a signed-in moderator out on reload.</li>
+  <li>Open before launch: CAPTCHA, rate limits on applications, account suspension, authorised security scan.</li>
+</ul>
+
+<h2>Next steps</h2>
+<ol>
+  <li>Owner: create and push <code>Road-trip-shared</code>, add token secrets if private, run CI; install WebKit dependencies; confirm admin-only organizer decisions.</li>
+  <li>Verification track: keyboard script, Lighthouse, axe, screen reader, WebKit, <code>pnpm audit</code>.</li>
+  <li>M3: routes, segments, checkpoints, services, contributions with moderation, storage and map.</li>
+</ol>
+</main>
+</body>
+</html>

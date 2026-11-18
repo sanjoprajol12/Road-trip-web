@@ -1,0 +1,62 @@
+# Design System
+
+Direction: **editorial road journal**. Condensed, signage-like headlines; serif reading text; real photographs of real places; thin route lines with checkpoint nodes as the recurring motif; dates everywhere. Calm, dense where it matters, never decorated for its own sake.
+
+Source of truth: `src/assets/styles/main.css` (`@theme` tokens). Admin copies the token block.
+
+## Colour
+| Token | Value | Use |
+|---|---|---|
+| `paper` | #f2f0ec | page background (warm stone, not white) |
+| `surface` | #faf9f7 | inputs, raised panels, alternating bands |
+| `line` / `line-strong` | #d9d5cd / #b9b3a8 | rules, borders |
+| `muted` | #5c5850 | secondary text (6.2:1 on paper) |
+| `ink` | #17181b | text |
+| `night` (+ `night-line`, `night-text`, `night-muted`) | #111215 | hero, freshness band, footer, admin sidebar |
+| `crimson` / `crimson-deep` / `crimson-wash` | #a51d2d / #841623 / #f4e4e3 | the one brand colour: primary actions, checkpoint nodes, focus ring |
+| `marigold` | #e0a12b | the one accent: small labels on night backgrounds only (fails contrast on paper) |
+| `success` `warning` `danger` `info` | #2e6a3c #8a5a00 #b42318 #285a8c | states only, always with an icon and words |
+
+Crimson echoes Nepal's flag and the red number plates on Nepali motorcycles. Danger is close in hue, so danger never relies on colour: icon + text, always.
+
+## Typography
+- **Archivo Variable** (wdth axis) for UI and display. `.display`: width 72, weight 800, uppercase, tight leading.
+- **Source Serif 4 Variable** for leads and long rider writing (`.lead`, `.prose-serif`).
+- `.label`: 12px uppercase tracking for metadata (province, dates). `.tabular` for numbers.
+- Self-hosted via Fontsource (offline-ready). Two families, no others.
+
+## Shape and depth
+Radius 2–4px. No shadows; borders and tone change only. Photos are square-cornered-ish (4px) and never framed with decoration.
+
+## Components (M1)
+`btn btn-primary`, `btn btn-quiet` (adapts on `.on-night`), `field` + `input` (+ `aria-invalid`, `field-hint`, `field-error`), `link`, `wrap` (78rem, 16px gutter on phones), `StatusPanel` (loading / error with retry / empty), `PlacePhoto` (srcset 640/1280), `BrandMark`.
+Rules: inputs 44px tall, sized to their content (province select 11rem, not full width); one `h1` per page; every icon-only control named; focus ring crimson (marigold on night).
+
+## Layout
+Not a card grid everywhere. Home: full-bleed hero → four-node route diagram → feature photo + numbered index list → night freshness band. Explore: photo plates (typographic plate when no photo of that exact place exists). Detail: big name + photo, then a two-column body with an information-status aside. Admin: dark sidebar, plain ruled tables and figures.
+
+## Photography
+Real, legally usable photos only (CC0/public domain or owner-supplied), each used only for the place it shows, credited (`public/images/photos/LICENSES.md`). No stock riders, no fake testimonials. Video: none yet; when added, poster image, no audio, no autoplay under reduced motion, local file not a remote URL.
+
+## Motion
+| Pattern | Spec |
+|---|---|
+| Hero entrance | photo settles from scale 1.07 (1.8s), headline lines rise from a mask (0.9s, 110ms stagger), copy fades up |
+| Scroll reveal | `v-reveal[=index]`: opacity + 14px rise, 640ms, 70ms stagger, once |
+| Page transition | 180ms opacity crossfade |
+| Hover | colour change; photos scale 1.03 over 700ms inside their frame (never the layout) |
+| Easing | `--ease-out-quint` cubic-bezier(0.22,1,0.36,1) |
+Only `opacity` and `transform` animate. `prefers-reduced-motion: reduce` removes all of it and reveal content is visible by default without JS. Planned: route line draw-in on route pages, map fly-to, drawer/modal slide. GSAP or motion-v only if the route map needs timeline control.
+
+## Banned
+Emojis, rainbow/multi-colour palettes, gradients except legibility scrims on photos, glass/blur effects (the scrolled header's slight blur is the single exception), heavy shadows, bouncing/spinning decoration (spinners only for real loading), stock-SaaS card grids and feature trios, fabricated data in demos.
+
+## Refinements after review (2026-11-18, session 2; owner approved direction with refinements)
+- **Crimson used selectively:** primary actions, the brand mark, route nodes, focus. Removed from nav active underline and hover states (now ink).
+- **Explore is an editorial index**, not a photo-card grid: oversized names, region, freshness ("Never confirmed" / confirmed date) and dev-seed status in each row, photo at the end of the row. On phones the "no photo" plate is hidden.
+- **Route line draws itself in** on the home page (`v-reveal:draw`, transform only, off under reduced motion).
+- **Admin stays restrained:** dark sidebar, plain ruled tables, native `<dialog>` confirmations, no imagery, crimson only for the history markers and primary action.
+- Hover motion is transform/colour only; a letter-spacing hover was rejected because it reflows text.
+
+## Video (not added yet)
+Wikimedia Commons has no usable footage of riding in Nepal (searched 2026-11-18). No video is shown until the owner supplies footage they own or a licence is verified. When it arrives: hero only, H.264 MP4 + WebM, 1920×1080 and 1280×720, ≤ 4 MB per 10 s loop, no audio track, `muted playsinline loop`, poster = the current hero photo, served from `public/videos/` (never a remote URL), not loaded on `prefers-reduced-motion` or `save-data`, pause control visible.
