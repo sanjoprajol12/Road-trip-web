@@ -1,0 +1,33 @@
+FROM node:22-alpine AS frontend
+
+WORKDIR /app
+RUN corepack enable
+
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+COPY . .
+RUN pnpm build
+
+FROM dunglas/frankenphp:1-php8.4-alpine AS runtime
+
+WORKDIR /app
+RUN install-php-extensions pdo_pgsql gd intl opcache \
+    && cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+COPY . .
+COPY --from=frontend /app/public/app ./public/app
+COPY Caddyfile /etc/caddy/Caddyfile
+
+RUN composer install --no-dev --no-interaction --no-progress --prefer-dist --optimize-autoloader \
+    && mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
+    && chown -R www-data:www-data storage bootstrap/cache \
+    && chmod -R ug+rwX storage bootstrap/cache
+
+ENV PORT=80 \
+    LARAVEL_STORAGE_PATH=/tmp/laravel-storage
+
+EXPOSE 80
+
+CMD ["sh", "-c", "mkdir -p \"$LARAVEL_STORAGE_PATH/app/private\" \"$LARAVEL_STORAGE_PATH/framework/cache/data\" \"$LARAVEL_STORAGE_PATH/framework/sessions\" \"$LARAVEL_STORAGE_PATH/framework/views\" \"$LARAVEL_STORAGE_PATH/logs\" && chown -R www-data:www-data \"$LARAVEL_STORAGE_PATH\" && exec frankenphp run --config /etc/caddy/Caddyfile"]
