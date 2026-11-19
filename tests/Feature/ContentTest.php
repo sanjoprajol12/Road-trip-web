@@ -14,7 +14,7 @@ class ContentTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function as(?User $u)
+    private function as(?\Illuminate\Contracts\Auth\Authenticatable $u)
     {
         $this->app['auth']->forgetGuards();
 
@@ -38,7 +38,7 @@ class ContentTest extends TestCase
     public function test_content_management_is_staff_only(): void
     {
         $body = ['slug' => 'bandipur', 'name' => 'Bandipur', 'status' => 'draft'];
-        $this->as($this->rider())->postJson('/api/v1/admin/destinations', $body)->assertForbidden();
+        $this->as($this->rider())->postJson('/api/v1/admin/destinations', $body)->assertUnauthorized();
         $mod = $this->staff('moderator');
         $id = $this->as($mod)->postJson('/api/v1/admin/destinations', $body)->assertCreated()->json('data.id');
         $this->as($mod)->postJson('/api/v1/admin/destinations', $body + ['slug' => 'Bad Slug'])->assertStatus(422);
@@ -97,5 +97,15 @@ class ContentTest extends TestCase
         \App\Support\Audit::record('test.entry', 'tests', null, ['x' => 1], 'one');
         $this->expectException(QueryException::class);
         DB::connection('pgsql')->table('audit_logs')->delete();
+    }
+
+    public function test_guides_cannot_be_saved_without_sources(): void
+    {
+        $mod = $this->staff('moderator');
+        $base = ['slug' => 'packing-list', 'title' => 'Packing list', 'category' => 'preparation', 'body' => str_repeat('Test guide body for the automated suite. ', 3)];
+        $this->as($mod)->postJson('/api/v1/admin/guides', $base)->assertStatus(422)->assertJsonValidationErrors('sources');
+        $this->as($mod)->postJson('/api/v1/admin/guides', $base + ['sources' => '   '])->assertStatus(422)->assertJsonValidationErrors('sources');
+        $id = $this->as($mod)->postJson('/api/v1/admin/guides', $base + ['sources' => 'Test source citation'])->assertCreated()->json('data.id');
+        $this->as($mod)->patchJson("/api/v1/admin/guides/{$id}", ['sources' => ''])->assertStatus(422)->assertJsonValidationErrors('sources');
     }
 }

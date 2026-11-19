@@ -1,11 +1,5 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-
-// Every non-API path is the public SPA (built by `pnpm build` into public/app). Vue Router takes it from there.
-Route::get('/{path?}', function () {
-    $index = public_path('app/index.html');
-    abort_unless(is_file($index), 503, 'The web app has not been built. Run `pnpm build` in web/.');
-
-    return response()->file($index, ['Cache-Control' => 'no-cache']);
-})->where('path', '^(?!api/|sanctum/|up$).*$');
+// Backend only (architecture Option B): this app serves the REST API under /api/v1 and nothing else.
+// The public website and the staff app are separate static builds (Road-trip-admin repo) whose hosts proxy
+// /api and /sanctum here. Any other path answers Laravel's normal 404.

@@ -1,47 +1,64 @@
 # Development Setup
 
+Architecture Option A (owner, 2026-11-18): three independent applications.
+- `web/` (repo Road-trip-web): the **Laravel API** at the repo root, and the **public website** in `web/frontend/` (its own `package.json`, lockfile, Vite config, `.env`, `vercel.json`, tests).
+- `admin/` (repo Road-trip-admin): the **staff portal** only, at the repo root.
+
+No command starts more than one application. Stopping a frontend never stops the API or the other frontend; stopping the API only makes API calls fail (502 from the dev proxy) while both frontends keep running (verified 2026-11-18).
+
 ## What runs where
-| Process | Command | Port |
-|---|---|---|
-| PostgreSQL + Mailpit (Supabase CLI, Docker) | `cd web && pnpm db:start` | 54322 (Postgres), 54324 (Mailpit inbox), 54325 (SMTP) |
-| Laravel API | `cd web && php artisan serve --port=8010` | 8010 |
-| Web SPA (Vite) | `cd web && pnpm dev` | 5180 (proxies /api, /sanctum to 8010) |
-| Admin SPA (Vite) | `cd admin && pnpm dev` | 5181 (proxies /api, /sanctum to 8010) |
+| Process | Folder | Command | Port |
+|---|---|---|---|
+| PostgreSQL + Mailpit (Supabase CLI, Docker) | `web` | `pnpm db:start` | 54322 (Postgres), 54324 (Mailpit inbox), 54325 (SMTP) |
+| Laravel API (+ queue listener + log tail) | `web` | `composer dev` (or only the server: `php artisan serve --port=8010`) | 8010 |
+| Public website | `web/frontend` | `pnpm dev` | 5180 (proxies /api, /sanctum to `API_TARGET`, default :8010) |
+| Staff portal | `admin` | `pnpm dev` | 5181 (proxies /api, /sanctum to `API_TARGET`, default :8010) |
+
+`APP_URL` in `web/.env` is the public website origin (`http://127.0.0.1:5180`): rider email links. `ADMIN_URL` is the staff portal origin (`http://127.0.0.1:5181`): staff invitations and staff password resets. Each frontend's own `.env` (copy `.env.example`) holds only `API_TARGET`; nothing in a frontend `.env` is bundled.
 
 ## Requirements
-PHP 8.3 with pdo_pgsql, gd (WebP), intl, bcmath; Composer 2; Node 24 + pnpm 12; Docker; `psql`. RAM in use: Postgres ~55 MB + Mailpit ~10 MB + Laravel ~60 MB + one Vite ~150 MB.
+PHP 8.3 with pdo_pgsql, gd (WebP), intl, bcmath; Composer 2; Node 24 + pnpm 12; Docker; `psql`.
 
 ## First-time setup
 ```sh
 cd web
-composer install && pnpm install
+composer install && pnpm install                # pnpm here installs only the Supabase CLI
 cp .env.example .env && php artisan key:generate
 # put two long random values in DB_PASSWORD and DB_MIGRATION_PASSWORD (openssl rand -hex 24)
 pnpm db:start                                   # Postgres + Mailpit only (supabase start -x kong)
-pnpm db:setup                                   # creates myridenepal + myridenepal_test and the mrn_owner / mrn_app roles
-php artisan migrate --database=pgsql_owner      # migrations run as the owner role
-php artisan db:seed                             # 4 development destinations (flagged is_dev_seed)
-cd ../admin && pnpm install
+pnpm db:setup                                   # creates myridenepal, myridenepal_test, myridenepal_e2e and the mrn_owner / mrn_app roles
+php artisan migrate --database=pgsql_owner      # development database, owner role
+php artisan db:seed                             # development destinations (flagged is_dev_seed)
+DB_DATABASE=myridenepal_e2e php artisan migrate --database=pgsql_owner && DB_DATABASE=myridenepal_e2e php artisan db:seed   # isolated E2E database
+cd frontend && pnpm install && cp .env.example .env
+cd ../../admin && pnpm install && cp .env.example .env
 ```
-First administrator: sign up in the web app, confirm via Mailpit (http://127.0.0.1:54324), then `php artisan mrn:grant-admin you@example.com`.
+First administrator: see `AUTHENTICATION_FLOW.md` (staff accounts are created on the server, never by sign-up).
 
-## Everyday commands (in `web/` unless noted)
-| Command | Does |
-|---|---|
-| `php artisan test` | backend feature tests on `myridenepal_test` |
-| `pnpm test:unit`, `pnpm type-check`, `pnpm lint`, `pnpm build` | web SPA checks (same scripts in `admin/`) |
-| `pnpm test:e2e --project=chromium --project=firefox --project=mobile` | web E2E (builds the SPA, Laravel serves it on :8010) |
-| `cd ../admin && pnpm test:e2e --project=chromium --project=firefox` | admin E2E (starts Laravel from ../web and the admin preview on :4181) |
-| `php artisan migrate --database=pgsql_owner` | new migrations (owner role) |
-| `php artisan scribe:generate` | regenerate API docs into `public/docs` |
-| `pnpm db:stop` | stop Postgres + Mailpit (data kept in the Docker volume) |
+## Everyday commands
+| Where | Command | Does |
+|---|---|---|
+| web | `php artisan test` | backend feature tests on `myridenepal_test` |
+| web | `composer audit` | PHP dependency advisories |
+| web | `php artisan migrate --database=pgsql_owner` | new migrations (owner role); repeat with `DB_DATABASE=myridenepal_e2e` for the E2E database |
+| web | `php artisan mrn:permissions:sync` | copy `config/permissions.php` into the database after adding or removing a permission |
+| web | `php artisan scribe:generate` | regenerate API docs into `public/docs` |
+| web | `docker build -f Dockerfile.vercel -t mrn-api .` | production API image (no frontend inside) |
+| web | `pnpm db:stop` | stop Postgres + Mailpit (data kept in the Docker volume) |
+| web/frontend and admin | `pnpm type-check && pnpm lint && pnpm test:unit && pnpm build` | that app's types, lint, unit tests, production build (`dist/`) |
+| web/frontend and admin | `pnpm preview` | serve the build (:4180 public, :4181 staff) |
+| web/frontend | `pnpm test:e2e --project=chromium --project=firefox --project=mobile` | public E2E |
+| admin | `pnpm test:e2e --project=chromium --project=firefox` | staff E2E |
+| web/frontend and admin | `pnpm audit --prod` | JS dependency advisories |
+
+## E2E
+Each frontend's suite starts **its own** Laravel API from the web repo on `E2E_API_PORT` (default **8011**, never your :8010) with `DB_DATABASE=myridenepal_e2e`, plus that app's preview. Test accounts use the `@e2e.test` domain and are deleted before and after a run, in `myridenepal_e2e` only; the development database is never touched. The suite's API runs with `API_PER_MINUTE=5000` because every test browser shares 127.0.0.1 (production default 120). Locally, running servers on 8011/4180/4181 are reused: stop stale ones first (a reused preview serves an old build).
+
+`@playwright/test` is pinned to 1.63.0 to use the cached browser builds. WebKit needs system libraries: `sudo pnpm exec playwright install-deps webkit` (owner).
 
 ## Remote database rule
-No remote project is linked. Never point `.env` at the remote Supabase project, and never run migrations or scripts against it without the owner's explicit approval. `scripts/setup-local-db.sh` refuses any host but 127.0.0.1; both E2E suites refuse to run unless `.env` points at the local `myridenepal` database.
-
-## Browsers for E2E
-`@playwright/test` is pinned to 1.63.0 to use the cached Chromium 1243 / Firefox 1543 / WebKit 2359 builds. WebKit needs system libraries: `sudo pnpm exec playwright install-deps webkit` (owner).
+No remote project is linked. Never point `.env` at the remote Supabase project, and never run migrations or scripts against it without the owner's explicit approval. `scripts/setup-local-db.sh` refuses any host but 127.0.0.1; the E2E suites refuse to run unless the API `.env` points at the local Postgres.
 
 ## Known local quirks
-- Laravel loads `.env.{APP_ENV}` instead of `.env` when such a file exists: never create `web/.env.local` (the SPA's Vite env file lives in `resources/app/`).
-- E2E reuses a running server on :8010 / :4181 locally: stop old ones to avoid testing a stale build.
+- Laravel loads `.env.{APP_ENV}` instead of `.env` when such a file exists: never create `web/.env.local`.
+- The old combined command (`pnpm dev` = both apps from `admin`) no longer exists. A staff dev server started with the old script before 2026-11-18 serves deleted folders: stop it and start `pnpm dev` in `admin`.

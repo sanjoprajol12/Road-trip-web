@@ -19,9 +19,10 @@ select format('alter role mrn_app password %L', :'app_pw') \gexec
 grant mrn_owner to postgres;
 select 'create database myridenepal owner mrn_owner' where not exists (select 1 from pg_database where datname = 'myridenepal') \gexec
 select 'create database myridenepal_test owner mrn_owner' where not exists (select 1 from pg_database where datname = 'myridenepal_test') \gexec
+select 'create database myridenepal_e2e owner mrn_owner' where not exists (select 1 from pg_database where datname = 'myridenepal_e2e') \gexec
 SQL
 
-for db in myridenepal myridenepal_test; do
+for db in myridenepal myridenepal_test myridenepal_e2e; do
   psql "$SUPER/$db" -v ON_ERROR_STOP=1 -q <<SQL
 revoke all on database $db from public;
 grant connect on database $db to mrn_app;
@@ -35,4 +36,4 @@ grant select, insert, update, delete on all tables in schema public to mrn_app;
 grant usage, select on all sequences in schema public to mrn_app;
 SQL
 done
-echo "Local databases and roles are ready (myridenepal, myridenepal_test; mrn_owner, mrn_app)."
+echo "Local databases and roles are ready (myridenepal, myridenepal_test, myridenepal_e2e; mrn_owner, mrn_app)."

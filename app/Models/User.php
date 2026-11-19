@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Enums\StaffRole;
 use App\Enums\VerificationKind;
 use App\Enums\VerificationStatus;
 use App\Notifications\VerifyEmailAddress;
@@ -13,8 +12,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Facades\DB;
 
+/**
+ * A rider account (public website, guard `web`). Riders never hold staff roles or permissions: staff have their own
+ * accounts (App\Models\StaffAccount).
+ */
 class User extends Authenticatable implements MustVerifyEmail
 {
     use HasFactory, HasUuids, Notifiable;
@@ -23,37 +25,19 @@ class User extends Authenticatable implements MustVerifyEmail
 
     protected $hidden = ['password', 'remember_token'];
 
-    /** @var list<string>|null cached for the request */
-    private ?array $staffRolesCache = null;
-
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'suspended_until' => 'datetime',
+            'deactivated_at' => 'datetime',
             'password' => 'hashed',
         ];
     }
 
-    /** @return list<string> */
-    public function staffRoles(): array
+    public function isDeactivated(): bool
     {
-        return $this->staffRolesCache ??= DB::table('user_roles')->where('user_id', $this->id)->orderBy('role')->pluck('role')->all();
-    }
-
-    public function forgetStaffRoles(): void
-    {
-        $this->staffRolesCache = null;
-    }
-
-    public function isStaff(): bool
-    {
-        return $this->staffRoles() !== [];
-    }
-
-    public function isAdmin(): bool
-    {
-        return in_array(StaffRole::Admin->value, $this->staffRoles(), true);
+        return $this->deactivated_at !== null;
     }
 
     public function verifications(): HasMany

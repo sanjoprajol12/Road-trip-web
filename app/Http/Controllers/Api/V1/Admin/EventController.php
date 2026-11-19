@@ -36,7 +36,7 @@ class EventController extends Controller
         DB::transaction(function () use ($event, $data) {
             $old = $event->status->value;
             $event->forceFill(['status' => EventStatus::Cancelled])->save();
-            EventUpdate::create(['event_id' => $event->id, 'author_id' => auth()->id(), 'kind' => 'cancellation', 'body' => 'Cancelled by My Ride Nepal staff: '.$data['reason']]);
+            EventUpdate::create(['event_id' => $event->id, 'author_staff_id' => auth('staff')->id(), 'kind' => 'cancellation', 'body' => 'Cancelled by My Ride Nepal staff: '.$data['reason']]);
             Audit::record('event.cancelled_by_staff', $event, ['status' => $old], ['status' => 'cancelled', 'reason' => $data['reason']]);
         });
         $people = $event->registrations()->whereIn('status', ['approved', 'pending', 'waitlisted', 'invited'])->with('user')->get()->pluck('user');

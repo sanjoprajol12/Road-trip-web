@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\User;
 use App\Notifications\EventInvitation;
+use App\Notifications\RegistrationChanged;
 use App\Support\Audit;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -103,6 +104,9 @@ class EventRegistrations
             }
             $reg->update(['status' => $to]);
             EventCapacity::settle($event);
+            if ($to === S::Approved || $to === S::Declined) {
+                $reg->user->notify(new RegistrationChanged($event, $to->value));
+            }
 
             return $reg;
         });

@@ -50,8 +50,8 @@ class VerificationTest extends TestCase
         $rider = $this->rider();
         $other = $this->rider();
         $claim = $this->apply($other)->json('data.id');
-        $this->actingAs($rider)->getJson('/api/v1/admin/verifications')->assertForbidden();
-        $this->actingAs($rider)->postJson("/api/v1/admin/verifications/{$claim}/decision", ['status' => 'approved'])->assertForbidden();
+        $this->actingAs($rider)->getJson('/api/v1/admin/verifications')->assertUnauthorized(); // no staff session
+        $this->actingAs($rider)->postJson("/api/v1/admin/verifications/{$claim}/decision", ['status' => 'approved'])->assertUnauthorized();
         $this->actingAs($rider)->getJson('/api/v1/users/me/verifications')->assertOk()->assertJsonCount(0, 'data');
     }
 
@@ -85,7 +85,7 @@ class VerificationTest extends TestCase
         $decide(['status' => 'approved'])->assertOk(); // reinstate
 
         $claim = Verification::find($id);
-        $this->assertSame($admin->id, $claim->reviewed_by);
+        $this->assertSame($admin->id, $claim->reviewed_by_staff_id);
         $this->assertSame(4, AuditLog::where('subject_type', 'user_verifications')->where('subject_id', $id)->count(), 'applied + 3 decisions');
         // The rider sees the decision and the reason, never the reviewer.
         $this->actingAs($rider)->getJson('/api/v1/users/me/verifications')->assertOk()
@@ -95,9 +95,15 @@ class VerificationTest extends TestCase
 
     public function test_nobody_reviews_their_own_claim(): void
     {
-        $admin = $this->staff('admin');
-        $id = $this->apply($admin, 'expert_reviewer', 'mechanical')->json('data.id');
-        $this->actingAs($admin)->postJson("/api/v1/admin/verifications/{$id}/decision", ['status' => 'approved'])->assertForbidden();
+        $rider = $this->rider();
+        $id = $this->apply($rider, 'expert_reviewer', 'mechanical')->json('data.id');
+        // The rider's own staff account, linked or with the same email, cannot decide it; another administrator can.
+        $linked = $this->staff('admin', $rider);
+        $sameEmail = $this->staff('admin');
+        $sameEmail->forceFill(['email' => $rider->email])->save();
+        $this->actingAs($linked)->postJson("/api/v1/admin/verifications/{$id}/decision", ['status' => 'approved'])->assertForbidden();
+        $this->actingAs($sameEmail)->postJson("/api/v1/admin/verifications/{$id}/decision", ['status' => 'approved'])->assertForbidden();
+        $this->actingAs($this->staff('admin'))->postJson("/api/v1/admin/verifications/{$id}/decision", ['status' => 'approved'])->assertOk();
     }
 
     public function test_reviewers_see_history_and_the_queue(): void

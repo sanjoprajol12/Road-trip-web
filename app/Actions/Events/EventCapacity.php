@@ -5,6 +5,7 @@ namespace App\Actions\Events;
 use App\Enums\EventStatus;
 use App\Enums\RegistrationStatus;
 use App\Models\Event;
+use App\Notifications\RegistrationChanged;
 
 /**
  * Capacity bookkeeping. Always called inside a transaction that holds the event row lock
@@ -26,6 +27,7 @@ class EventCapacity
                 break;
             }
             $next->update(['status' => RegistrationStatus::Approved]);
+            $next->user->notify(new RegistrationChanged($event, 'promoted'));
         }
         $full = ! self::hasRoom($event);
         if ($full && $event->status === EventStatus::Published) {

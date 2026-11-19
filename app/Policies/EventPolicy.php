@@ -6,6 +6,7 @@ use App\Enums\EventStatus;
 use App\Enums\RegistrationStatus;
 use App\Enums\VerificationKind;
 use App\Models\Event;
+use App\Models\StaffAccount;
 use App\Models\User;
 
 class EventPolicy
@@ -24,7 +25,7 @@ class EventPolicy
         if (! $user) {
             return false;
         }
-        if ($event->organizer_id === $user->id || $user->isStaff()) {
+        if ($event->organizer_id === $user->id) {
             return true;
         }
         $reg = $event->registrationOf($user);
@@ -38,8 +39,8 @@ class EventPolicy
     }
 
     /** Staff can cancel any event (oversight) but do not run other people's events. */
-    public function cancelAsStaff(User $user, Event $event): bool
+    public function cancelAsStaff(StaffAccount $staff, Event $event): bool
     {
-        return $user->isStaff();
+        return $staff->hasPermission('events.cancel');
     }
 }

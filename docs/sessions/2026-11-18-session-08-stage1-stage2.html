@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 08: Stages 1 to 3 | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:60rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; }
+  h2 { font-size:1.3rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.4rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  code { font-size:.88em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; word-break:break-word; }
+  .warn { color:var(--warn); font-weight:700; }
+  .ok { color:var(--ok); font-weight:700; }
+  ul, ol { padding-left:1.3rem; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; margin:.6rem 0 1rem; }
+  th, td { text-align:left; vertical-align:top; padding:.4rem .6rem; border-bottom:1px solid var(--line); }
+  th { background:var(--surface); }
+</style>
+</head>
+<body>
+<main>
+<p class="meta">My Ride Nepal · Session report</p>
+<h1>Session 08: Stage 1 (wire what exists), Stage 2 (permissions), Stage 3 (settings, media, storage)</h1>
+<p class="meta">2026-11-18 · Claude Code (Opus 5.5) · Nothing committed · No remote database touched · Two additive local migrations</p>
+
+<h2>Objective</h2>
+<p>Owner: "GO" for Stage 1 (screens for endpoints that already existed, missing notifications, tests, an automated check for unguarded endpoints), then continue through the roadmap in dependency order until an owner decision is genuinely needed.</p>
+
+<h2>Stage 1: requirement by requirement</h2>
+<div class="scroll"><table>
+<thead><tr><th>Requirement</th><th>Result</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td>Rider's own events (D19)</td><td class="ok">Complete</td><td>"Your events" on the Events page; feature test + E2E</td></tr>
+<tr><td>Edit contributions waiting for review (C12)</td><td class="ok">Complete</td><td>edit screen, links, locked after review, edits audited; feature test + E2E. Drafts stay open (brief only, Q2)</td></tr>
+<tr><td>Resend confirmation email (G2)</td><td class="ok">Complete</td><td>button on sign-up and after an unconfirmed sign-in (never after a wrong password); generic answer, rate limit; feature tests + E2E counting Mailpit emails</td></tr>
+<tr><td>Destination services and rider reports (A7, A10)</td><td class="ok">Complete</td><td>published services only, 5 newest visible reports with dates; feature test + E2E (also Explore search and not-found)</td></tr>
+<tr><td>Missing notifications (D8, D10)</td><td class="ok">Complete</td><td>waitlist promotion, approval, decline; feature test + E2E for the approval notice</td></tr>
+<tr><td>Unguarded-endpoint detection (G15)</td><td class="ok">Complete</td><td><code>RouteAuthorizationTest</code>; mutation check: an unguarded probe route fails it</td></tr>
+<tr><td>Audit gaps in tests (A2, D9, D12, D13, D15, D20, D21, E11, C19)</td><td class="ok">Tested</td><td>new cases in <code>EventTest</code>, <code>ContentTest</code>, <code>RiderWorkflowsTest</code>; D13 and D15 stay partial (new-date prompt, completion photos are Stage 11)</td></tr>
+</tbody></table></div>
+
+<h2>Stage 2: permissions foundation</h2>
+<ul>
+  <li>Registry of 23 permissions in <code>config/permissions.php</code>; <code>roles</code>, <code>permissions</code>, <code>permission_role</code>; <code>user_roles.role</code> now references <code>roles.slug</code> (all existing assignments kept).</li>
+  <li>Built-in <code>admin</code> (every permission, always) and <code>moderator</code> (exactly the rights it had); custom roles; several roles per person.</li>
+  <li>No escalation: nobody creates, widens, narrows or gives a role beyond their own permissions; only administrators give <code>admin</code>; last <em>active</em> administrator protected.</li>
+  <li>Staff invitations (hash-only token, 72 h, single use), deactivation, admin-sent reset links, sign out everywhere; all audited.</li>
+  <li>Every staff route names a permission; the route test fails otherwise. Rider verification never grants a permission (tested).</li>
+  <li>Staff app: Roles page, People page with dynamic roles, invitations and account controls, invitation acceptance page, permission-driven menu and guard.</li>
+</ul>
+
+<h2>Stage 3: settings, media and storage (local disk)</h2>
+<ul>
+  <li>Settings registry in code (general, maintenance, registration, storage): validated, cached, audited; secrets encrypted at rest, never returned, masked in the audit log (framework tested with a test-only secret; real secrets arrive with mail settings, Stage 9).</li>
+  <li>Public <code>GET /api/v1/site</code>; maintenance switch as a database flag (not <code>artisan down</code>, which is lost on Vercel): public API answers 503 with the message, staff and sign-in keep working, the public site shows "Back soon"; sign-up can be closed with a message.</li>
+  <li>Media library: licence limited to CC0, public domain or owner-supplied, credit required, used images cannot be deleted; every upload goes through one pipeline that honours the storage limits and re-encodes to WebP.</li>
+  <li>Every stored file records its disk and size, so old files keep working after a provider switch; storage test with usage figures. <span class="warn">The S3-compatible driver waits for owner decision D1.</span></li>
+</ul>
+
+<h2>Tests performed</h2>
+<div class="scroll"><table>
+<thead><tr><th>Check</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td><code>php artisan test</code></td><td class="ok">86 passed, 1289 assertions (was 55 / 381 at the start of the session)</td></tr>
+<tr><td><code>composer audit</code></td><td class="ok">clean</td></tr>
+<tr><td>admin repo: type-check, lint, unit tests, both builds</td><td class="ok">pass, 14 unit tests</td></tr>
+<tr><td>E2E (public 14 × Chromium, Firefox, Pixel 7; staff 11 × Chromium, Firefox)</td><td class="ok">64/64</td></tr>
+<tr><td><code>pnpm audit --prod</code></td><td>1 documented accepted advisory</td></tr>
+<tr><td>WebKit, axe, screen reader, Lighthouse, CI</td><td class="warn">not run</td></tr>
+</tbody></table></div>
+
+<h2>Problems and failed attempts</h2>
+<ul>
+  <li>Test-side mistakes, all fixed without weakening assertions: non-mass-assignable fields, audit column names, newest-first ordering, the factory password, guard mixing, a stale model, a "last admin" scenario that was not the last admin, an ambiguous locator, cleanup order.</li>
+  <li>The role confirmation text was reworded and broke an existing E2E check; the original wording was restored instead of editing the test.</li>
+  <li>Stage 3: a settings E2E cleanup removed rows but not the API's settings cache, so sign-up stayed closed for later tests; the cleanup now clears both, before and after. A full run then hit 429 because every browser shares 127.0.0.1; the general API limit became configurable and only the E2E server raises it.</li>
+  <li>The owner's <code>composer dev</code> held :8010 with the old <code>APP_URL</code> and an unmigrated database, so the first staff E2E run reused it and failed. The local database was migrated (additive) and the E2E API port made configurable (<code>E2E_API_PORT</code>).</li>
+</ul>
+
+<h2>Security considerations</h2>
+<ul>
+  <li>Permissions are checked by middleware and policies, never only in the UI; the route test covers every endpoint.</li>
+  <li>Invitation tokens are stored as SHA-256 hashes; an existing account cannot be taken over with a token alone.</li>
+  <li>Deactivated and suspended accounts lose sessions immediately and are refused at sign-in.</li>
+</ul>
+
+<h2>Next steps</h2>
+<ol>
+  <li>Stage 4 trust pipeline (next; no decision needed).</li>
+  <li>Stage 8 CMS content and Stage 9 settings screens (after Stage 4; D4 for crawler-visible SEO).</li>
+  <li>Owner decisions D1–D7, Q2, Q4, Q6–Q11 before the stages that need them; D3 (PostGIS) blocks Stages 5, 7 and 10.</li>
+</ol>
+</main>
+</body>
+</html>

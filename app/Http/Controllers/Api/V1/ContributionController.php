@@ -71,7 +71,16 @@ class ContributionController extends Controller
     public function update(Request $request, Contribution $contribution): ContributionResource
     {
         $this->authorize('update', $contribution);
-        $contribution->update($this->validated($request));
+        $fields = ['kind', 'title', 'body', 'observed_on', 'destination_id', 'route_id', 'route_segment_id', 'details'];
+        DB::transaction(function () use ($request, $contribution, $fields) {
+            $old = $contribution->only($fields);
+            $contribution->update($this->validated($request));
+            // Moderators can see what changed between submission and review.
+            $changed = array_keys($contribution->getChanges());
+            if (array_diff($changed, ['updated_at'])) {
+                Audit::record('contribution.edited', $contribution, array_intersect_key($old, array_flip($changed)), $contribution->only(array_intersect($fields, $changed)));
+            }
+        });
 
         return new ContributionResource($contribution->load(self::WITH));
     }
@@ -96,7 +105,7 @@ class ContributionController extends Controller
     {
         Gate::forUser($request->user())->authorize('view', $media->contribution);
 
-        return Storage::disk('local')->response($media->path, null, ['Content-Type' => 'image/webp', 'Cache-Control' => 'private, max-age=3600']);
+        return Storage::disk($media->disk)->response($media->path, null, ['Content-Type' => 'image/webp', 'Cache-Control' => 'private, max-age=3600']);
     }
 
     public function report(Request $request, Contribution $contribution): JsonResponse

@@ -49,6 +49,9 @@ class FortifyServiceProvider extends ServiceProvider
             if (! $user->hasVerifiedEmail()) {
                 throw ValidationException::withMessages(['email' => ['Confirm your email first: open the link we sent when you signed up.']]);
             }
+            if ($user->isDeactivated()) {
+                throw ValidationException::withMessages(['email' => ['This account is deactivated. Contact My Ride Nepal if you think this is a mistake.']]);
+            }
             if ($user->isSuspended()) {
                 throw ValidationException::withMessages(['email' => ['This account is suspended until '.$user->suspended_until->format('j M Y').'.']]);
             }

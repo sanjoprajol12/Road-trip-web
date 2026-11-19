@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 10: Option A and staff accounts | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:60rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; }
+  h2 { font-size:1.3rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.4rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  code { font-size:.88em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; word-break:break-word; }
+  .warn { color:var(--warn); font-weight:700; }
+  .ok { color:var(--ok); font-weight:700; }
+  ul, ol { padding-left:1.3rem; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; margin:.6rem 0 1rem; }
+  th, td { text-align:left; vertical-align:top; padding:.4rem .6rem; border-bottom:1px solid var(--line); }
+  th { background:var(--surface); }
+</style>
+</head>
+<body>
+<main>
+<p class="meta">My Ride Nepal · Session report</p>
+<h1>Session 10: Option A layout, independent apps, deployment fixes, separate staff authentication</h1>
+<p class="meta">2026-11-18 · Claude Code (Opus 5.5) · Migration stages A1–A6 · Nothing committed · One additive migration (dev and E2E databases)</p>
+
+<h2>Objective</h2>
+<p>Owner: complete the project from the migration plan onward; first finish the Option A migration (public app in <code>web/frontend</code>, staff portal alone in <code>admin</code>), independent dev/build/deploy, separate rider and staff authentication, using only an isolated E2E database.</p>
+
+<h2>Results</h2>
+<div class="scroll"><table><thead><tr><th>Stage</th><th>Result</th><th>Evidence</th></tr></thead><tbody>
+<tr><td>Recovery point</td><td class="ok">Done</td><td><code>_backups/2026-11-18-pre-option-a/web-admin-working-trees.tgz</code> (owner-only)</td></tr>
+<tr><td>Isolated E2E database</td><td class="ok">Done</td><td><code>myridenepal_e2e</code>; 87 audit rows from the first run there, none in the dev database</td></tr>
+<tr><td>A2 public app → <code>web/frontend</code></td><td class="ok">Done</td><td>type-check, lint, 7 unit tests, build; E2E 48/48</td></tr>
+<tr><td>A3 staff portal → <code>admin</code> root</td><td class="ok">Done</td><td>type-check, lint, 13 unit tests, build; E2E 22/22</td></tr>
+<tr><td>Independence</td><td class="ok">Verified</td><td>stopping either dev server leaves the other and the API answering; a frontend survives an API outage (502)</td></tr>
+<tr><td>A4 deployment config</td><td class="ok">Done</td><td><code>vercel.json</code> ×2 + guard script, <code>.env.production.example</code>, trusted proxies, CORS closed</td></tr>
+<tr><td>Vercel failure</td><td class="ok">Diagnosed and fixed</td><td>reproduced from <code>git archive HEAD</code>: <code>composer install --no-dev</code> failed on <code>config/scribe.php</code>; fixed; image built and served <code>/api/v1/health</code> 200 against a local database</td></tr>
+<tr><td>A5 route split</td><td class="ok">Done</td><td><code>route:list</code> identical before and after</td></tr>
+<tr><td>A6 staff accounts</td><td class="ok">Done</td><td>96 feature tests (1687 assertions) incl. <code>StaffAuthTest</code> and route-wide 401 checks both ways, mutation-checked</td></tr>
+</tbody></table></div>
+
+<h2>Security changes</h2>
+<ul>
+  <li>Staff have their own accounts, guard, cookie, session table (60 min idle, 12 h max), password broker (links to the staff portal), login and provisioning (invitation or <code>mrn:staff:create-admin</code>). No staff sign-up.</li>
+  <li>Rider credentials are refused at staff sign-in; rider sessions get 401 on every staff route and staff sessions 401 on every rider route.</li>
+  <li>Existing staff were carried over with the same roles and no password; accounts are never linked by email. Explicit rider linking (rider password required) feeds the self-review rule; same-email rider content is refused too.</li>
+  <li>Staff maintenance bypass replaced by signed 30-minute preview tokens.</li>
+  <li><span class="warn">Staff two-factor sign-in not enabled:</span> owner decision AR3.</li>
+</ul>
+
+<h2>Tests performed</h2>
+<div class="scroll"><table><thead><tr><th>Check</th><th>Result</th></tr></thead><tbody>
+<tr><td><code>php artisan test</code></td><td class="ok">96 passed, 1687 assertions</td></tr>
+<tr><td><code>composer audit</code></td><td class="ok">clean</td></tr>
+<tr><td>Public app checks</td><td class="ok">pass</td></tr>
+<tr><td>Staff portal checks</td><td class="ok">pass</td></tr>
+<tr><td>E2E public (Chromium, Firefox, Pixel 7)</td><td class="ok">48/48</td></tr>
+<tr><td>E2E staff (Chromium, Firefox)</td><td class="ok">22/22</td></tr>
+<tr><td><code>docker build -f Dockerfile.vercel</code></td><td class="ok">built and run</td></tr>
+<tr><td>WebKit, axe, Lighthouse, CI on GitHub</td><td class="warn">not run</td></tr>
+</tbody></table></div>
+
+<h2>Problems and resolutions</h2>
+<ul>
+  <li>The owner's old <code>pnpm dev</code> held :5181; it was identified and left running, and the independence check was repeated on spare ports.</li>
+  <li>Test harness assumed one shared session for every identity; it now mirrors separate browsers. No assertion was weakened: rider-on-staff-route expectations changed from 403 to the stricter 401, and self-review tests now cover linked and same-email staff.</li>
+  <li>Real bugs found and fixed: container build (Scribe), unnamed routes breaking <code>route:cache</code>, audit <code>actor_type</code> not stored, event resource treating staff as participants.</li>
+</ul>
+
+<h2>Next steps</h2>
+<ol><li>A7 feature-module refactor.</li><li>A8 dynamic homepage and CMS foundation.</li><li>Roadmap Stage 4 onward.</li><li>Owner: commit and push both repos; decisions AR3, AR4, AR5, D1–D7.</li></ol>
+</main>
+</body>
+</html>

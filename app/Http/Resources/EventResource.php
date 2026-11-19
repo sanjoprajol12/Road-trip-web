@@ -9,7 +9,8 @@ class EventResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
-        $mine = $this->registrationOf($request->user());
+        $rider = $request->user() instanceof \App\Models\User ? $request->user() : null; // staff are never participants
+        $mine = $this->registrationOf($rider);
 
         return [
             'id' => $this->id,
@@ -30,7 +31,7 @@ class EventResource extends JsonResource
             'organizer' => (new PublicUserResource($this->organizer))->toArray($request),
             'route' => $this->route ? ['slug' => $this->route->slug, 'name' => $this->route->name] : null,
             'my_registration' => $mine?->status->value,
-            'is_organizer' => $request->user()?->id === $this->organizer_id,
+            'is_organizer' => $rider !== null && $rider->id === $this->organizer_id,
             'updates' => $this->whenLoaded('updates', fn () => $this->updates->map(fn ($u) => [
                 'id' => $u->id, 'kind' => $u->kind, 'body' => $u->body, 'created_at' => $u->created_at?->toIso8601String(),
             ])->values()),

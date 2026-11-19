@@ -10,7 +10,7 @@ class ContributionMedia extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['contribution_id', 'path', 'width', 'height', 'alt'];
+    protected $fillable = ['contribution_id', 'disk', 'path', 'width', 'height', 'size_bytes', 'alt'];
 
     protected $hidden = ['path'];
 

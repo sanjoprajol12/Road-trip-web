@@ -8,8 +8,12 @@
 !**/.env.example
 node_modules
 vendor
-public/app
 storage/logs/*
 storage/framework/cache/data/*
 storage/framework/sessions/*
 storage/framework/views/*
+
+# Public website (its own project; deployed separately, never part of the API image)
+frontend/
+docs/
+tests/

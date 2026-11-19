@@ -7,6 +7,7 @@ use App\Http\Resources\DestinationResource;
 use App\Http\Resources\RouteResource;
 use App\Models\Destination;
 use App\Models\RideRoute;
+use App\Models\ServicePoint;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -33,6 +34,14 @@ class DestinationController extends Controller
         $routes = RideRoute::published()->with(['startDestination', 'endDestination'])
             ->where(fn ($w) => $w->where('start_destination_id', $d->id)->orWhere('end_destination_id', $d->id))->orderBy('name')->get();
 
-        return response()->json(['data' => (new DestinationResource($d))->toArray(request()), 'routes' => RouteResource::collection($routes)]);
+        // Practical stops staff attached to this destination; drafts and archived points stay hidden.
+        $services = ServicePoint::where('destination_id', $d->id)->where('status', 'published')->orderBy('kind')->orderBy('name')->get()
+            ->map(fn (ServicePoint $p) => [
+                'id' => $p->id, 'kind' => $p->kind, 'name' => $p->name, 'notes' => $p->notes,
+                'position' => $p->latitude !== null ? [$p->latitude, $p->longitude] : null,
+                'last_confirmed_on' => $p->last_confirmed_on?->toDateString(),
+            ]);
+
+        return response()->json(['data' => (new DestinationResource($d))->toArray(request()), 'routes' => RouteResource::collection($routes), 'services' => $services]);
     }
 }

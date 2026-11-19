@@ -2,6 +2,7 @@
 
 namespace App\Actions\Users;
 
+use App\Models\StaffAccount;
 use App\Models\User;
 use App\Support\Audit;
 use Carbon\CarbonInterface;
@@ -10,13 +11,11 @@ use Illuminate\Validation\ValidationException;
 
 class SuspendUser
 {
-    public function suspend(User $staff, User $target, CarbonInterface $until, string $reason): void
+    /** Riders only. Staff cannot act on their own rider account (linked, or with their email). */
+    public function suspend(StaffAccount $staff, User $target, CarbonInterface $until, string $reason): void
     {
-        if ($target->id === $staff->id) {
-            throw ValidationException::withMessages(['user' => ['You cannot suspend yourself.']]);
-        }
-        if ($target->isStaff() && ! $staff->isAdmin()) {
-            throw ValidationException::withMessages(['user' => ['Only administrators can suspend staff.']]);
+        if ($staff->isSamePersonAs($target->id)) {
+            throw ValidationException::withMessages(['user' => ['You cannot suspend your own rider account.']]);
         }
         DB::transaction(function () use ($target, $until, $reason) {
             $old = $target->only(['suspended_until', 'suspension_reason']);
