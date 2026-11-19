@@ -1,0 +1,6 @@
+# Settings only (a single package, not a monorepo).
+auditConfig:
+  ignoreGhsas:
+    # picomatch ReDoS: no patched release exists. Build-time only (vue-router's unplugin-utils, eslint);
+    # not in the shipped bundle. Re-check when a fix is released.
+    - GHSA-fc5q-39xc-vjpf

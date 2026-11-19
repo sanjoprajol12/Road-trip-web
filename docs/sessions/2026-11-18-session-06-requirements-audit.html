@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 06: Requirements Audit | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; --bad:#9b2c2c; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:60rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; }
+  h2 { font-size:1.3rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.4rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  code { font-size:.88em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; }
+  .warn { color:var(--warn); font-weight:700; }
+  .ok { color:var(--ok); font-weight:700; }
+  ul { padding-left:1.3rem; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; margin:.6rem 0 1rem; }
+  th, td { text-align:left; vertical-align:top; padding:.4rem .6rem; border-bottom:1px solid var(--line); }
+  th { background:var(--surface); }
+  td.n { text-align:right; font-variant-numeric:tabular-nums; }
+</style>
+</head>
+<body>
+<main>
+<p class="meta">My Ride Nepal · Session report</p>
+<h1>Session 06: complete product requirements audit</h1>
+<p class="meta">2026-11-18 · Claude Code (Opus 5.5) · Inspection only · Nothing committed · No remote database touched</p>
+
+<h2>Objective</h2>
+<p>Owner brief: check the whole project against every previously agreed requirement, not against the handoff alone. Report what is implemented, partial, missing or unverifiable, with evidence; check the architecture decision history; write a requirements matrix and a prioritized roadmap; do not change working code, restructure, delete or reset anything.</p>
+
+<h2>Initial state</h2>
+<ul>
+  <li>Handoff at session 5 (Vercel container preparation, done by a parallel session while this audit ran; its content was kept).</li>
+  <li>Before the audit, on request: the admin sign-in page failed because the Laravel API on :8010 was not running. Started it and created a local admin account <code>admin@local.test</code> (dev only, local database).</li>
+</ul>
+
+<h2>Method</h2>
+<ul>
+  <li>Sources read: <code>handoff.md</code>, every file in <code>docs/product</code>, <code>docs/architecture</code>, <code>docs/database</code>, <code>docs/security</code>, <code>docs/audits</code>, and the text of session reports 01–05.</li>
+  <li>The original owner briefs were never saved as files, so the baseline is rebuilt from documents written at the time. Requirements that appear only in today's brief are marked <em>brief only</em> for owner confirmation instead of being assumed.</li>
+  <li>Code read: all 11 migrations, <code>routes/api.php</code> (every route), all 5 policies, all actions, the public and admin controllers for every area, the API resources, and the list of API calls each SPA actually makes (to find endpoints without screens and screens without endpoints).</li>
+  <li>Status rule: "complete" only with an API, a usable screen, authorization, and a test that ran this session.</li>
+</ul>
+
+<h2>Result</h2>
+<div class="scroll"><table>
+<thead><tr><th>Area</th><th>Rows</th><th>Complete, tested</th><th>Complete, under-tested</th><th>Partial</th><th>Documented, not built</th><th>Missing</th><th>Unable to verify</th></tr></thead>
+<tbody>
+<tr><td>A Explore Nepal</td><td class="n">14</td><td class="n">0</td><td class="n">4</td><td class="n">6</td><td class="n">4</td><td class="n">0</td><td class="n">0</td></tr>
+<tr><td>B Routes and road information</td><td class="n">13</td><td class="n">3</td><td class="n">2</td><td class="n">7</td><td class="n">0</td><td class="n">1</td><td class="n">0</td></tr>
+<tr><td>C Rider experiences</td><td class="n">19</td><td class="n">8</td><td class="n">7</td><td class="n">4</td><td class="n">0</td><td class="n">0</td><td class="n">0</td></tr>
+<tr><td>D Events and rides</td><td class="n">21</td><td class="n">13</td><td class="n">2</td><td class="n">6</td><td class="n">0</td><td class="n">0</td><td class="n">0</td></tr>
+<tr><td>E Preparation and safety</td><td class="n">14</td><td class="n">2</td><td class="n">2</td><td class="n">9</td><td class="n">0</td><td class="n">0</td><td class="n">1</td></tr>
+<tr><td>F My Rides and group trips</td><td class="n">19</td><td class="n">8</td><td class="n">4</td><td class="n">5</td><td class="n">2</td><td class="n">0</td><td class="n">0</td></tr>
+<tr><td>G Accounts, roles, verification</td><td class="n">20</td><td class="n">16</td><td class="n">2</td><td class="n">0</td><td class="n">1</td><td class="n">0</td><td class="n">1</td></tr>
+<tr><td>H Trust, moderation, integrity</td><td class="n">12</td><td class="n">3</td><td class="n">0</td><td class="n">7</td><td class="n">1</td><td class="n">1</td><td class="n">0</td></tr>
+<tr><td>X Technical quality</td><td class="n">12</td><td class="n">3</td><td class="n">2</td><td class="n">3</td><td class="n">0</td><td class="n">0</td><td class="n">4</td></tr>
+<tr><th>Total</th><th class="n">144</th><th class="n">56</th><th class="n">25</th><th class="n">47</th><th class="n">8</th><th class="n">2</th><th class="n">6</th></tr>
+</tbody></table></div>
+<p>Full matrix with file paths, endpoints, constraints, policies and test names: <code>docs/audits/COMPLETE_PRODUCT_REQUIREMENTS_AUDIT.md</code>.</p>
+
+<h2>Main findings</h2>
+<ul>
+  <li><span class="ok">Strong and tested:</span> accounts, sessions, roles, claim-specific verification, organizer-only hosting, event joining with capacity lock and waitlist, private group trips, the moderation gate, the append-only audit log.</li>
+  <li><span class="warn">Content model thinner than the specification:</span> destinations have no attractions, permits, seasons, cost estimates or sources; routes have no difficulty, per-segment time, alternatives or filters.</li>
+  <li><span class="warn">Trust pipeline incomplete:</span> no moderation transition rules (rejected can jump to officially sourced), no "request correction", no automatic outdating or corroboration, no <code>last_confirmed_on</code> on contributions, item history invisible to moderators.</li>
+  <li><span class="warn">Built API, no screen:</span> "My events" (<code>GET /users/me/events</code>), editing a pending contribution (<code>PATCH /contributions/{id}</code>), email resend. Destination services and experiences are available from the API but not shown.</li>
+  <li><span class="warn">Consent gap:</span> a trip owner can add any rider to a group trip without that rider accepting (journey J7 says members accept).</li>
+  <li><span class="warn">Scope regression:</span> "saved services" (specification §6) was moved to "future recommendations" in session 4 without a recorded owner decision.</li>
+  <li>Safety areas have the review machinery but no content, as intended: content must come from qualified people.</li>
+  <li>Offline Ride Pack (agreed for a later milestone) is not started.</li>
+</ul>
+
+<h2>Architecture check</h2>
+<p>Implemented: <code>web</code> = Laravel API + public/rider SPA; <code>admin</code> = staff-only SPA. History: the session-1 addendum separated public and staff apps; the session-4 brief first placed all Vue code in <code>admin</code>; mid-session 4 the owner was asked directly and chose the current structure, recorded in five documents. That answer exists only in Claude-written documents, and today's brief calls the other structure "earlier approved". <span class="warn">Flagged for owner confirmation.</span> Nothing was restructured.</p>
+
+<h2>Changes made</h2>
+<div class="scroll"><table>
+<thead><tr><th>File</th><th>What</th></tr></thead>
+<tbody>
+<tr><td><code>docs/audits/COMPLETE_PRODUCT_REQUIREMENTS_AUDIT.md</code></td><td>new: 144-row requirements matrix, architecture check, 11 owner questions</td></tr>
+<tr><td><code>docs/audits/REMAINING_IMPLEMENTATION_ROADMAP.md</code></td><td>new: gaps in 7 categories, 9 stages with dependencies, suggestions kept separate</td></tr>
+<tr><td><code>docs/handoff.md</code></td><td>updated, six sections kept, session-5 content kept</td></tr>
+<tr><td>local database <code>myridenepal</code></td><td>one dev account <code>admin@local.test</code> with the admin role (owner request)</td></tr>
+</tbody></table></div>
+<p>No product code, migration or schema changed. Legacy SQL and archived requirements untouched.</p>
+
+<h2>Tests performed</h2>
+<div class="scroll"><table>
+<thead><tr><th>Check</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td><code>php artisan test</code> (real Postgres)</td><td>55 passed, 381 assertions</td></tr>
+<tr><td>web SPA: type-check, lint, unit, build</td><td>pass, 6/6</td></tr>
+<tr><td>admin SPA: type-check, lint, unit, build</td><td>pass, 12/12</td></tr>
+<tr><td>web E2E (Chromium, Firefox, Pixel 7)</td><td>27 passed</td></tr>
+<tr><td>admin E2E (Chromium, Firefox)</td><td>16 passed</td></tr>
+<tr><td><code>composer audit</code></td><td>no advisories</td></tr>
+<tr><td><code>pnpm audit --prod</code> (both)</td><td>clean apart from the one documented, accepted advisory</td></tr>
+<tr><td>WebKit, axe, screen reader, Lighthouse, CI on GitHub</td><td>not run (unchanged blockers)</td></tr>
+</tbody></table></div>
+
+<h2>Problems and failed attempts</h2>
+<ul>
+  <li>The session restarted mid-audit; the scratchpad (first E2E logs) was cleared and the :8010 server stopped. E2E was re-run from scratch.</li>
+  <li>The first status summary was counted by hand and was wrong; one row also used a non-standard status. Replaced with counts produced by a script over the rows.</li>
+  <li>The handoff had been updated by a parallel session (session 5) during the audit; this report is numbered 06 and that content was merged, not overwritten.</li>
+</ul>
+
+<h2>Security considerations</h2>
+<ul>
+  <li>Remote Supabase never contacted. No reset, no deletion.</li>
+  <li>The dev admin password was given to the owner in chat and is not written in any file.</li>
+  <li>Security-relevant gaps found: trip members added without consent; authorization matrix test is representative, not generated from all routes; rider contribution edits not audited; photos on a non-durable disk for the Vercel target.</li>
+</ul>
+
+<h2>Next steps</h2>
+<ol>
+  <li>Owner answers the 11 questions in the audit (Stage 0), starting with the architecture confirmation.</li>
+  <li>Stage 1, "wire what already exists" (no decisions needed): destination services and experiences, My events, edit pending contribution, email resend, missing notifications and tests, generated authorization matrix.</li>
+  <li>Stages 2–8 as in the roadmap.</li>
+</ol>
+</main>
+</body>
+</html>

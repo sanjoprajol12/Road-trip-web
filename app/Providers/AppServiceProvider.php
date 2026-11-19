@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Models\StaffAccount;
 use App\Models\User;
+use App\Support\Permissions;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -21,14 +23,21 @@ class AppServiceProvider extends ServiceProvider
         URL::forceRootUrl(config('app.url'));
         ResetPassword::createUrlUsing(fn (User $user, string $token) => url('/reset-password').'?'.http_build_query(['token' => $token, 'email' => $user->email]));
 
-        Gate::define('staff', fn (User $user) => $user->isStaff());
-        Gate::define('admin', fn (User $user) => $user->isAdmin());
+        // Staff rights exist only on staff accounts (guard `staff`). A rider account never passes these gates,
+        // whatever claims or history it has.
+        Gate::define('staff', fn ($user) => $user instanceof StaffAccount && $user->isActiveStaff());
+        Gate::define('admin', fn ($user) => $user instanceof StaffAccount && $user->isAdmin());
+        // One gate per registry permission: routes use `can:<key>`, policies call hasPermission().
+        foreach (Permissions::keys() as $key) {
+            Gate::define($key, fn ($user) => $user instanceof StaffAccount && $user->hasPermission($key));
+        }
 
         $per = fn (Request $r) => $r->user()?->id ?: $r->ip();
-        RateLimiter::for('api', fn (Request $r) => Limit::perMinute(120)->by($per($r)));
+        RateLimiter::for('api', fn (Request $r) => Limit::perMinute((int) config('mrn.limits.api_per_minute'))->by($per($r)));
         RateLimiter::for('register', fn (Request $r) => Limit::perHour((int) config('mrn.limits.register_per_hour'))->by($r->ip()));
         // Signed-in requests (password change/confirm) are limited per account, others per email and IP.
         RateLimiter::for('auth-email', fn (Request $r) => Limit::perMinutes(10, 5)->by(($r->user()?->id ?? Str::lower((string) $r->input('email'))).'|'.$r->ip()));
+        RateLimiter::for('staff-login', fn (Request $r) => Limit::perMinute(5)->by('staff|'.Str::lower((string) $r->input('email')).'|'.$r->ip()));
         RateLimiter::for('applications', fn (Request $r) => Limit::perDay(5)->by($per($r)));
         RateLimiter::for('contributions', fn (Request $r) => Limit::perDay(30)->by($per($r)));
         RateLimiter::for('reports', fn (Request $r) => Limit::perDay(30)->by($per($r)));

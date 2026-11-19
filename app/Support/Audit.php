@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\AuditLog;
+use App\Models\StaffAccount;
 use Illuminate\Database\Eloquent\Model;
 
 /** Writes the append-only audit trail. Call inside the same transaction as the change it records. */
@@ -12,6 +13,7 @@ final class Audit
     {
         AuditLog::create([
             'actor_id' => auth()->id(),
+            'actor_type' => auth()->user() instanceof StaffAccount ? 'staff' : 'user',
             'action' => $action,
             'subject_type' => $subject instanceof Model ? $subject->getTable() : $subject,
             'subject_id' => $subjectId ?? ($subject instanceof Model ? (string) $subject->getKey() : ''),

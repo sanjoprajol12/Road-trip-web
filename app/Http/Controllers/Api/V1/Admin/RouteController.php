@@ -27,7 +27,7 @@ class RouteController extends Controller
     public function store(Request $request): JsonResponse
     {
         $r = new RideRoute($this->validated($request));
-        $r->created_by = $request->user()->id;
+        $r->created_by_staff_id = $request->user()->id;
         $r->save();
         Audit::record('route.created', $r, null, $r->only(['name', 'status']));
 

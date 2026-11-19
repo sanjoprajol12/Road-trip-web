@@ -24,7 +24,7 @@ class GuideController extends Controller
     public function store(Request $request): GuideResource
     {
         $g = new Guide($this->validated($request));
-        $g->author_id = $request->user()->id;
+        $g->author_staff_id = $request->user()->id;
         $g->save();
         Audit::record('guide.created', $g, null, $g->only(['title', 'category']));
 

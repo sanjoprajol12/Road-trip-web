@@ -32,7 +32,8 @@ class VerificationController extends Controller
     public function show(Request $request, Verification $claim): JsonResponse
     {
         $history = AuditLog::where('subject_type', 'user_verifications')->where('subject_id', $claim->id)->orderBy('id')->get();
-        $names = User::whereIn('id', $history->pluck('actor_id')->filter())->pluck('display_name', 'id');
+        $ids = $history->pluck('actor_id')->filter();
+        $names = User::whereIn('id', $ids)->pluck('display_name', 'id')->union(\App\Models\StaffAccount::whereIn('id', $ids)->pluck('display_name', 'id'));
 
         return response()->json([
             'data' => $this->row($claim->load('user')) + [

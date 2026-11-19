@@ -21,7 +21,7 @@ class DestinationController extends Controller
     public function store(Request $request): DestinationResource
     {
         $d = new Destination($this->validated($request));
-        $d->created_by = $request->user()->id;
+        $d->created_by_staff_id = $request->user()->id;
         $d->save();
         Audit::record('destination.created', $d, null, $d->only(['name', 'status']));
 

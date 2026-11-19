@@ -3,7 +3,7 @@
 namespace App\Actions\Verification;
 
 use App\Enums\VerificationStatus;
-use App\Models\User;
+use App\Models\StaffAccount;
 use App\Models\Verification;
 use App\Notifications\VerificationDecided;
 use App\Support\Audit;
@@ -12,7 +12,7 @@ use Illuminate\Validation\ValidationException;
 
 class DecideVerification
 {
-    public function __invoke(User $reviewer, Verification $claim, VerificationStatus $to, ?string $note): Verification
+    public function __invoke(StaffAccount $reviewer, Verification $claim, VerificationStatus $to, ?string $note): Verification
     {
         $note = $note !== null && trim($note) !== '' ? trim($note) : null;
 
@@ -29,7 +29,7 @@ class DecideVerification
             $claim->forceFill([
                 'status' => $to,
                 'review_note' => $note ?? $claim->review_note,
-                'reviewed_by' => $reviewer->id,
+                'reviewed_by_staff_id' => $reviewer->id,
                 'reviewed_at' => now(),
             ])->save();
             Audit::record('verification.'.$to->value, $claim, $old, $claim->only(['status', 'review_note', 'kind', 'scope', 'user_id']));

@@ -10,7 +10,7 @@ class TripTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function as(?User $u)
+    private function as(?\Illuminate\Contracts\Auth\Authenticatable $u)
     {
         $this->app['auth']->forgetGuards();
 
@@ -28,7 +28,7 @@ class TripTest extends TestCase
         $this->as($stranger)->postJson("/api/v1/trips/{$id}/stops", ['name' => 'Sneaky'])->assertForbidden();
         $this->as($stranger)->getJson('/api/v1/trips')->assertOk()->assertJsonCount(0, 'data');
         $this->as(null)->getJson("/api/v1/trips/{$id}")->assertUnauthorized();
-        $this->as($this->staff('admin'))->getJson("/api/v1/trips/{$id}")->assertForbidden();
+        $this->as($this->staff('admin'))->getJson("/api/v1/trips/{$id}")->assertUnauthorized(); // staff have no rider session, so no way into private trips
     }
 
     public function test_group_roles_owner_editor_viewer(): void

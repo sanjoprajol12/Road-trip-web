@@ -19,7 +19,6 @@ class UserResource extends JsonResource
             'email_verified' => $this->email_verified_at !== null,
             'bio' => $this->bio,
             'home_city' => $this->home_city,
-            'roles' => $this->staffRoles(),
             'verified' => $this->verifications()->where('status', VerificationStatus::Approved->value)->get(['kind', 'scope'])
                 ->map(fn ($v) => ['kind' => $v->kind->value, 'scope' => $v->scope])->values(),
             'suspended_until' => $this->isSuspended() ? $this->suspended_until?->toIso8601String() : null,

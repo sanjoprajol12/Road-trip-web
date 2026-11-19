@@ -38,9 +38,15 @@ return [
     */
 
     'guards' => [
+        // Riders (public website). Sanctum's stateful API checks this guard only (config/sanctum.php).
         'web' => [
             'driver' => 'session',
             'provider' => 'users',
+        ],
+        // Staff (staff portal, /api/v1/admin): own accounts, own session cookie and table.
+        'staff' => [
+            'driver' => 'session',
+            'provider' => 'staff_accounts',
         ],
     ],
 
@@ -65,6 +71,10 @@ return [
         'users' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', User::class),
+        ],
+        'staff_accounts' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\StaffAccount::class,
         ],
 
         // 'users' => [
@@ -97,6 +107,12 @@ return [
             'provider' => 'users',
             'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
             'expire' => 30, // reset links work for 30 minutes
+            'throttle' => 60,
+        ],
+        'staff' => [
+            'provider' => 'staff_accounts',
+            'table' => 'staff_password_reset_tokens',
+            'expire' => 30,
             'throttle' => 60,
         ],
     ],

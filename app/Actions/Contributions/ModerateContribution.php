@@ -24,7 +24,7 @@ class ModerateContribution
             $old = $c->only(['status', 'moderation_note']);
             $c->forceFill(['status' => $to, 'moderation_note' => $note ? trim($note) : $c->moderation_note, 'source_url' => $sourceUrl ?? $c->source_url])->save();
             if ($to !== ContributionStatus::Flagged) {
-                $c->reports()->whereNull('resolved_at')->update(['resolved_at' => now(), 'resolved_by' => auth()->id()]);
+                $c->reports()->whereNull('resolved_at')->update(['resolved_at' => now(), 'resolved_by_staff_id' => auth('staff')->id()]);
             }
             Audit::record('contribution.'.$to->value, $c, $old, $c->only(['status', 'moderation_note', 'author_id', 'kind']));
 

@@ -10,7 +10,7 @@ class ContributionResource extends JsonResource
     public function toArray(Request $request): array
     {
         $user = $request->user();
-        $insider = $user && ($user->id === $this->author_id || $user->isStaff());
+        $insider = $user instanceof \App\Models\StaffAccount ? $user->hasPermission('contributions.moderate') : ($user && $user->id === $this->author_id);
 
         return [
             'id' => $this->id,

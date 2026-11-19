@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 07: Scope and Option B | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:60rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; }
+  h2 { font-size:1.3rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.4rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  code { font-size:.88em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; word-break:break-word; }
+  .warn { color:var(--warn); font-weight:700; }
+  .ok { color:var(--ok); font-weight:700; }
+  ul, ol { padding-left:1.3rem; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; margin:.6rem 0 1rem; }
+  th, td { text-align:left; vertical-align:top; padding:.4rem .6rem; border-bottom:1px solid var(--line); }
+  th { background:var(--surface); }
+  td.n { text-align:right; font-variant-numeric:tabular-nums; }
+  pre { background:var(--surface); border:1px solid var(--line); padding:.8rem; overflow-x:auto; font-size:.85rem; }
+</style>
+</head>
+<body>
+<main>
+<p class="meta">My Ride Nepal · Session report</p>
+<h1>Session 07: expanded scope and architecture Option B</h1>
+<p class="meta">2026-11-18 · Claude Code (Opus 5.5) · Nothing committed · No remote database touched · No destructive database operation</p>
+
+<h2>Objective</h2>
+<ol>
+  <li>Owner brief "Additional Mandatory Product Requirements": record CMS and site settings, CMS content, admin users/roles/permissions, destination mapping, Explore Along My Route and restored saved services as agreed scope; define frontend, endpoints, database, authorization, validation, tests and dependencies per requirement; find conflicts; rebuild the roadmap. Do not implement them yet.</li>
+  <li>Owner decision "Option B" (final): <code>web</code> = Laravel backend only; <code>admin</code> = both Vue apps in <code>src/apps/public</code> and <code>src/apps/admin</code>. Plan a recoverable migration and execute it; keep everything working.</li>
+</ol>
+
+<h2>Initial state</h2>
+<ul>
+  <li>Both repos committed and pushed by the owner (<code>web</code> ccc0f45, <code>admin</code> 1e9563e); only session-6 docs uncommitted.</li>
+  <li>Public SPA in <code>web/resources/app</code>, served by Laravel from <code>public/app</code>; staff SPA in <code>admin/src</code>; two E2E suites in two repos.</li>
+</ul>
+
+<h2>Scope update</h2>
+<div class="scroll"><table>
+<thead><tr><th>Module</th><th class="n">Rows</th><th class="n">Complete</th><th class="n">Partial</th><th class="n">Documented, not built</th><th class="n">Missing</th></tr></thead>
+<tbody>
+<tr><td>N1 Site settings</td><td class="n">12</td><td class="n">0</td><td class="n">3</td><td class="n">0</td><td class="n">9</td></tr>
+<tr><td>N2 CMS content</td><td class="n">24</td><td class="n">0</td><td class="n">2</td><td class="n">0</td><td class="n">22</td></tr>
+<tr><td>N3 Admin users, roles, permissions</td><td class="n">12</td><td class="n">2</td><td class="n">6</td><td class="n">0</td><td class="n">3</td></tr>
+<tr><td>N4 Destination mapping</td><td class="n">14</td><td class="n">1</td><td class="n">7</td><td class="n">4</td><td class="n">2</td></tr>
+<tr><td>N5 Explore Along My Route</td><td class="n">16</td><td class="n">0</td><td class="n">1</td><td class="n">0</td><td class="n">15</td></tr>
+<tr><td>N6 Saved services</td><td class="n">3</td><td class="n">0</td><td class="n">0</td><td class="n">3</td><td class="n">0</td></tr>
+</tbody></table></div>
+<p>(N3 also has 1 suggestion row, staff MFA. Counted by script.) Part 1 (144 earlier requirements) stays in the audit unchanged; nothing was dropped.</p>
+<p><strong>Conflicts found and how they are handled:</strong></p>
+<ul>
+  <li>Fixed staff roles (<code>user_roles</code> + <code>can:staff</code>/<code>can:admin</code>) vs module/action permissions: plain tables (no new package), system roles seeded to today's rights, backfill, gates switched, old table retired only after verification. Permissions are defined in code, because a UI-created permission nothing checks would grant nothing.</li>
+  <li>SMTP and storage settings from the database vs Laravel's boot-time config: applied per request from cache, <code>.env</code> as fallback; secrets encrypted with the app key, never returned, masked in audit rows.</li>
+  <li>Maintenance mode: <code>artisan down</code> is per-instance and ephemeral on Vercel: use a database flag.</li>
+  <li>SEO and social metadata vs a client-rendered SPA: crawlers do not see Vue-set tags (decision D4).</li>
+  <li>Configurable tile URL vs a static Content Security Policy: tile hosts from an allow-list.</li>
+  <li>Routing and geocoding are separate providers from tiles; their keys stay in Laravel behind proxy endpoints; no time or distance is shown without a provider or an "estimate" label.</li>
+  <li>Places vs services: services stay in <code>service_points</code>, points of interest get a new <code>places</code> table; rider-submitted places use the moderation rules.</li>
+  <li>Route discovery needs real geometry (today only segment endpoints) and spatial queries: PostGIS is available locally (3.3.7) but needs approval (D3).</li>
+  <li>Durable media on Vercel needs an object store and a new Composer package (D1).</li>
+</ul>
+
+<h2>Roadmap</h2>
+<p>Stage M (migration, done) → 1 wire what exists → 2 permissions → 3 settings, media, storage → 4 trust pipeline → 5 location foundation (PostGIS, places, geometry, map settings, geo proxies) → 6 freshness → 7 destination and route depth → 8 CMS content → 9 settings screens → 10 Explore Along My Route → 11 My Rides and events completion (saved services) → 12 safety content → 13 verification track and privacy → 14 Offline Ride Pack. Foundations come before the features that use them; earlier gaps are not skipped.</p>
+
+<h2>Migration (Option B)</h2>
+<p><strong>Recovery point first:</strong> git <code>HEAD</code> of both repos plus archives of both working trees (including git-ignored <code>.env</code> files) in <code>/var/www/html/Road-trip/_backups/2026-11-18-pre-option-b/</code>, owner-only permissions. The old public app in <code>web</code> was deleted only after the new builds passed the full E2E suite.</p>
+<pre>admin/
+  src/apps/public/   public website (from web/resources/app; photos and LICENSES.md in public/images/photos)
+  src/apps/admin/    staff app (from admin/src)
+  src/shared/lib/    api/client.ts, format.ts (union), safeNext.ts (+ their tests)
+  e2e/public/        web E2E (moved)      e2e/admin/   staff E2E      e2e/support/local.ts (merged)
+  vite.config.ts     --mode public | admin → dist/public | dist/admin (dev 5180/5181, preview 4180/4181)
+web/
+  routes/web.php     no SPA fallback (Laravel answers 404 outside /api)
+  package.json       Supabase CLI only</pre>
+<ul>
+  <li>226 <code>@/</code> imports rewritten to <code>@public/</code> or <code>@admin/</code>; ESLint <code>no-restricted-imports</code> forbids cross-app and app-from-shared imports (probe confirmed the error).</li>
+  <li>Removed from <code>web</code>: <code>resources/app</code>, <code>e2e</code>, Vite/TS/ESLint/Vitest/Playwright configs, <code>public/app</code>, <code>public/images</code>, SPA favicon, caches. CSP for HTML no longer allows map tiles (no frontend there). Dockerfile builds no frontend. Composer scripts no longer call npm.</li>
+  <li>CI: web runs backend tests and <code>composer audit</code>; admin runs both apps' checks and the combined E2E (Postgres + Mailpit, backend checked out from Road-trip-web).</li>
+  <li>Laravel <code>APP_URL</code> = public website origin (email links); E2E starts Laravel with the public preview origin and both stateful domains.</li>
+</ul>
+
+<h2>Tests performed</h2>
+<div class="scroll"><table>
+<thead><tr><th>Check</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td><code>php artisan test</code></td><td class="ok">55 passed, 381 assertions</td></tr>
+<tr><td><code>composer audit</code></td><td class="ok">no advisories</td></tr>
+<tr><td>admin repo: type-check, lint, unit tests, both builds</td><td class="ok">pass, 14 tests (duplicate tests from the two old apps merged)</td></tr>
+<tr><td>E2E before deleting the old app (public 9 × Chromium, Firefox, Pixel 7; staff 8 × Chromium, Firefox)</td><td>40/43, then <span class="ok">43/43</span> after a test-data fix</td></tr>
+<tr><td>E2E after cleaning <code>web</code></td><td class="ok">43/43</td></tr>
+<tr><td>Laravel paths: <code>/</code>, <code>/explore</code>, <code>/api/v1/health</code></td><td>404, 404, 200</td></tr>
+<tr><td><code>pnpm audit --prod</code> (admin / web)</td><td>1 documented accepted advisory / none</td></tr>
+<tr><td>CI workflows</td><td>YAML parses; never run on GitHub</td></tr>
+<tr><td>WebKit, axe, screen reader, Lighthouse</td><td class="warn">not run (unchanged)</td></tr>
+</tbody></table></div>
+
+<h2>Problems and failed attempts</h2>
+<ul>
+  <li>One E2E test built a username from the project name; the new name <code>public-chromium</code> has a hyphen, which the username rule refuses (3 failures). Fixed in the test; a second test's <code>slice(0, 6)</code> would have given the same prefix to every project and was fixed too.</li>
+  <li>A <code>pkill</code> for a probe server matched its own shell; the probe server was confirmed stopped.</li>
+</ul>
+
+<h2>Security considerations</h2>
+<ul>
+  <li>No secrets moved into either frontend; the archived <code>.env</code> files are readable by the owner only. The old Supabase <code>.env.local</code> in <code>web/resources/app</code> was not copied into the new app (it is only in the archive).</li>
+  <li>Planned rules recorded for the new scope: encrypted, masked, audited settings; provider keys only server-side; SVG sanitizing for brand assets; signed short-lived preview tokens; permission per endpoint with a generated route test; no admin permission ever derived from rider verification.</li>
+</ul>
+
+<h2>Next steps</h2>
+<ol>
+  <li>Owner commits the new layout in both repos (the backup folder can then be removed) and pushes so CI runs.</li>
+  <li>Owner decisions D1–D7 and Q2, Q4, Q6–Q11 (audit Part 4), each before the stage that needs it.</li>
+  <li>Stage 1, "wire what already exists" (needs no decision), then Stage 2 (permissions) and Stage 3 (settings, media, storage).</li>
+</ol>
+</main>
+</body>
+</html>

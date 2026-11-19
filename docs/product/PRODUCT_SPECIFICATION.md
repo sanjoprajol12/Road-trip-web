@@ -2,7 +2,9 @@
 
 Status legend: **Built** (exists and verified), **Designed** (spec + schema plan, not built), **Later**.
 
-> **Update 2026-11-18 (session 4):** the six product areas are now built on the Laravel API (web SPA + staff SPA): Explore, Routes (map, segments, services, segment reports), Rider Experiences (progressive form, photos, library, search, profiles), Events & Rides (hosting, joining, invitations, capacity, waitlist, updates, attendance), Preparation & Safety (guides with sources and expert review, checklists, emergency contacts), My Rides (personal and group trips). Not built: Offline Ride Pack (PWA). The tables below are the original plan.
+> **Update 2026-11-18 (session 7):** architecture Option B: Laravel API in `web`, both frontends in `admin` (`src/apps/public`, `src/apps/admin`). The owner added mandatory scope (CMS and settings, admin permissions, destination mapping, Explore Along My Route, saved services): see `../audits/COMPLETE_PRODUCT_REQUIREMENTS_AUDIT.md` Part 2. Status per requirement is in that audit, not in the tables below.
+>
+> **Update 2026-11-18 (session 4):** the six product areas are now built on the Laravel API (public SPA + staff SPA): Explore, Routes (map, segments, services, segment reports), Rider Experiences (progressive form, photos, library, search, profiles), Events & Rides (hosting, joining, invitations, capacity, waitlist, updates, attendance), Preparation & Safety (guides with sources and expert review, checklists, emergency contacts), My Rides (personal and group trips). Not built: Offline Ride Pack (PWA). The tables below are the original plan.
 
 ## 1. Explore Nepal
 | Capability | Status | Notes |

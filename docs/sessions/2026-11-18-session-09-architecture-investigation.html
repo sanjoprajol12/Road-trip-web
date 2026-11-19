@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 09: Architecture investigation | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:60rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; }
+  h2 { font-size:1.3rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.4rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  code { font-size:.88em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; word-break:break-word; }
+  .warn { color:var(--warn); font-weight:700; }
+  .ok { color:var(--ok); font-weight:700; }
+  ul, ol { padding-left:1.3rem; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; margin:.6rem 0 1rem; }
+  th, td { text-align:left; vertical-align:top; padding:.4rem .6rem; border-bottom:1px solid var(--line); }
+  th { background:var(--surface); }
+</style>
+</head>
+<body>
+<main>
+<p class="meta">My Ride Nepal · Session report</p>
+<h1>Session 09: Architecture investigation, project comparison and migration plan</h1>
+<p class="meta">2026-11-18 · Claude Code (Opus 5.5) · Investigation only · No code, schema, data, dependency, process or git change · Nothing committed</p>
+
+<h2>Objective</h2>
+<p>Owner brief "Architecture Investigation, Project Comparison &amp; Structural Improvement": compare My Ride Nepal with the consultancy and ERP projects, explain why stopping one dev server stops both apps, find the Vercel problem, design separate rider and staff authentication, a modular staff portal and a database-driven homepage, recheck every requirement, and deliver a staged plan before any implementation.</p>
+
+<h2>Projects inspected</h2>
+<div class="scroll"><table>
+<thead><tr><th>Project</th><th>Path</th><th>Shape</th></tr></thead>
+<tbody>
+<tr><td>My Ride Nepal</td><td><code>/var/www/html/Road-trip/{web,admin}</code></td><td>web = Laravel API only; admin = both Vue apps (Option B)</td></tr>
+<tr><td>Consultancy</td><td><code>/var/www/html/consultancy/{web,portal}</code></td><td>web = Laravel + six Inertia entries; portal = admin SPA; separate guard and table per audience</td></tr>
+<tr><td>ERP</td><td><code>/var/www/html/erp/{erp-web,erp-portal}</code></td><td>erp-web = Laravel + Inertia site, routes per module; erp-portal = admin SPA with services and types per module; separate staff session cookie and staff login with 2FA</td></tr>
+</tbody></table></div>
+<p>Other folders in <code>/var/www/html</code> were listed but not needed.</p>
+
+<h2>Files inspected (main ones)</h2>
+<ul>
+  <li>My Ride Nepal: <code>admin/{package.json,vite.config.ts,.env.example}</code>, <code>admin/.env</code> and <code>.env.local</code> (variable names only), <code>admin/src/apps/*/app/router/index.ts</code>, <code>staffAccess.ts</code>, <code>HomePage.vue</code>, <code>SiteFooter.vue</code>, <code>SettingsPage.vue</code>, <code>MediaPage.vue</code>; <code>web/{composer.json,package.json,Dockerfile.vercel,Caddyfile,.dockerignore}</code>, <code>web/config/{auth,sanctum,session,cors,fortify,mrn}.php</code>, <code>web/routes/api.php</code>, <code>AuthController.php</code>, policies, <code>MaintenanceMode.php</code>; <code>git show HEAD:</code> of <code>Dockerfile.vercel</code>, <code>routes/web.php</code>, <code>.env.example</code>, <code>package.json</code>; audit, roadmap, FEATURE_SCOPE.</li>
+  <li>Consultancy: <code>web/{package.json,vite.config.ts,composer.json,config/auth.php,routes/*}</code>, <code>portal/{package.json,vite.config.ts,.env.example,src/*}</code>.</li>
+  <li>ERP: <code>erp-web/{package.json,vite.config.js,composer.json,config/auth.php,routes/**,bootstrap/app.php}</code>, <code>SelectAuthenticationSession.php</code>, <code>AuthenticatePortal.php</code>; <code>erp-portal/{package.json,vite.config.ts,src/views/pages/{cms,site-setting}/**,src/services/**}</code>.</li>
+  <li>Vercel documentation (current): PHP with Docker guide, Dockerfile changelog of 2026-06-30.</li>
+</ul>
+
+<h2>Commands executed</h2>
+<ul>
+  <li>Read-only: <code>ls</code>, <code>find</code>, <code>grep</code>, <code>jq</code>, <code>wc</code>, <code>git remote -v</code>, <code>git log</code>, <code>git show</code>, <code>git ls-tree</code>, <code>git check-ignore</code>, <code>ps</code> (identified the owner's <code>composer dev</code> on :8010; not touched).</li>
+  <li>Checks: <code>php artisan test</code>, <code>composer audit</code> (web); <code>pnpm type-check</code>, <code>pnpm exec oxlint .</code>, <code>pnpm exec eslint .</code> (no <code>--fix</code>), <code>pnpm test:unit</code>, <code>pnpm build-only</code>, <code>pnpm audit --prod</code> (admin).</li>
+  <li>Web: one search and two page reads of vercel.com (no project data sent).</li>
+</ul>
+
+<h2>Findings</h2>
+<ol>
+  <li><strong>Why both apps stop:</strong> <code>admin</code> <code>pnpm dev</code> is <code>run-p dev:public dev:admin</code>: one parent process for both Vite servers. There is no runtime coupling. The two apps share one <code>package.json</code>, Vite config, lockfile, <code>.env</code>, CI, E2E and repo, so they cannot be deployed with separate configurations.</li>
+  <li><strong>Vercel:</strong> no linked project or logs here; Vercel can run the API container (<code>Dockerfile.vercel</code> is the documented mechanism). GitHub <code>HEAD</code> is still the pre-Option-B layout. It cannot serve pages without a production database (sessions and cache are database-backed, DB defaults to 127.0.0.1) and <code>APP_KEY</code>; frontends have no <code>vercel.json</code> (no API rewrite, no SPA fallback); local-disk uploads and the database queue are not durable on Vercel; Hobby terms are an owner question.</li>
+  <li><strong>Authentication:</strong> one guard, one <code>users</code> table, one cookie and 7-day session for riders and staff; the staff app signs in through the rider endpoint; staff reset links go to the public site; any rider can be given a staff role. No escalation exists (every staff route is permission-checked and tested; registration accepts three fields), but rider credentials can open a staff-origin session and become staff credentials.</li>
+  <li><strong>Frontend organisation:</strong> 37 <code>.vue</code> files call the API directly; only three service files; <code>PeoplePage</code>, <code>SettingsPage</code>, <code>MediaPage</code>, <code>TripPage</code> mix several jobs (files are under 300 lines: responsibility, not size, is the problem); 10 API types defined in both apps; all runtime dependencies used.</li>
+  <li><strong>Homepage:</strong> hero copy, headline lines, CTAs, hero image and credit, section headings and texts, freshness legend, header menu and footer copy are hard-coded; no CMS tables exist beyond the media library and settings.</li>
+  <li><strong>Requirements:</strong> 261 rows (225 audited + 36 new): 87 complete and tested, 19 under-tested, 66 partial, 15 documented-not-built, 67 missing, 6 unverifiable, 1 suggestion. The original master brief was never saved as a file.</li>
+</ol>
+
+<h2>Recommendations (proposed, not implemented)</h2>
+<ul>
+  <li><strong>Option A:</strong> Laravel stays at the <code>web</code> root; public app in <code>web/frontend/</code>; staff app at the <code>admin</code> root. Commands: <code>composer dev</code> (API :8010), <code>pnpm dev</code> in <code>web/frontend</code> (:5180), <code>pnpm dev</code> in <code>admin</code> (:5181). Three Vercel projects, each with its own config.</li>
+  <li><strong>Staff accounts separated:</strong> own table, guard, cookie, shorter sessions, login, password broker, invitation-only provisioning, optional 2FA with Fortify's built-in support (no new package), and ten tests including "a rider cannot authenticate as staff".</li>
+  <li><strong>Modules:</strong> one page per responsibility, a service and types per feature, shared admin UI primitives, settings as one page per group with tabs.</li>
+  <li><strong>Homepage:</strong> section registry with draft/published data, featured items, preview, publish, seeded with the current copy so nothing changes visually on day one.</li>
+</ul>
+
+<h2>Decisions needed from the owner</h2>
+<div class="scroll"><table>
+<thead><tr><th>#</th><th>Decision</th></tr></thead>
+<tbody>
+<tr><td>AR1</td><td>Replace Option B by Option A</td></tr>
+<tr><td>AR2 / AR2b</td><td>Separate staff accounts; may a person hold both, and must they link them</td></tr>
+<tr><td>AR3</td><td>Staff two-factor sign-in (at least administrators)</td></tr>
+<tr><td>AR4</td><td>Hosting plan (Vercel Hobby terms)</td></tr>
+<tr><td>AR5</td><td>Production Postgres provider</td></tr>
+<tr><td>D1–D7, Q2, Q4, Q6–Q11</td><td>unchanged from the audit; D4 matters for homepage SEO</td></tr>
+</tbody></table></div>
+
+<h2>Tests performed</h2>
+<div class="scroll"><table>
+<thead><tr><th>Check</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td><code>php artisan test</code> (<code>myridenepal_test</code>)</td><td class="ok">86 passed, 1289 assertions</td></tr>
+<tr><td><code>composer audit</code></td><td class="ok">clean</td></tr>
+<tr><td>admin: type-check, oxlint + eslint without <code>--fix</code>, unit tests, both builds</td><td class="ok">pass, 14 unit tests</td></tr>
+<tr><td><code>pnpm audit --prod</code></td><td>1 reviewed and ignored advisory</td></tr>
+<tr><td>E2E</td><td class="warn">not run: it writes to the local development database (no isolated E2E database)</td></tr>
+</tbody></table></div>
+
+<h2>Risks</h2>
+<ul>
+  <li><span class="warn">Sessions 7–8 exist only on disk:</span> GitHub <code>HEAD</code> is the pre-Option-B layout and the backup folder predates Option B. The owner should commit before any move.</li>
+  <li>The staff authentication split (A6) is the largest change: self-review, staff visibility of pending/private items, maintenance bypass and audit actors all need tests before and after.</li>
+  <li>The Vercel diagnosis is from code, not from a log.</li>
+</ul>
+
+<h2>Problems and failed attempts</h2>
+<ul>
+  <li>zsh expanded unquoted <code>--include=*.vue</code> patterns; reran with quotes.</li>
+  <li>One check command needed to be re-issued for auto-mode review.</li>
+  <li>The first gap-analysis totals counted 25 new rows instead of 36; corrected.</li>
+</ul>
+
+<h2>Documents produced</h2>
+<ul>
+  <li><code>docs/architecture/PROJECT_COMPARISON.md</code></li>
+  <li><code>docs/architecture/CURRENT_ARCHITECTURE_AUDIT.md</code></li>
+  <li><code>docs/architecture/PROPOSED_ARCHITECTURE.md</code></li>
+  <li><code>docs/architecture/MIGRATION_PLAN.md</code></li>
+  <li><code>docs/architecture/REQUIREMENTS_GAP_ANALYSIS.md</code></li>
+  <li><code>docs/handoff.md</code> (session 9 added, earlier content kept), pointer line in <code>docs/audits/REMAINING_IMPLEMENTATION_ROADMAP.md</code></li>
+</ul>
+
+<h2>Next steps</h2>
+<ol>
+  <li>Owner: decisions AR1–AR5; commit and push both repos; share the Vercel log; add the master brief if it exists.</li>
+  <li>Then migration stages A1–A8 (<code>MIGRATION_PLAN.md</code>), each with full checks.</li>
+  <li>Then roadmap Stage 4 (trust pipeline) and onward.</li>
+</ol>
+</main>
+</body>
+</html>

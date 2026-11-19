@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Destination;
+use App\Models\Contribution;
 use App\Models\RideRoute;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -14,7 +15,7 @@ class ContributionTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function as(?User $u)
+    private function as(?\Illuminate\Contracts\Auth\Authenticatable $u)
     {
         $this->app['auth']->forgetGuards();
 
@@ -57,7 +58,7 @@ class ContributionTest extends TestCase
         $this->as(null)->getJson('/api/v1/contributions')->assertJsonCount(0, 'data');
         $this->as($author)->getJson("/api/v1/contributions/{$id}")->assertOk();
 
-        $this->as($this->rider())->postJson("/api/v1/admin/contributions/{$id}/decision", ['status' => 'published'])->assertForbidden();
+        $this->as($this->rider())->postJson("/api/v1/admin/contributions/{$id}/decision", ['status' => 'published'])->assertUnauthorized();
         $this->as($this->staff('moderator'))->postJson("/api/v1/admin/contributions/{$id}/decision", ['status' => 'rejected', 'moderation_note' => 'short'])->assertStatus(422);
         $this->as($this->staff('moderator'))->postJson("/api/v1/admin/contributions/{$id}/decision", ['status' => 'officially_sourced'])->assertStatus(422)->assertJsonValidationErrors('source_url');
         $this->as($this->staff('moderator'))->postJson("/api/v1/admin/contributions/{$id}/decision", ['status' => 'published', 'body' => 'rewritten'])->assertOk();
@@ -68,9 +69,21 @@ class ContributionTest extends TestCase
 
     public function test_authors_cannot_moderate_their_own_contributions(): void
     {
-        $mod = $this->staff('moderator');
-        $id = $this->as($mod)->postJson('/api/v1/contributions', $this->report(['route_segment_id' => $this->segmentId()]))->json('data.id');
-        $this->as($mod)->postJson("/api/v1/admin/contributions/{$id}/decision", ['status' => 'published'])->assertForbidden();
+        $author = $this->rider();
+        $segment = $this->segmentId();
+        // A staff account cannot write as a rider at all: it has no rider session.
+        $this->as($this->staff('moderator'))->postJson('/api/v1/contributions', $this->report(['route_segment_id' => $segment]))->assertUnauthorized();
+        $id = $this->as($author)->postJson('/api/v1/contributions', $this->report(['route_segment_id' => $segment]))->json('data.id');
+
+        // The author's own staff account: linked explicitly, or (conservatively) carrying the same email.
+        $linked = $this->staff('moderator', $author);
+        $sameEmail = $this->staff('moderator');
+        $sameEmail->forceFill(['email' => $author->email])->save();
+        $this->as($linked)->postJson("/api/v1/admin/contributions/{$id}/decision", ['status' => 'published'])->assertForbidden();
+        $this->as($sameEmail)->postJson("/api/v1/admin/contributions/{$id}/decision", ['status' => 'published'])->assertForbidden();
+        $this->assertSame('pending_review', Contribution::find($id)->status->value);
+        // Any other moderator may decide.
+        $this->as($this->staff('moderator'))->postJson("/api/v1/admin/contributions/{$id}/decision", ['status' => 'published'])->assertOk();
     }
 
     public function test_three_reports_flag_a_published_contribution(): void

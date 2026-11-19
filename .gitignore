@@ -23,8 +23,6 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 
-# Vue SPA (resources/app) build output and tooling
-/public/app
 *.tsbuildinfo
 .eslintcache
 *.local

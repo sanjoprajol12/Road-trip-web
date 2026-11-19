@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Support\Audit;
+use App\Support\Settings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,6 +30,8 @@ class AuthController extends Controller
 
     public function register(Request $request): JsonResponse
     {
+        // Closing sign-up (a site setting) does not affect staff invitations or existing accounts.
+        abort_unless(Settings::get('registration.open'), 403, Settings::get('registration.closed_message'));
         $data = $request->validate([
             'display_name' => ['required', 'string', 'min:2', 'max:60'],
             'email' => ['required', 'string', 'email:rfc', 'max:255'],

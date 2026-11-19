@@ -8,5 +8,5 @@ class EventUpdate extends Model
 {
     public const UPDATED_AT = null;
 
-    protected $fillable = ['event_id', 'author_id', 'kind', 'body'];
+    protected $fillable = ['event_id', 'author_id', 'author_staff_id', 'kind', 'body'];
 }
