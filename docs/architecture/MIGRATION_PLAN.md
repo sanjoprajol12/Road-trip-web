@@ -1,6 +1,6 @@
 # Migration Plan: independent apps, separate staff authentication, modular frontends, dynamic homepage
 
-Date: 2026-11-18 (session 9). **Status (session 10): A0 replaced by a recovery archive (no commits allowed), A1–A6 done and verified; A7 and A8 next.** Stages A0–A8 implement `PROPOSED_ARCHITECTURE.md`; after them the product roadmap (`docs/audits/REMAINING_IMPLEMENTATION_ROADMAP.md`) continues from Stage 4. Stage A8 replaces the homepage part of roadmap Stages 8 and 9.
+Date: 2026-11-18 (session 9). **Status (session 10): A0 replaced by a recovery archive (no commits allowed); A1–A6 and A8 done and verified; A7 done except splitting `TripPage` and `MediaPage` into components (moved to roadmap Stage 11 / media work).** Stages A0–A8 implement `PROPOSED_ARCHITECTURE.md`; after them the product roadmap (`docs/audits/REMAINING_IMPLEMENTATION_ROADMAP.md`) continues from Stage 4. Stage A8 replaces the homepage part of roadmap Stages 8 and 9.
 
 Rules for every stage (from CLAUDE.md, unchanged): nothing destructive; new columns nullable or defaulted; old structures retired only after the replacement is verified **and the owner confirms**; every new endpoint has a policy/permission, validation, an audit row for staff decisions, and a feature test; the full check list runs at the end of each stage; `handoff.md` and a session report are updated. **No commits by Claude**: each recovery point below is a commit **the owner makes**.
 
@@ -118,6 +118,8 @@ A2 and A3 can run in either order but in one session each. A6 needs A5 (route fi
 
 ## A7. Frontend module restructure (behaviour-preserving)
 
+**Done (session 10):** every API call in both apps goes through `features/*/services` (lint rule forbids importing the raw `api` client in pages and components); People split into Riders/Staff/Roles/Profile; Settings split into one page per group under a tabbed layout (`useSettingsGroup`, `SettingsForm`); homepage split into section components. Remaining: `TripPage` panels, `MediaPage` components.
+
 - **Objective:** one responsibility per page; services and types per feature (`PROPOSED_ARCHITECTURE.md` §8).
 - **Files:** staff app: `PeoplePage.vue` → `riders/` + `staff/`; `SettingsPage.vue` → one page per group + `SettingsLayout.vue` + `useSettingsGroup.ts`; `MediaPage.vue` → library + upload form + details dialog; `content/` → `destinations/`, `routes/`, `services/`; `components/ui/{DataTable,FormField,FormDialog,PageHeader}.vue`; per-feature `routes.ts` feeding router and navigation. Public app: `TripPage.vue` → five panels; `HomePage.vue` → one component per section; `services/` for every feature that calls the API (37 pages today).
 - **Dependencies:** none new. **DB:** none.
@@ -127,6 +129,8 @@ A2 and A3 can run in either order but in one session each. A6 needs A5 (route fi
 - **Acceptance:** no `.vue` file calls `api.*` directly; no page owns more than one module's data; E2E unchanged.
 
 ## A8. Dynamic homepage and CMS foundation
+
+**Done (session 10):** `config/home.php` (9 section types), `App\Support\HomeContent`, migration `2026_11_18_100012` (home_sections, menu_items, notices; current copy seeded as published), `/api/v1/{home,menus/{location},notices/active}`, staff `/admin/cms/*`, settings groups branding/social/seo/footer, staff Homepage/Menus/Notices pages + 4 settings tabs, public section components, header/footer/notice bar from the API. CmsTest (8), E2E staff cms.spec, public home.spec.
 
 - **Objective:** everything ordinary on the homepage, header, footer and SEO defaults is edited in the staff portal (`PROPOSED_ARCHITECTURE.md` §7); the CMS rules CM-X1–X8 exist once and every later CMS module reuses them.
 - **Files (backend):** `config/home.php` (section type registry), migrations `create_home_sections`, `create_home_section_items`, `create_home_slides`, `create_menus` (+ `menu_items`), `create_notices`, `create_banners`; settings groups `branding`, `social`, `seo`, `footer` added to `config/settings.php`; `Support/Cms/{Publishing,PreviewToken}.php` (status transitions, schedule, signed preview); `Api/V1/HomeController` (`GET /home`), `Api/V1/MenuController` (`GET /menus/{location}`), `Admin/Cms/{HomeSection,HomeSlide,Menu,Notice,Banner}Controller`; permissions `cms.home.edit`, `cms.home.publish`, `cms.menus.manage`, `cms.notices.*`, `cms.banners.*`, `settings.{branding,social,seo,footer}.manage`; seed migration with **the current copy** from `HomePage.vue`, `SiteFooter.vue`, `SiteHeader.vue` as published rows.

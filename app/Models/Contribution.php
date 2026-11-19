@@ -13,13 +13,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Contribution extends Model
 {
-    use HasFactory, HasUuids;
+    use \App\Models\Concerns\HasSources, HasFactory, HasUuids;
 
     protected $fillable = ['kind', 'title', 'body', 'observed_on', 'destination_id', 'route_id', 'route_segment_id', 'details'];
 
     protected function casts(): array
     {
-        return ['kind' => ContributionKind::class, 'status' => ContributionStatus::class, 'observed_on' => 'date:Y-m-d', 'details' => 'array'];
+        return ['kind' => ContributionKind::class, 'status' => ContributionStatus::class, 'observed_on' => 'date:Y-m-d', 'details' => 'array', 'last_confirmed_on' => 'date:Y-m-d',
+            'correction_requested_at' => 'datetime', 'author_corrected_at' => 'datetime', 'author_correction_reviewed_at' => 'datetime'];
     }
 
     public function scopeVisible(Builder $q): void
@@ -55,6 +56,17 @@ class Contribution extends Model
     public function segment(): BelongsTo
     {
         return $this->belongsTo(RouteSegment::class, 'route_segment_id');
+    }
+
+    /** True while the author's addendum waits for a moderator. */
+    public function hasCorrectionToReview(): bool
+    {
+        return $this->author_corrected_at !== null && $this->author_correction_reviewed_at === null;
+    }
+
+    public function confirmations(): HasMany
+    {
+        return $this->hasMany(ContributionConfirmation::class);
     }
 
     public function reports(): HasMany

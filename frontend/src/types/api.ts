@@ -16,6 +16,7 @@ export interface Me {
   /** Staff role slugs (built-in or custom); empty for riders. */
   verified: VerifiedClaim[]
   suspended_until: string | null
+  contribution_suspension?: { until: string; reason: string; appealed_at: string | null; appeal_decision: 'upheld' | 'lifted' | null } | null
   created_at: string
 }
 
@@ -49,6 +50,7 @@ export interface Destination {
   last_confirmed_on: string | null
   is_dev_seed: boolean
   updated_at: string
+  sources?: Source[]
 }
 
 export interface ServicePoint {
@@ -86,6 +88,7 @@ export interface RideRoute {
   last_confirmed_on: string | null
   is_dev_seed: boolean
   segments?: Segment[]
+  sources?: Source[]
 }
 
 export type ContributionKind = 'trip' | 'road_report' | 'accommodation' | 'fuel' | 'mechanic' | 'recommendation' | 'unexpected' | 'observation'
@@ -117,6 +120,14 @@ export interface Contribution {
   route?: { slug: string; name: string } | null
   segment?: { id: string; start_name: string; end_name: string } | null
   media?: { id: string; url: string; width: number; height: number; alt: string }[]
+  last_confirmed_on: string | null
+  /** The author's dated addendum; public once a moderator has seen it. */
+  author_correction: string | null
+  author_corrected_at: string | null
+  /** Only for the author: what a moderator asked them to correct. */
+  correction_request?: string | null
+  correction_pending_review?: boolean
+  sources?: Source[]
 }
 
 export type EventStatus = 'draft' | 'published' | 'full' | 'postponed' | 'cancelled' | 'completed'
@@ -162,7 +173,9 @@ export interface Trip {
   my_role: 'owner' | 'editor' | 'viewer'
   member_count: number
   members?: { id: string; display_name: string; username: string | null; role: 'owner' | 'editor' | 'viewer' }[]
-  stops?: { id: string; position: number; day: number | null; name: string; destination_id: string | null; route_id: string | null; overnight: boolean; note: string | null }[]
+  /** Owner only: invitations waiting for an answer. */
+  invitations?: { id: string; role: 'editor' | 'viewer'; expires_at: string; display_name: string; username: string | null; expired: boolean }[]
+  stops?: { id: string; position: number; day: number | null; name: string; destination_id: string | null; route_id: string | null; service_point_id: string | null; overnight: boolean; note: string | null }[]
   expenses?: { id: string; label: string; category: string; amount_npr: number; paid_by: string | null }[]
   expense_total_npr?: number
   checklist?: { id: string; label: string; section: 'motorcycle' | 'personal' | 'trip'; done: boolean; position: number }[]
@@ -199,10 +212,20 @@ export interface OwnVerification {
 
 export interface AppNotification {
   id: string
-  data: { kind: string; title?: string; body?: string; note?: string; status?: string; claim_kind?: string; change?: 'promoted' | 'approved' | 'declined'; link?: string }
+  data: { kind: string; title?: string; body?: string; note?: string; status?: string; claim_kind?: string; change?: 'promoted' | 'approved' | 'declined' | 'removed' | 'suspended' | 'lifted' | 'appeal_upheld'; link?: string; by?: string }
   read_at: string | null
   created_at: string
 }
+
+export interface Source {
+  id: string
+  title: string
+  publisher: string | null
+  url: string | null
+  accessed_on: string | null
+}
+
+export type ReportCategory = 'dangerous' | 'wrong' | 'outdated' | 'spam' | 'offensive' | 'other'
 
 export interface Paginated<T> {
   data: T[]

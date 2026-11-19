@@ -30,8 +30,8 @@ class SelectSessionAudience
         config($staff ? [
             'session.cookie' => self::$rider['session.cookie'].'_staff',
             'session.table' => 'staff_sessions',
-            'session.lifetime' => config('mrn.staff_session.idle_minutes'),
-            'mrn.session_max_minutes' => config('mrn.staff_session.max_minutes'),
+            'session.lifetime' => self::staffLimit('security.staff_idle_minutes', config('mrn.staff_session.idle_minutes')),
+            'mrn.session_max_minutes' => self::staffLimit('security.staff_max_hours', config('mrn.staff_session.max_minutes') / 60) * 60,
         ] : self::$rider);
         if (config('session.driver') === 'database') {
             app('session')->forgetDrivers(); // the next store uses this audience's table and cookie
@@ -47,5 +47,15 @@ class SelectSessionAudience
     public static function isStaffRequest(Request $request): bool
     {
         return $request->is('api/v1/admin', 'api/v1/admin/*');
+    }
+
+    /** Staff session limits from the security settings; the .env values if settings cannot be read (e.g. before migrations). */
+    private static function staffLimit(string $key, int|float $fallback): int
+    {
+        try {
+            return (int) \App\Support\Settings::get($key);
+        } catch (\Throwable) {
+            return (int) $fallback;
+        }
     }
 }

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Models\ContributionSuspension;
+use App\Notifications\ContributionRightsChanged;
 use App\Actions\Users\SuspendUser;
 use App\Http\Controllers\Controller;
 use App\Models\StaffAccount;
@@ -24,7 +26,11 @@ class UserController extends Controller
         $like = '%'.addcslashes(trim((string) $request->query('q')), '%_\\').'%';
         $users = User::query()
             ->where(fn ($w) => $w->whereLike('display_name', $like)->orWhereLike('username', $like)->when($emails, fn ($w) => $w->orWhereLike('email', $like)))
+            // Repeat-offender signal for staff: contributions rejected or currently flagged.
+            ->withCount(['contributions as rejected_count' => fn ($q) => $q->where('status', 'rejected'), 'contributions as flagged_count' => fn ($q) => $q->where('status', 'flagged')])
             ->orderByDesc('created_at')->limit(50)->get();
+
+        $pauses = ContributionSuspension::whereIn('user_id', $users->pluck('id'))->whereNull('lifted_at')->where('until', '>', now())->get()->keyBy('user_id');
 
         return response()->json(['data' => $users->map(fn (User $u) => [
             'id' => $u->id, 'display_name' => $u->display_name, 'username' => $u->username,
@@ -34,6 +40,8 @@ class UserController extends Controller
             'suspended_until' => $u->isSuspended() ? $u->suspended_until->toIso8601String() : null,
             'suspension_reason' => $u->isSuspended() ? $u->suspension_reason : null,
             'joined_at' => $u->created_at?->toIso8601String(),
+            'offences' => ['rejected' => $u->rejected_count, 'flagged' => $u->flagged_count],
+            'contribution_suspension' => ($cs = $pauses[$u->id] ?? null) ? $cs->toRider() + ['appeal' => $cs->appeal] : null,
         ])]);
     }
 
@@ -91,6 +99,40 @@ class UserController extends Controller
     }
 
     /** Staff never act on their own rider account here (linked, or with their email). */
+    /** Pause contribution rights only (reports, corrections, confirmations); the account keeps working otherwise. */
+    public function suspendContributions(Request $request, User $user): JsonResponse
+    {
+        $this->guardTarget($request->user(), $user);
+        $data = $request->validate(['until' => ['required', 'date', 'after:now', 'before:+2 years'], 'reason' => ['required', 'string', 'min:10', 'max:500']]);
+        abort_if(ContributionSuspension::activeFor($user->id), 422, 'Contribution rights are already paused. Lift that pause first.');
+        $s = DB::transaction(function () use ($request, $user, $data) {
+            $s = ContributionSuspension::create(['user_id' => $user->id, 'until' => Carbon::parse($data['until']), 'reason' => trim($data['reason']), 'created_by_staff_id' => $request->user()->id]);
+            Audit::record('user.contributions_suspended', $user, null, ['until' => $s->until->toIso8601String(), 'reason' => $s->reason]);
+
+            return $s;
+        });
+        $user->notify(new ContributionRightsChanged('suspended', $s->until->toIso8601String()));
+
+        return response()->json(['data' => $s->toRider()], 201);
+    }
+
+    /** Lift the pause early, or decide the rider's appeal (upheld keeps it, lifted ends it). */
+    public function reviewContributionSuspension(Request $request, User $user): JsonResponse
+    {
+        $this->guardTarget($request->user(), $user);
+        $data = $request->validate(['decision' => ['required', 'in:lifted,upheld'], 'note' => ['required', 'string', 'min:10', 'max:500']]);
+        $s = ContributionSuspension::activeFor($user->id) ?? abort(404);
+        abort_if($data['decision'] === 'upheld' && ! $s->appealed_at, 422, 'There is no appeal to decide.');
+        DB::transaction(function () use ($request, $user, $s, $data) {
+            $s->forceFill(['appeal_decision' => $s->appealed_at ? $data['decision'] : null, 'lift_note' => trim($data['note'])]
+                + ($data['decision'] === 'lifted' ? ['lifted_at' => now(), 'lifted_by_staff_id' => $request->user()->id] : []))->save();
+            Audit::record('user.contributions_'.$data['decision'], $user, null, ['note' => $s->lift_note, 'appeal' => (bool) $s->appealed_at]);
+        });
+        $user->notify(new ContributionRightsChanged($data['decision'] === 'lifted' ? 'lifted' : 'appeal_upheld', $s->until->toIso8601String()));
+
+        return response()->json(['data' => $s->toRider()]);
+    }
+
     private function guardTarget(StaffAccount $actor, User $target): void
     {
         if ($actor->isSamePersonAs($target->id)) {

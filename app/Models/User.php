@@ -46,6 +46,11 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /** Approved claim of this kind (and field, for experts). Read live, so suspension takes effect at once. */
+    public function contributions(): HasMany
+    {
+        return $this->hasMany(Contribution::class, 'author_id');
+    }
+
     public function hasVerification(VerificationKind $kind, string $scope = ''): bool
     {
         return $this->verifications()

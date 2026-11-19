@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 15: Destination maps | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:60rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; }
+  h2 { font-size:1.3rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.4rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  code { font-size:.88em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; word-break:break-word; }
+  .warn { color:var(--warn); font-weight:700; }
+  .ok { color:var(--ok); font-weight:700; }
+  ul, ol { padding-left:1.3rem; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; margin:.6rem 0 1rem; }
+  th, td { text-align:left; vertical-align:top; padding:.4rem .6rem; border-bottom:1px solid var(--line); }
+  th { background:var(--surface); }
+</style>
+</head>
+<body>
+<main>
+<p class="meta">My Ride Nepal · Session report</p>
+<h1>Session 15: destination maps and a progress baseline</h1>
+<p class="meta">2026-11-19 · Claude Code (Opus 5.5) · Nothing committed · No migration · One staff-portal dependency (Leaflet 1.9.4, the approved map library)</p>
+
+<h2>Project progress</h2>
+<ul>
+<li><strong>Overall verified requirement completion: 61.3%</strong> (160 complete and verified / 261 applicable)</li>
+<li><strong>Implementation coverage: 77.3%</strong> (201.80 / 261; weights: complete and verified 1, verification incomplete 0.75, partial 0.4, not implemented 0, blocked 0)</li>
+<li>Previous verified completion: 59.8% (156 / 261), measured this session after reconciliation, before any implementation</li>
+<li>Current verified completion: 61.3% (160 / 261)</li>
+<li>Change this session: <strong>+1.5 percentage points</strong></li>
+<li>Completed and verified this session: 4 (L1, L2, L5, L6). Moved from partial to complete: 3 (L1, L5, L6; L2 went from not implemented to complete). Newly partial: 1 (L13). Newly implemented but awaiting verification: 0.</li>
+<li>Blocked by an owner decision: 4 (R8, R14: D2; P12: AR3; X7: WebKit system libraries)</li>
+</ul>
+<p><strong>Baseline note.</strong> No earlier session computed percentages, so this is the first measured baseline. Before measuring, 239 audit rows plus 36 gap-analysis rows were read with <code>scripts/requirements-progress.mjs</code>; owner-decision tables are not requirements, which leaves 261 rows. Without reconciliation the figure was 154 / 261 = 59.0%. Reconciliation changed two stale rows to complete (CM16 and R16, built and E2E-tested in sessions 10, 12 and 13) and three rows to blocked (R8, R14, P12). That change is not counted as session progress.</p>
+<p><strong>Caveat.</strong> "Complete and verified" reuses the audit's "Complete, tested", which the building session recorded from automated tests. Some of those rows have backend tests but no browser test. I did not re-verify all 160 this session.</p>
+
+<h2>Feature-area progress</h2>
+<div class="scroll"><table><tr><th>Area</th><th>Complete and verified</th><th>Applicable</th><th>Verified</th></tr><tr><td>Authentication and rider accounts</td><td>15</td><td>17</td><td>88.2%</td></tr><tr><td>CMS and public content</td><td>33</td><td>39</td><td>84.6%</td></tr><tr><td>Deployment and production readiness</td><td>6</td><td>9</td><td>66.7%</td></tr><tr><td>Destinations and exploration</td><td>7</td><td>25</td><td>28.0%</td></tr><tr><td>Events and organized rides</td><td>16</td><td>19</td><td>84.2%</td></tr><tr><td>Explore Along My Route</td><td>6</td><td>10</td><td>60.0%</td></tr><tr><td>Media and storage</td><td>1</td><td>3</td><td>33.3%</td></tr><tr><td>My Rides and private trip planning</td><td>9</td><td>18</td><td>50.0%</td></tr><tr><td>Notifications and communication</td><td>4</td><td>5</td><td>80.0%</td></tr><tr><td>Places and points of interest</td><td>0</td><td>7</td><td>0.0%</td></tr><tr><td>Preparation and safety</td><td>3</td><td>14</td><td>21.4%</td></tr><tr><td>Rider experiences and moderation</td><td>20</td><td>30</td><td>66.7%</td></tr><tr><td>Routes and route information</td><td>4</td><td>13</td><td>30.8%</td></tr><tr><td>Saved items and services</td><td>3</td><td>5</td><td>60.0%</td></tr><tr><td>Security, privacy and account lifecycle</td><td>4</td><td>7</td><td>57.1%</td></tr><tr><td>Site settings and branding</td><td>8</td><td>11</td><td>72.7%</td></tr><tr><td>Staff portal, roles and permissions</td><td>21</td><td>23</td><td>91.3%</td></tr><tr><td>Technical quality (accessibility, browsers, performance)</td><td>0</td><td>6</td><td>0.0%</td></tr></table></div>
+
+<h2>Work completed</h2>
+<ul>
+<li><strong>Staff map picker.</strong> On the destination form, staff can click the map to place a destination, drag the marker to adjust it, or type exact values (the marker follows). The map is limited to Nepal, uses the tile and attribution settings, and has a "Remove the position" option.</li>
+<li><strong>Public destination map.</strong> An interactive map shows the destination, its services and nearby destinations, with a text alternative because the lists carry the same information. The new "Nearby" section lists other destinations within 50 km, services within 20 km (with Save) and routes passing within 15 km. All distances are straight-line and labelled. Destinations without a recorded position say so.</li>
+<li><strong>API.</strong> <code>GET /api/v1/destinations/{slug}</code> returns <code>nearby</code>: published items only, found with a bounding box and <code>App\Support\Geo</code>, no PostGIS.</li>
+<li><strong>Bug fixed.</strong> Opening an existing destination or CMS entry for editing crashed the staff form with <code>DataCloneError</code>. It was found in the Playwright trace and fixed with <code>toRaw</code> in three places; regression steps were added.</li>
+<li><strong>Measurement.</strong> Added <code>scripts/requirements-progress.mjs</code> for every future session.</li>
+</ul>
+
+<h2>Evidence</h2>
+<div class="scroll"><table>
+<tr><th>Requirement</th><th>Implemented</th><th>Files</th><th>Tests and browser checks</th><th>Limitations</th></tr>
+<tr><td>L1 Latitude/longitude and map marker on every destination</td><td>Public map with the destination marker; a "no position" state when none is recorded</td><td><code>DestinationPage.vue</code>, <code>DestinationMap.vue</code>, <code>mapTiles.ts</code></td><td>DestinationNearbyTest (2 passed); E2E destination-map.spec passed in Chromium, Firefox and Pixel 7; desktop and mobile screenshots inspected</td><td>The 4 existing dev destinations have no coordinates; staff must add them</td></tr>
+<tr><td>L2 Admin map picker</td><td>Click, drag and typed coordinates, Nepal bounds, remove position</td><td><code>MapPicker.vue</code>, <code>DestinationsPage.vue</code>, <code>content.ts</code></td><td>E2E destinations.spec passed in Chromium and Firefox (click sets coordinates within Nepal, typed values saved to the database, reopening shows the marker); screenshot inspected</td><td>Route segment coordinates still use number fields</td></tr>
+<tr><td>L5 Nearby services</td><td>Published services within 20 km, on the map and in a list with Save</td><td><code>DestinationController.php</code></td><td>DestinationNearbyTest (drafts excluded, attached services not duplicated); E2E</td><td>Straight-line only</td></tr>
+<tr><td>L6 Nearby routes</td><td>Routes passing within 15 km of a recorded stretch, plus routes that start or end here</td><td><code>DestinationController.php</code></td><td>DestinationNearbyTest (a route 5.6 km away is listed; a remote route is not); E2E</td><td>Routes are listed, not drawn on the destination map</td></tr>
+<tr><td>L13 (partial)</td><td>Map plus nearby layers for services and destinations</td><td>as above</td><td>as above</td><td>No places model (R2); routes not drawn on the map</td></tr>
+</table></div>
+
+<h2>Verification</h2>
+<div class="scroll"><table>
+<tr><th>Check</th><th>Result</th></tr>
+<tr><td><code>php artisan test</code></td><td class="ok">131 passed (2761 assertions)</td></tr>
+<tr><td><code>composer audit</code>, both <code>pnpm audit --prod</code></td><td class="ok">No advisories</td></tr>
+<tr><td>Public: type-check, lint, unit, build</td><td class="ok">Pass; 7 unit tests</td></tr>
+<tr><td>Staff: type-check, lint, unit, build</td><td class="ok">Pass; 13 unit tests</td></tr>
+<tr><td>Public E2E (Chromium, Firefox, Pixel 7)</td><td class="ok">114 passed, 3 skipped by design (Chromium-only Web Vitals check; keyboard check skipped on the phone profile)</td></tr>
+<tr><td>Staff E2E (Chromium, Firefox)</td><td class="ok">34 passed</td></tr>
+<tr><td>Visual checks</td><td>Staff picker (Chromium): tiles, marker, attribution. Public map on desktop and mobile: markers, attribution and controls. Fixed afterwards: long unbroken names overflowed on mobile</td></tr>
+<tr><td>Not run</td><td class="warn">WebKit (blocked by system libraries), axe and Lighthouse (not installed), screen reader</td></tr>
+</table></div>
+
+<h2>Remaining work (priority)</h2>
+<ol>
+<li>Places model with rider submissions and moderation (R2, R3, R9, R12, R13, A4, L4; 0 of 7). It can be built now without PostGIS.</li>
+<li>Draw routes on the destination map (L13); route depth (B rows, 30.8%).</li>
+<li>Preparation and safety workflow (E rows, 21.4%); account deletion and data export (G19, H11); saving guides (F8).</li>
+<li>Owner decisions: D3 PostGIS (plan ready), D2 routing provider, D1 storage, AR3 MFA, AR4 and AR5 hosting and database, D4 SEO, D7 retention; approval for axe and Lighthouse; WebKit libraries.</li>
+</ol>
+
+<h2>Files and database changes</h2>
+<p>See <code>docs/handoff.md</code> §3 (session 15). No migration and no schema change. The E2E specs insert test rows into <code>myridenepal_e2e</code> and delete them afterwards. The staff portal's <code>package.json</code> and lockfile gained <code>leaflet</code> 1.9.4 and <code>@types/leaflet</code> 1.9.22.</p>
+</main>
+</body>
+</html>

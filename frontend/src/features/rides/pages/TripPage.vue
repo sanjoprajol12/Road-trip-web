@@ -7,7 +7,7 @@ import { errorMessage, statusOf } from '@/lib/api/client'
 import { useAsync } from '@/lib/useAsync'
 import { useAuth } from '@/features/authentication/useAuth'
 import type { Trip } from '@/types/api'
-import { addMember as addTripMember, addPart, deleteTrip as destroyTrip, getTrip, removeMember as dropMember, removePart, setMemberRole, updatePart, updateTrip } from '../services/trips'
+import { addMember as addTripMember, addPart, cancelInvitation, deleteTrip as destroyTrip, getTrip, removeMember as dropMember, removePart, setMemberRole, updatePart, updateTrip } from '../services/trips'
 import { listDestinations } from '@/features/explore/services/destinations'
 
 const props = defineProps<{ id: string }>()
@@ -31,6 +31,16 @@ async function call(fn: () => Promise<{ data: { data: Trip } }>) {
   err.value = null
   try {
     trip.data.value = (await fn()).data.data
+  } catch (e) {
+    err.value = errorMessage(e)
+  }
+}
+
+async function cancelInv(id: string) {
+  err.value = null
+  try {
+    await cancelInvitation(props.id, id)
+    await trip.run()
   } catch (e) {
     err.value = errorMessage(e)
   }
@@ -180,8 +190,15 @@ const npr = (n: number) => `NPR ${n.toLocaleString('en-IN', { maximumFractionDig
             <form v-if="isOwner" class="grid grid-cols-[1fr_6rem] gap-2" @submit.prevent="addMember">
               <input v-model="member.username" class="input" placeholder="Rider's username" aria-label="Username to add" autocapitalize="none" />
               <select v-model="member.role" class="input" aria-label="Role"><option value="editor">editor</option><option value="viewer">viewer</option></select>
-              <button type="submit" class="btn btn-quiet col-span-2" :disabled="member.username.trim().length < 3">Add member</button>
+              <button type="submit" class="btn btn-quiet col-span-2" :disabled="member.username.trim().length < 3">Send invitation</button>
+              <p class="col-span-2 text-xs text-muted">They join only after accepting, within 14 days.</p>
             </form>
+            <ul v-if="isOwner && t.invitations?.length" class="grid gap-1 text-sm" aria-label="Invitations waiting for an answer">
+              <li v-for="i in t.invitations" :key="i.id" class="flex items-center gap-2">
+                <span class="flex-1">{{ i.display_name }} <span class="text-muted">({{ i.role }}, {{ i.expired ? 'expired' : 'waiting' }})</span></span>
+                <button type="button" class="p-1 text-muted hover:text-danger" :aria-label="`Cancel the invitation for ${i.display_name}`" @click="cancelInv(i.id)"><Trash2 class="size-4" aria-hidden="true" /></button>
+              </li>
+            </ul>
           </section>
           <button v-if="isOwner" type="button" class="link justify-self-start text-danger" @click="deleteTrip">Delete this trip</button>
         </aside>

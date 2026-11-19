@@ -92,7 +92,8 @@ class EventRegistrations
             $reg = EventRegistration::whereKey($reg->id)->lockForUpdate()->firstOrFail();
             $allowed = match ($to) {
                 S::Approved => in_array($reg->status, [S::Pending, S::Waitlisted], true),
-                S::Declined => in_array($reg->status, [S::Pending, S::Waitlisted], true),
+                // Approved riders can be removed before the start; their place goes to the waitlist (settle).
+                S::Declined => in_array($reg->status, [S::Pending, S::Waitlisted], true) || ($reg->status === S::Approved && $event->starts_at->isFuture()),
                 S::Attended, S::DidNotAttend => in_array($reg->status, [S::Approved, S::Attended, S::DidNotAttend], true) && $event->starts_at->isPast(),
                 default => false,
             };
@@ -102,10 +103,11 @@ class EventRegistrations
             if ($to === S::Approved && ! EventCapacity::hasRoom($event)) {
                 throw ValidationException::withMessages(['status' => ['The event is full. Raise the capacity or wait for a place.']]);
             }
+            $wasApproved = $reg->status === S::Approved;
             $reg->update(['status' => $to]);
             EventCapacity::settle($event);
             if ($to === S::Approved || $to === S::Declined) {
-                $reg->user->notify(new RegistrationChanged($event, $to->value));
+                $reg->user->notify(new RegistrationChanged($event, $to === S::Declined && $wasApproved ? 'removed' : $to->value));
             }
 
             return $reg;

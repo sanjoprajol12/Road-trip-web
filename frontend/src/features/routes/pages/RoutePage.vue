@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import SaveButton from '@/features/saved/components/SaveButton.vue'
+import SourceList from '@/components/ui/SourceList.vue'
 import { computed, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { ArrowLeft, CalendarClock, MessageSquarePlus } from 'lucide-vue-next'
@@ -42,6 +44,7 @@ watch(r, (v) => v && (document.title = `${v.name} | My Ride Nepal`))
           <p class="label text-muted"><template v-if="r.start || r.end">{{ r.start?.name ?? '?' }} to {{ r.end?.name ?? '?' }}</template></p>
           <h1 class="display mt-3 text-[clamp(3rem,2rem+4vw,6rem)]">{{ r.name }}</h1>
           <p v-if="r.summary" class="lead mt-4 max-w-xl text-muted">{{ r.summary }}</p>
+          <SaveButton class="mt-6" type="route" :id="r.id" :name="r.name" />
         </div>
         <dl class="grid grid-cols-2 gap-4 text-sm">
           <div><dt class="label text-muted">Distance</dt><dd class="display tabular mt-1 text-3xl">{{ r.distance_km ?? '–' }}<span v-if="r.distance_km" class="text-base"> km</span></dd></div>
@@ -51,6 +54,7 @@ watch(r, (v) => v && (document.title = `${v.name} | My Ride Nepal`))
             <span v-if="r.last_confirmed_on">Route details confirmed {{ formatDay(r.last_confirmed_on) }} ({{ ageInWords(r.last_confirmed_on) }}). Not live conditions.</span>
             <span v-else>Route details never confirmed against a source. Check conditions locally.</span>
           </div>
+          <SourceList class="col-span-2" :sources="r.sources" />
         </dl>
       </header>
 
@@ -70,7 +74,7 @@ watch(r, (v) => v && (document.title = `${v.name} | My Ride Nepal`))
             <p v-if="s.notes" class="prose-serif mt-2 max-w-prose">{{ s.notes }}</p>
             <ul v-if="s.services.length" class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm" aria-label="Services along this stretch">
               <li v-for="svc in s.services" :key="svc.id" class="flex items-center gap-1.5">
-                <component :is="serviceKinds[svc.kind].icon" class="size-4 text-info" aria-hidden="true" /><span class="sr-only">{{ serviceKinds[svc.kind].label }}:</span>{{ svc.name }}
+                <component :is="serviceKinds[svc.kind].icon" class="size-4 text-info" aria-hidden="true" /><span class="sr-only">{{ serviceKinds[svc.kind].label }}:</span>{{ svc.name }}<SaveButton type="service" :id="svc.id" :name="svc.name" compact />
                 <span class="text-xs text-muted">({{ svc.last_confirmed_on ? `seen ${formatDay(svc.last_confirmed_on)}` : 'never confirmed' }})</span>
               </li>
             </ul>

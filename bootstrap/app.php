@@ -29,7 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
         }
         $middleware->api(append: [SessionMaxAge::class, MaintenanceMode::class]);
         $middleware->append(SecurityHeaders::class);
-        $middleware->alias(['not-suspended' => EnsureNotSuspended::class]);
+        $middleware->alias(['not-suspended' => EnsureNotSuspended::class, 'can-contribute' => \App\Http\Middleware\EnsureCanContribute::class]);
         $middleware->throttleApi('api');
     })
     ->withExceptions(function (Exceptions $exceptions): void {

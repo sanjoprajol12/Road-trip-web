@@ -62,25 +62,25 @@ A5 routes from a destination, A13 dev-seed label, B2 route map, B4 checkpoint di
 
 | ID | Requirement | Status | Evidence / gap |
 |---|---|---|---|
-| H-1 | Homepage heading, subheading, description, labels editable | Missing | hard-coded in `admin/src/apps/public/features/home/pages/HomePage.vue` (eyebrow "Motorcycle travel in Nepal", `heroLines`, lead paragraph, section headings, layer texts, freshness legend) |
-| H-2 | Hero section and hero background image editable | Missing | `kathmandu-motorcycle-*.webp` srcset and credit hard-coded |
-| H-3 | CTA text and links editable | Missing | "Explore destinations" → `/explore`, "Create an account" → `/sign-up` hard-coded |
-| H-4 | Featured destinations chosen by staff | Partial | section reads `listDestinations()` (published destinations), but which ones and in what order is not curated |
-| H-5 | Featured routes | Missing | no section |
-| H-6 | Featured rider experiences | Missing | no section |
-| H-7 | Promotional banners | Missing | = CM10 (D6) |
-| H-8 | Announcement notices | Missing | = CM8 |
-| H-9 | Homepage sliders | Missing | = CM9 |
-| H-10 | Section ordering and visibility | Missing | order fixed in the template |
-| H-11 | Navigation menus | Missing | = CM13; header links hard-coded in `SiteHeader.vue` |
-| H-12 | Footer content | Missing | `SiteFooter.vue` tagline and disclaimer hard-coded |
-| H-13 | Social links | Missing | = S7 |
-| H-14 | SEO title and description | Missing | = S5; crawler visibility = D4 |
-| H-15 | Default social-sharing image | Missing | = S6/S5 |
-| H-16 | Draft / published / archived, scheduling, media selection, published-only public API, permission-protected writes | Partial | media library and permissions exist (CM12, P1); publishing model missing (CM-X1, X2, X5) |
-| H-17 | Loading, empty, error states for managed content | Partial | `useAsync` + `StatusPanel` exist for destinations only |
+| H-1 | Homepage heading, subheading, description, labels editable | Complete, tested | `home_sections` (hero/layers/freshness copy), staff Homepage page; CmsTest, E2E staff cms.spec (edit → publish → public API) |
+| H-2 | Hero section and hero background image editable | Complete, tested | hero background: bundled photo (allow-list) or public media-library image, credit shown; validated (CmsTest) |
+| H-3 | CTA text and links editable | Complete, tested | hero primary/secondary buttons: internal path or https only (javascript:/http refused, CmsTest) |
+| H-4 | Featured destinations chosen by staff | Complete, tested | featured destinations chosen and ordered by staff; unpublished items drop out (CmsTest) |
+| H-5 | Featured routes | Complete, under-tested | section type `featured_routes` (API + public component); no E2E yet |
+| H-6 | Featured rider experiences | Complete, under-tested | section type `featured_experiences` (visible contributions only, dated); no E2E yet |
+| H-7 | Promotional banners | Complete, under-tested | section type `banner` (site content only; D6 open for third-party promotion) |
+| H-8 | Announcement notices | Complete, tested | `notices` (draft/published/archived, schedule), staff Notices page, public notice bar; CmsTest, E2E home.spec |
+| H-9 | Homepage sliders | Complete, under-tested | section type `slides` (1–5 library images, pause control, no auto-advance under reduced motion); no E2E yet |
+| H-10 | Section ordering and visibility | Complete, tested | order, visibility, schedule and archive per section, applied on publish (CmsTest) |
+| H-11 | Navigation menus | Complete, tested | `menu_items` header/footer, staff Menus page, public header and footer read them; CmsTest, E2E home.spec |
+| H-12 | Footer content | Complete, tested | settings group `footer` (tagline, required emergency disclaimer, note, credits); CmsTest |
+| H-13 | Social links | Complete, tested | settings group `social` (https only), footer links; CmsTest |
+| H-14 | SEO title and description | Partial | settings group `seo` sets the default title and description at runtime; crawler-visible tags wait for D4 (prerender) |
+| H-15 | Default social-sharing image | Partial | settings `branding.share_image_media_id` sets og:image at runtime; crawler visibility D4 |
+| H-16 | Draft / published / archived, scheduling, media selection, published-only public API, permission-protected writes | Complete, tested | drafts, publish (audited), schedule, archive, signed preview tokens, permission per action (`cms.home.edit` / `.publish`); CmsTest |
+| H-17 | Loading, empty, error states for managed content | Complete, tested | homepage loading and error states; menus/notices fail soft (maintenance E2E caught a real bug, fixed) |
 
-Plan: `PROPOSED_ARCHITECTURE.md` §7, `MIGRATION_PLAN.md` A8.
+Built in session 10 (A8): `config/home.php`, `App\Support\HomeContent`, migration `2026_11_18_100012`, staff `features/cms/{home,menus,notices}`, public `features/home/sections/*`. CM8, CM9 (as slider sections), CM13, CM16, S5 (runtime), S6 (share image only), S7 are covered by these rows; the other CMS modules (pages, FAQs, blog, popups, team, authors, blocks, contact) are roadmap Stage 8.
 
 ### N8. Independent applications
 

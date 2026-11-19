@@ -6,10 +6,22 @@ import StatusPanel from '@/components/ui/StatusPanel.vue'
 import { errorMessage } from '@/lib/api/client'
 import { useAsync } from '@/lib/useAsync'
 import { formatDay } from '@/lib/format'
-import { createTrip, listTrips } from '../services/trips'
+import { answerInvitation, createTrip, listTrips, myInvitations, type TripInvitation } from '../services/trips'
 
 const router = useRouter()
 const trips = useAsync(() => listTrips())
+const invitations = useAsync(() => myInvitations())
+const answerMsg = ref<string | null>(null)
+async function answer(i: TripInvitation, a: 'accept' | 'decline') {
+  try {
+    const r = await answerInvitation(i.id, a)
+    if (r.trip_id) return void (await router.push(`/rides/${r.trip_id}`))
+    answerMsg.value = `You declined the invitation to ${i.trip_title}.`
+    await invitations.run()
+  } catch (e) {
+    answerMsg.value = errorMessage(e)
+  }
+}
 const title = ref('')
 const error = ref<string | null>(null)
 async function create() {
@@ -27,6 +39,20 @@ async function create() {
   <div class="wrap pt-28 pb-24">
     <h1 class="display text-[clamp(3rem,2rem+4vw,6rem)]">My rides</h1>
     <p class="lead mt-5 max-w-xl text-muted">Private trip plans. Invite riders to plan together; nobody else, staff included, can see them.</p>
+    <section v-if="invitations.data.value?.length" class="mt-8 max-w-2xl rounded-md border border-line bg-surface p-5" aria-labelledby="inv-title">
+      <h2 id="inv-title" class="font-bold">Invitations</h2>
+      <p class="mt-1 text-sm text-muted">You see a trip only after you accept. Invitations close after 14 days.</p>
+      <ul class="mt-3 grid gap-3">
+        <li v-for="i in invitations.data.value" :key="i.id" class="flex flex-wrap items-center justify-between gap-3 text-sm">
+          <span><span class="font-semibold">{{ i.trip_title }}</span>: {{ i.invited_by ?? 'A rider' }} invited you as {{ i.role }}. Open until {{ formatDay(i.expires_at) }}.</span>
+          <span class="flex gap-2">
+            <button type="button" class="btn btn-primary min-h-9 px-3" :aria-label="`Accept the invitation to ${i.trip_title}`" @click="answer(i, 'accept')">Accept</button>
+            <button type="button" class="btn btn-quiet min-h-9 px-3" :aria-label="`Decline the invitation to ${i.trip_title}`" @click="answer(i, 'decline')">Decline</button>
+          </span>
+        </li>
+      </ul>
+    </section>
+    <p v-if="answerMsg" class="mt-3 text-sm" role="status">{{ answerMsg }}</p>
     <form class="mt-8 flex max-w-xl flex-wrap items-end gap-3" @submit.prevent="create">
       <div class="field flex-1"><label for="new-trip">New trip</label><input id="new-trip" v-model="title" class="input" maxlength="120" placeholder="For example: Upper Mustang in April" /></div>
       <button type="submit" class="btn btn-primary" :disabled="title.trim().length < 2"><Plus class="size-4" aria-hidden="true" /> Create</button>

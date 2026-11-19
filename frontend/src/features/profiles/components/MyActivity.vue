@@ -20,11 +20,17 @@ async function markRead() {
 function describe(n: AppNotification): string {
   const d = n.data
   if (d.kind === 'verification_decided') return `Your ${String(d.claim_kind).replace('_', ' ')} claim is now ${d.status}.`
+  if (d.kind === 'contribution_rights' && d.change === 'suspended') return 'A moderator paused your contribution rights. See the reason on this page.'
+  if (d.kind === 'contribution_rights' && d.change === 'lifted') return 'Your contribution rights are back.'
+  if (d.kind === 'contribution_rights') return 'Your appeal was reviewed: the pause stays.'
+  if (d.kind === 'trip_invitation') return `${d.by ?? 'A rider'} invited you to plan "${d.title}". Answer under My rides.`
+  if (d.kind === 'contribution_correction') return `A moderator asked you to add a correction to "${d.title}".`
   if (d.kind === 'event_invitation') return `You are invited to ${d.title}.`
   if (d.kind === 'event_cancellation') return `${d.title} was cancelled.`
   if (d.kind === 'event_postponement') return `${d.title} was postponed.`
   if (d.kind === 'event_registration' && d.change === 'promoted') return `A place opened up: you are in for ${d.title}.`
   if (d.kind === 'event_registration' && d.change === 'approved') return `The organizer approved your place on ${d.title}.`
+  if (d.kind === 'event_registration' && d.change === 'removed') return `The organizer removed you from ${d.title}.`
   if (d.kind === 'event_registration' && d.change === 'declined') return `The organizer declined your request for ${d.title}.`
   return `${d.title ?? 'An event'} has an update.`
 }

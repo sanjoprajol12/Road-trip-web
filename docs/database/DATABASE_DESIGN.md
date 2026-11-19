@@ -31,3 +31,14 @@ Authority: `web/database/migrations` (Laravel). Local database `myridenepal` (te
 
 ## Seed
 `database/seeders/DatabaseSeeder.php`: the four development destinations (Pokhara, Bandipur, Mustang, Rara) with factual names, provinces and districts only, flagged `is_dev_seed`. No routes, prices, services or reports are seeded.
+
+## Session 12 additions (2026-11-19, additive migrations)
+- `2026_11_19_100013_create_trust_pipeline`: `contributions.last_confirmed_on`, `correction_request`, `correction_requested_at`, `author_correction`, `author_corrected_at`, `author_correction_reviewed_at` (all nullable); `contribution_reports.category` (check: dangerous, wrong, outdated, spam, offensive, other; default `other` for old rows), `resolution` (upheld/dismissed); `contribution_confirmations` (unique per contribution, rider, day); `sources` (title, publisher, url with http(s) check, accessed_on) and `sourceables` (source, morph type `destination`/`route`/`contribution`, id, position). Rollback: `down()` drops only these.
+- `2026_11_19_100014_create_saved_items`: `saved_items` (user, item_type check destination/route/service/contribution, item_id; unique per rider and item; cascade on user delete); `trip_stops.service_point_id` (nullable FK, null on delete). Rollback: `down()` drops only these.
+- Status transitions are enforced in `App\Enums\ContributionStatus::next()` (rejected is final).
+
+## Session 13 additions (2026-11-19, additive migrations)
+- `2026_11_19_100015_create_cms_content`: `cms_entries` (type check: page, faq, post, blog_category, blog_tag, author, team_member, popup, banner; unique (type, slug) where slug is set; status draft/published/archived; publish_at/expires_at with a check; jsonb `data` validated by `config/cms.php`; nullable FK to `media_assets`), `contact_messages` (status new/open/done/spam; `ip_hash` is an HMAC of the address, never the address). Syncs the permission registry.
+- `2026_11_19_100016_create_trip_invitations_and_contribution_suspensions`: `trip_invitations` (one pending per trip and rider, 14-day `expires_at`, status pending/accepted/declined/cancelled), `contribution_suspensions` (until, reason, lift note, one appeal and its decision; separate from `users.suspended_until`).
+- `media_usages` is now written (CMS entries, homepage sections, settings `*_media_id`), so the media library refuses to delete images in use. It was never written before session 13.
+- Rollback: each `down()` drops only its own tables.

@@ -24,6 +24,9 @@ async function run(fn: () => Promise<unknown>, ok: string) {
     err.value = errorMessage(e)
   }
 }
+function confirmRemove(r: Registration) {
+  if (window.confirm(`Remove ${r.rider.display_name}? Their place goes to the next rider on the waitlist, and they are told.`)) void decide(r, 'declined')
+}
 const decide = (r: Registration, status: string) => run(() => decideRegistration(props.id, r.id, status), `${r.rider.display_name}: ${registrationLabels[status as keyof typeof registrationLabels]}.`)
 const invitee = ref('')
 const invite = () => run(() => inviteRider(props.id, invitee.value.trim()), `Invited ${invitee.value}.`).then(() => (invitee.value = ''))
@@ -33,11 +36,15 @@ const postUpdate = () => run(() => postEventUpdate(props.id, update.value), 'Upd
 const nextStatuses: Record<EventStatus, EventStatus[]> = { draft: ['published', 'cancelled'], published: ['postponed', 'cancelled', 'completed'], full: ['postponed', 'cancelled', 'completed'], postponed: ['published', 'cancelled'], cancelled: [], completed: [] }
 const target = ref<EventStatus | ''>('')
 const statusMessage = ref('')
+const newStart = ref('')
+const newEnd = ref('')
 const needsMessage = computed(() => target.value === 'postponed' || target.value === 'cancelled')
 const changeStatus = () =>
-  run(() => changeEventStatus(props.id, { status: target.value, message: statusMessage.value || undefined, summary: target.value === 'completed' ? statusMessage.value || undefined : undefined }), 'Status changed.').then(() => {
+  run(() => changeEventStatus(props.id, { status: target.value, message: statusMessage.value || undefined, summary: target.value === 'completed' ? statusMessage.value || undefined : undefined,
+    ...(target.value === 'postponed' && newStart.value ? { starts_at: new Date(newStart.value).toISOString(), ends_at: newEnd.value ? new Date(newEnd.value).toISOString() : undefined } : {}) }), 'Status changed.').then(() => {
     target.value = ''
     statusMessage.value = ''
+    newStart.value = newEnd.value = ''
   })
 const started = computed(() => ev.data.value && new Date(ev.data.value.starts_at) < new Date())
 </script>
@@ -67,6 +74,7 @@ const started = computed(() => ev.data.value && new Date(ev.data.value.starts_at
                 <button type="button" class="btn btn-quiet min-h-9 px-3" @click="decide(r, 'approved')">Approve</button>
                 <button type="button" class="btn btn-quiet min-h-9 px-3" @click="decide(r, 'declined')">Decline</button>
               </template>
+              <button v-if="!started && r.status === 'approved'" type="button" class="btn btn-quiet min-h-9 px-3" :aria-label="`Remove ${r.rider.display_name} from the event`" @click="confirmRemove(r)">Remove</button>
               <template v-if="started && ['approved', 'attended', 'did_not_attend'].includes(r.status)">
                 <button type="button" class="btn btn-quiet min-h-9 px-3" :aria-pressed="r.status === 'attended'" @click="decide(r, 'attended')">Attended</button>
                 <button type="button" class="btn btn-quiet min-h-9 px-3" :aria-pressed="r.status === 'did_not_attend'" @click="decide(r, 'did_not_attend')">Did not attend</button>
@@ -84,6 +92,10 @@ const started = computed(() => ev.data.value && new Date(ev.data.value.starts_at
               <option v-for="s in nextStatuses[ev.data.value.status]" :key="s" :value="s">{{ s === 'published' ? 'Publish' : eventStatusLabels[s] }}</option>
             </select>
             <textarea v-if="target && target !== 'published'" v-model="statusMessage" class="input" rows="3" :aria-label="target === 'completed' ? 'Summary of how it went' : 'Message to participants'" :placeholder="target === 'completed' ? 'How it went (optional)' : 'Tell participants why (required)'" />
+            <div v-if="target === 'postponed'" class="grid gap-2 sm:grid-cols-2">
+              <div class="field"><label for="pp-start" class="text-xs">New start (optional)</label><input id="pp-start" v-model="newStart" type="datetime-local" class="input" /></div>
+              <div class="field"><label for="pp-end" class="text-xs">New end</label><input id="pp-end" v-model="newEnd" type="datetime-local" class="input" :required="!!newStart" /></div>
+            </div>
             <button type="submit" class="btn btn-primary" :disabled="!target || (needsMessage && statusMessage.trim().length < 10)">Apply</button>
           </form>
           <form class="grid gap-3" @submit.prevent="invite">

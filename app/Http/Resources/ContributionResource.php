@@ -23,6 +23,13 @@ class ContributionResource extends JsonResource
             'details' => (object) ($this->details ?? []),
             'source_url' => $this->source_url,
             'moderation_note' => $this->when($insider, $this->moderation_note),
+            'last_confirmed_on' => $this->last_confirmed_on?->toDateString(),
+            // The author's dated addendum: public once a moderator has seen it; the author and moderators see it at once.
+            'author_correction' => $insider || $this->author_correction_reviewed_at ? $this->author_correction : null,
+            'author_corrected_at' => $insider || $this->author_correction_reviewed_at ? $this->author_corrected_at?->toIso8601String() : null,
+            'correction_pending_review' => $this->when($insider, fn () => $this->hasCorrectionToReview()),
+            'correction_request' => $this->when($insider, $this->correction_request),
+            'sources' => $this->whenLoaded('sources', fn () => $this->sources->map->toPublic()->values()),
             'author' => $this->whenLoaded('author', fn () => (new PublicUserResource($this->author))->toArray($request)),
             'destination' => $this->whenLoaded('destination', fn () => $this->destination ? ['slug' => $this->destination->slug, 'name' => $this->destination->name] : null),
             'route' => $this->whenLoaded('route', fn () => $this->route ? ['slug' => $this->route->slug, 'name' => $this->route->name] : null),

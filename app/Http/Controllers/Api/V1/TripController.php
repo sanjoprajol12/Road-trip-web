@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use Illuminate\Support\Str;
 use App\Enums\TripRole;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\TripResource;
@@ -70,7 +71,15 @@ class TripController extends Controller
         if ($trip->roleOf($user)) {
             throw ValidationException::withMessages(['username' => ['Already a member.']]);
         }
-        $trip->members()->attach($user->id, ['role' => $data['role']]);
+        // Consent: the rider becomes a member only by accepting (TripInvitationController); one open invitation each.
+        $open = DB::table('trip_invitations')->where(['trip_id' => $trip->id, 'user_id' => $user->id, 'status' => 'pending']);
+        if ((clone $open)->where('expires_at', '>', now())->exists()) {
+            throw ValidationException::withMessages(['username' => ['Already invited.']]);
+        }
+        $open->update(['status' => 'cancelled', 'updated_at' => now()]); // an expired one is replaced
+        DB::table('trip_invitations')->insert(['id' => (string) Str::uuid(), 'trip_id' => $trip->id, 'user_id' => $user->id, 'invited_by' => $request->user()->id,
+            'role' => $data['role'], 'expires_at' => now()->addDays(TripInvitationController::DAYS), 'created_at' => now(), 'updated_at' => now()]);
+        $user->notify(new \App\Notifications\TripInvited($trip, $request->user()->display_name));
 
         return new TripResource($this->full($trip));
     }

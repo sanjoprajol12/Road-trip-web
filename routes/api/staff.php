@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\Admin;
+use App\Http\Controllers\Api\V1;
 use Illuminate\Support\Facades\Route;
 
 // Staff API (/api/v1/admin). Staff accounts only (guard `staff`, own session cookie and table: see
@@ -44,6 +45,11 @@ Route::prefix('admin')->name('admin.')->middleware(['auth:staff', 'can:staff'])-
     Route::middleware('can:contributions.moderate')->group(function () {
         Route::get('contributions', [Admin\ContributionController::class, 'index']);
         Route::post('contributions/{contribution}/decision', [Admin\ContributionController::class, 'decide']);
+        Route::post('contributions/{contribution}/correction-request', [Admin\ContributionController::class, 'requestCorrection']);
+        Route::post('contributions/{contribution}/correction-review', [Admin\ContributionController::class, 'reviewCorrection']);
+        Route::post('contributions/{contribution}/reports/{report}/dismiss', [Admin\ContributionController::class, 'dismissReport']);
+        Route::post('contributions/{contribution}/confirm', [Admin\ContributionController::class, 'confirm']);
+        Route::get('contributions/{contribution}/history', [Admin\ContributionController::class, 'history']);
     });
 
     Route::get('events', [Admin\EventController::class, 'index'])->middleware('can:events.view');
@@ -62,6 +68,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth:staff', 'can:staff'])-
     Route::get('users', [Admin\UserController::class, 'index'])->middleware('can:users.view');
     Route::post('users/{user}/suspension', [Admin\UserController::class, 'suspend'])->middleware('can:users.suspend');
     Route::delete('users/{user}/suspension', [Admin\UserController::class, 'liftSuspension'])->middleware('can:users.suspend');
+    Route::post('users/{user}/contribution-suspension', [Admin\UserController::class, 'suspendContributions'])->middleware('can:users.suspend');
+    Route::post('users/{user}/contribution-suspension/review', [Admin\UserController::class, 'reviewContributionSuspension'])->middleware('can:users.suspend');
     Route::post('users/{user}/activation', [Admin\UserController::class, 'setActive'])->middleware('can:users.activate');
     Route::post('users/{user}/password-reset', [Admin\UserController::class, 'sendPasswordReset'])->middleware(['can:users.password_reset', 'throttle:auth-email']);
     Route::delete('users/{user}/sessions', [Admin\UserController::class, 'revokeSessions'])->middleware('can:users.sessions.revoke');
@@ -96,6 +104,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth:staff', 'can:staff'])-
         Route::put("settings/{$group}", [Admin\SettingsController::class, 'update'])->defaults('group', $group)->middleware("can:settings.{$group}.manage");
     }
     Route::post('settings/storage/test', [Admin\SettingsController::class, 'testStorage'])->middleware('can:settings.storage.manage');
+    Route::post('settings/mail/test-connection', [Admin\SettingsController::class, 'testMailConnection'])->middleware(['can:settings.mail.manage', 'throttle:auth-email']);
+    Route::post('settings/mail/test-email', [Admin\SettingsController::class, 'sendTestMail'])->middleware(['can:settings.mail.manage', 'throttle:auth-email']);
+    Route::post('settings/maps/test', [Admin\SettingsController::class, 'testProvider'])->middleware(['can:settings.maps.manage', 'throttle:auth-email']);
     Route::post('cache/clear', [Admin\SettingsController::class, 'clearCache'])->middleware('can:system.cache.manage');
 
     // CMS (routes/api/staff.php): homepage drafts and publishing, menus, notices.
@@ -112,6 +123,19 @@ Route::prefix('admin')->name('admin.')->middleware(['auth:staff', 'can:staff'])-
         Route::get('cms/menus/{location}', [Admin\Cms\MenuController::class, 'show']);
         Route::put('cms/menus/{location}', [Admin\Cms\MenuController::class, 'update']);
     });
+    // Pages, FAQs, blog, team, popups, banners: one route set per config/cms.php type, guarded by that type's permission.
+    Route::get('cms/types', [Admin\Cms\EntryController::class, 'types']); // any staff: lists only the types they may manage
+    foreach (config('cms.types') as $cmsType => $def) {
+        Route::middleware("can:{$def['permission']}")->prefix("cms/entries/{$cmsType}")->group(function () use ($cmsType) {
+            Route::get('', [Admin\Cms\EntryController::class, 'index'])->defaults('type', $cmsType);
+            Route::post('', [Admin\Cms\EntryController::class, 'store'])->defaults('type', $cmsType);
+            Route::put('{id}', [Admin\Cms\EntryController::class, 'update'])->defaults('type', $cmsType)->whereUuid('id');
+            Route::delete('{id}', [Admin\Cms\EntryController::class, 'destroy'])->defaults('type', $cmsType)->whereUuid('id');
+        });
+    }
+    Route::get('contact-messages', [V1\ContactController::class, 'index'])->middleware('can:contact.view');
+    Route::patch('contact-messages/{message}', [V1\ContactController::class, 'update'])->middleware('can:contact.view')->whereUuid('message');
+    Route::delete('contact-messages/{message}', [V1\ContactController::class, 'destroy'])->middleware('can:contact.manage')->whereUuid('message');
     Route::middleware('can:cms.notices.manage')->group(function () {
         Route::get('cms/notices', [Admin\Cms\NoticeController::class, 'index']);
         Route::post('cms/notices', [Admin\Cms\NoticeController::class, 'store']);

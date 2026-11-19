@@ -22,6 +22,7 @@ class RouteResource extends JsonResource
             'estimated_hours' => $this->estimated_hours,
             'status' => $this->status->value,
             'last_confirmed_on' => $this->last_confirmed_on?->toDateString(),
+            'sources' => $this->whenLoaded('sources', fn () => $this->sources->map->toPublic()->values()),
             'is_dev_seed' => $this->is_dev_seed,
             'segments' => $this->whenLoaded('segments', fn () => $this->segments->map(fn ($s) => [
                 'id' => $s->id, 'position' => $s->position, 'start_name' => $s->start_name, 'end_name' => $s->end_name,

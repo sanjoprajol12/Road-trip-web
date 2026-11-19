@@ -24,6 +24,10 @@ class RouteAuthorizationTest extends TestCase
         'GET api/v1/health',
         'GET api/v1/site',
         'GET api/v1/files/{asset}',
+        'GET api/v1/journeys',
+        'GET api/v1/content/{type}',
+        'GET api/v1/content/{type}/{slug}',
+        'POST api/v1/contact',
         'GET api/v1/auth/session',
         'POST api/v1/auth/register',
         'GET api/v1/auth/verify-email/{id}/{hash}',
@@ -70,6 +74,10 @@ class RouteAuthorizationTest extends TestCase
         'GET api/v1/users/me/events',
         'GET api/v1/users/me/notifications',
         'POST api/v1/users/me/notifications/read',
+        'POST api/v1/users/me/contribution-appeal',
+        'GET api/v1/users/me/saved',
+        'POST api/v1/users/me/saved',
+        'DELETE api/v1/users/me/saved/{type}/{id}',
         'GET api/v1/users/me/emergency-contacts',
         'POST api/v1/users/me/emergency-contacts',
         'PUT api/v1/users/me/emergency-contacts/{contact}',
@@ -79,6 +87,7 @@ class RouteAuthorizationTest extends TestCase
 
     /** A signed-in staff account, with or without a role (so it can always sign out or fix its own password). */
     private const STAFF_ACCOUNT = [
+        'GET api/v1/admin/cms/types',
         'POST api/v1/admin/auth/logout',
         'POST api/v1/admin/auth/confirm-password',
         'PUT api/v1/admin/auth/password',

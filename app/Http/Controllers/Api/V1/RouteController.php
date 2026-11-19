@@ -23,7 +23,7 @@ class RouteController extends Controller
     public function show(string $slug): RouteResource
     {
         $route = RideRoute::published()->where('slug', $slug)
-            ->with(['startDestination', 'endDestination', 'segments.servicePoints' => fn ($q) => $q->where('status', 'published')])->firstOrFail();
+            ->with(['sources', 'startDestination', 'endDestination', 'segments.servicePoints' => fn ($q) => $q->where('status', 'published')])->firstOrFail();
 
         return new RouteResource($route);
     }

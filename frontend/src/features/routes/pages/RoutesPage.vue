@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
+import { Navigation } from 'lucide-vue-next'
 import StatusPanel from '@/components/ui/StatusPanel.vue'
 
 import { useAsync } from '@/lib/useAsync'
@@ -13,6 +14,7 @@ const routes = useAsync(() => listRoutes())
   <div class="wrap pt-28 pb-24">
     <h1 class="display text-[clamp(3rem,2rem+4vw,6rem)]">Routes</h1>
     <p class="lead mt-5 max-w-xl text-muted">Each route is broken into stretches you can check on their own, with the reports riders filed for each one.</p>
+    <RouterLink to="/journey" class="btn btn-quiet mt-6"><Navigation class="size-4" aria-hidden="true" /> Explore along my route</RouterLink>
 
     <section class="mt-10" aria-label="Routes">
       <StatusPanel v-if="routes.loading.value" state="loading" title="Loading routes" />

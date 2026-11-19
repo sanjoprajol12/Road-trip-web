@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Admin\Cms;
 
 use App\Http\Controllers\Controller;
 use App\Support\Audit;
+use App\Support\MediaUsages;
 use App\Support\HomeContent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -62,6 +63,7 @@ class HomeSectionController extends Controller
         DB::transaction(function () use ($row, $changes, $request) {
             DB::table('home_sections')->where('id', $row->id)->update($changes + ['updated_by_staff_id' => $request->user()->id, 'updated_at' => now()]);
             Audit::record('home.section_edited', 'home_sections', null, array_keys($changes), $row->id);
+            self::syncMedia($row->id);
         });
 
         return response()->json(['data' => self::out(DB::table('home_sections')->find($row->id))]);
@@ -100,11 +102,19 @@ class HomeSectionController extends Controller
         $count = DB::transaction(function () {
             $n = DB::update('update home_sections set published_data = draft_data, published_position = position, published_visible = (is_visible and archived_at is null), published_at = ? ', [now()]);
             Audit::record('home.published', 'home_sections', null, ['sections' => $n], 'all');
+            DB::table('home_sections')->pluck('id')->each(fn ($id) => self::syncMedia($id));
 
             return $n;
         });
 
         return response()->json(['published' => $count]);
+    }
+
+    /** Images used by the draft or the published version cannot be deleted from the media library. */
+    private static function syncMedia(string $id): void
+    {
+        $s = DB::table('home_sections')->find($id, ['draft_data', 'published_data']);
+        MediaUsages::syncFromJson('home_sections', $id, $s->draft_data, $s->published_data);
     }
 
     private static function out(object $s): array

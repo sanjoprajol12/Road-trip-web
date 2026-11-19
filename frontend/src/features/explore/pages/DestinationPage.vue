@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import SaveButton from '@/features/saved/components/SaveButton.vue'
+import DestinationMap, { type MapPoint } from '../components/DestinationMap.vue'
+import SourceList from '@/components/ui/SourceList.vue'
 import { computed, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { ArrowLeft, CalendarClock, TriangleAlert } from 'lucide-vue-next'
@@ -17,6 +20,14 @@ const { data: result, error, loading, run } = useAsync(() => getDestination(prop
 const d = computed(() => result.value?.destination ?? null)
 const routes = computed(() => result.value?.routes ?? [])
 const services = computed(() => result.value?.services ?? [])
+const nearby = computed(() => result.value?.nearby ?? null)
+const center = computed<[number, number] | null>(() => (d.value?.latitude != null && d.value.longitude != null ? [d.value.latitude, d.value.longitude] : null))
+const mapPoints = computed<MapPoint[]>(() => [
+  ...services.value.filter((s) => s.position).map((s) => ({ name: s.name, position: s.position!, kind: 'service' as const })),
+  ...(nearby.value?.services ?? []).map((s) => ({ name: s.name, position: s.position, kind: 'service' as const })),
+  ...(nearby.value?.destinations ?? []).map((n) => ({ name: n.name, position: n.position, kind: 'destination' as const })),
+])
+const km = (n: number) => `${n.toLocaleString('en-IN')} km`
 // The newest published rider reports filed under this destination (dated observations, never live conditions).
 const reports = useAsync(() => listContributions({ destination: props.slug, per_page: 5 }))
 
@@ -48,8 +59,9 @@ watch(d, (dest) => {
       <header class="wrap grid gap-8 pt-8 pb-12 lg:grid-cols-[1fr_1.25fr] lg:items-end">
         <div>
           <p class="label text-muted">{{ [d.district, d.province].filter(Boolean).join(', ') }}</p>
-          <h1 class="display mt-3 text-[clamp(3.5rem,2rem+6vw,8rem)]">{{ d.name }}</h1>
+          <h1 class="display mt-3 text-[clamp(3.5rem,2rem+6vw,8rem)] [overflow-wrap:anywhere]">{{ d.name }}</h1>
           <p v-if="d.summary" class="lead mt-5 max-w-lg text-muted">{{ d.summary }}</p>
+          <SaveButton class="mt-6" type="destination" :id="d.id" :name="d.name" />
         </div>
         <figure v-if="d.photo_path" class="grid gap-2">
           <div class="aspect-[16/10] overflow-hidden rounded-md bg-night">
@@ -64,6 +76,12 @@ watch(d, (dest) => {
           <h2 id="overview-title" class="display text-3xl">Overview</h2>
           <p v-if="d.overview" class="prose-serif mt-4 max-w-prose whitespace-pre-line">{{ d.overview }}</p>
           <StatusPanel v-else class="mt-4" state="empty" title="No overview yet" message="Nothing has been written about this destination yet." />
+
+          <template v-if="center">
+            <h2 id="map-title" class="display mt-12 text-3xl">On the map</h2>
+            <DestinationMap class="mt-4" :center="center" :name="d.name" :points="mapPoints" />
+          </template>
+          <p v-else class="mt-12 rounded-md border border-line bg-surface p-4 text-sm text-muted">No map position has been recorded for {{ d.name }} yet.</p>
 
           <h2 class="display mt-12 text-3xl">Routes</h2>
           <ul v-if="routes.length" class="mt-4 grid border-t border-line">
@@ -83,12 +101,39 @@ watch(d, (dest) => {
                 <component :is="serviceKinds[s.kind].icon" class="size-4 text-info" aria-hidden="true" />
                 <span class="sr-only">{{ serviceKinds[s.kind].label }}:</span>{{ s.name }}
                 <span class="label font-normal text-muted" aria-hidden="true">{{ serviceKinds[s.kind].label }}</span>
+                <SaveButton class="ml-auto" type="service" :id="s.id" :name="s.name" compact />
               </span>
               <span v-if="s.notes" class="text-muted">{{ s.notes }}</span>
               <span class="text-xs text-muted">{{ s.last_confirmed_on ? `Last confirmed ${formatDay(s.last_confirmed_on)} (${ageInWords(s.last_confirmed_on)})` : 'Never confirmed' }}. Check locally before relying on it.</span>
             </li>
           </ul>
           <p v-else class="mt-4 text-sm text-muted">No services are listed for {{ d.name }} yet.</p>
+
+          <section v-if="nearby" class="mt-12" aria-labelledby="nearby-title">
+            <h2 id="nearby-title" class="display text-3xl">Nearby</h2>
+            <p class="mt-2 text-sm text-muted">Straight-line distance from {{ d.name }}, not riding distance.</p>
+            <h3 class="mt-6 font-semibold">Other destinations within {{ nearby.radius_km.destinations }} km</h3>
+            <ul v-if="nearby.destinations.length" class="mt-2 grid border-t border-line text-sm" aria-label="Nearby destinations">
+              <li v-for="n in nearby.destinations" :key="n.slug" class="flex justify-between gap-3 border-b border-line py-2"><RouterLink :to="`/explore/${n.slug}`" class="link font-semibold">{{ n.name }}</RouterLink><span class="tabular text-muted">{{ km(n.distance_km) }}</span></li>
+            </ul>
+            <p v-else class="mt-2 text-sm text-muted">None recorded.</p>
+            <h3 class="mt-6 font-semibold">Services within {{ nearby.radius_km.services }} km</h3>
+            <ul v-if="nearby.services.length" class="mt-2 grid border-t border-line text-sm" aria-label="Nearby services">
+              <li v-for="s in nearby.services" :key="s.id" class="flex flex-wrap items-center gap-2 border-b border-line py-2">
+                <component :is="serviceKinds[s.kind].icon" class="size-4 text-info" aria-hidden="true" />
+                <span class="font-semibold"><span class="sr-only">{{ serviceKinds[s.kind].label }}:</span>{{ s.name }}</span>
+                <span class="text-muted">{{ serviceKinds[s.kind].label }}<template v-if="s.place"> · {{ s.place }}</template></span>
+                <span class="tabular ml-auto text-muted">{{ km(s.distance_km) }}</span>
+                <SaveButton type="service" :id="s.id" :name="s.name" compact />
+              </li>
+            </ul>
+            <p v-else class="mt-2 text-sm text-muted">None recorded.</p>
+            <h3 class="mt-6 font-semibold">Routes passing within {{ nearby.radius_km.routes }} km</h3>
+            <ul v-if="nearby.routes.length" class="mt-2 grid border-t border-line text-sm" aria-label="Routes passing nearby">
+              <li v-for="r in nearby.routes" :key="r.slug" class="flex justify-between gap-3 border-b border-line py-2"><RouterLink :to="`/routes/${r.slug}`" class="link font-semibold">{{ r.name }}</RouterLink><span class="tabular text-muted">{{ km(r.distance_km) }} from the route line</span></li>
+            </ul>
+            <p v-else class="mt-2 text-sm text-muted">None recorded.</p>
+          </section>
 
           <h2 class="display mt-12 text-3xl">Recent rider reports</h2>
           <StatusPanel v-if="reports.loading.value" class="mt-4" state="loading" title="Loading reports" />
@@ -119,6 +164,7 @@ watch(d, (dest) => {
             </p>
             <p v-else><span class="font-semibold">Never confirmed.</span> <span class="text-muted">No one has checked this record against a source yet.</span></p>
           </div>
+          <SourceList :sources="d.sources" />
         </aside>
       </div>
     </article>

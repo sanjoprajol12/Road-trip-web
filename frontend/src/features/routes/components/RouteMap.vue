@@ -2,8 +2,10 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import type { Map as LeafletMap } from 'leaflet'
 import type { Segment } from '@/types/api'
+import { addTiles } from '@/lib/mapTiles'
 
-const props = defineProps<{ segments: Segment[] }>()
+// `nearby`: places off the route line (Explore Along My Route), drawn as hollow markers.
+const props = defineProps<{ segments: Segment[]; nearby?: { name: string; position: [number, number] | null }[] }>()
 const el = ref<HTMLDivElement | null>(null)
 const failed = ref(false)
 let map: LeafletMap | null = null
@@ -18,10 +20,7 @@ onMounted(async () => {
     const L = (await import('leaflet')).default
     await import('leaflet/dist/leaflet.css')
     map = L.map(el.value, { scrollWheelZoom: false, zoomAnimation: !matchMedia('(prefers-reduced-motion: reduce)').matches })
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 18,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    }).addTo(map)
+    addTiles(L, map)
     const bounds = L.latLngBounds([])
     for (const s of lines) {
       const pts: [number, number][] = [s.start!, s.end!]
@@ -32,6 +31,7 @@ onMounted(async () => {
       }
       for (const svc of s.services) if (svc.position) L.circleMarker(svc.position, { radius: 4, color: '#285a8c', weight: 2 }).addTo(map).bindTooltip(svc.name)
     }
+    for (const p of props.nearby ?? []) if (p.position) L.circleMarker(p.position, { radius: 5, color: '#285a8c', weight: 2, fillOpacity: 0 }).addTo(map).bindTooltip(p.name)
     map.fitBounds(bounds, { padding: [24, 24] })
   } catch {
     failed.value = true

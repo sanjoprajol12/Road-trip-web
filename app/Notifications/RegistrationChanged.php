@@ -11,7 +11,7 @@ use Illuminate\Notifications\Notification;
  */
 class RegistrationChanged extends Notification
 {
-    /** @param 'promoted'|'approved'|'declined' $change */
+    /** @param 'promoted'|'approved'|'declined'|'removed' $change */
     public function __construct(public Event $event, public string $change) {}
 
     public function via(object $notifiable): array

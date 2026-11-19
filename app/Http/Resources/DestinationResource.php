@@ -25,6 +25,7 @@ class DestinationResource extends JsonResource
             'photo_credit' => $this->photo_credit,
             'status' => $this->status->value,
             'last_confirmed_on' => $this->last_confirmed_on?->toDateString(),
+            'sources' => $this->whenLoaded('sources', fn () => $this->sources->map->toPublic()->values()),
             'is_dev_seed' => $this->is_dev_seed,
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

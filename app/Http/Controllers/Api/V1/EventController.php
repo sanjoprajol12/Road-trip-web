@@ -93,11 +93,15 @@ class EventController extends Controller
             'status' => ['required', Rule::in(array_map(fn ($s) => $s->value, $event->status->next()))],
             'message' => ['nullable', 'required_if:status,postponed,cancelled', 'string', 'min:10', 'max:2000'],
             'summary' => ['nullable', 'string', 'max:5000'],
+            // Postponing may set the new dates at once (or later through the edit form).
+            'starts_at' => ['nullable', 'prohibited_unless:status,postponed', 'date', 'after:now'],
+            'ends_at' => ['nullable', 'required_with:starts_at', 'date', 'after:starts_at'],
         ], ['status.in' => 'This event cannot move to that status now.', 'message.required_if' => 'Tell participants why (at least 10 characters).']);
         $to = EventStatus::from($data['status']);
         DB::transaction(function () use ($event, $to, $data) {
             $old = $event->status->value;
-            $event->forceFill(['status' => $to, 'summary' => $to === EventStatus::Completed ? ($data['summary'] ?? $event->summary) : $event->summary])->save();
+            $event->forceFill(['status' => $to, 'summary' => $to === EventStatus::Completed ? ($data['summary'] ?? $event->summary) : $event->summary]
+                + (! empty($data['starts_at']) ? ['starts_at' => $data['starts_at'], 'ends_at' => $data['ends_at']] : []))->save();
             if ($to === EventStatus::Published) {
                 \App\Actions\Events\EventCapacity::settle($event);
             }

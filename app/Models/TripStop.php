@@ -9,7 +9,7 @@ class TripStop extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['position', 'day', 'name', 'destination_id', 'route_id', 'overnight', 'note'];
+    protected $fillable = ['position', 'day', 'name', 'destination_id', 'route_id', 'overnight', 'note', 'service_point_id'];
 
     protected function casts(): array
     {

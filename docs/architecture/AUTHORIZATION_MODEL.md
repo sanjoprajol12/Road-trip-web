@@ -40,3 +40,8 @@ Row-level security is **not** used (owner decision): only Laravel connects, as `
 1. Add the key to `config/permissions.php` (and to the moderator defaults if moderators should have it).
 2. Use it on the route (`->middleware('can:<key>')`) or in a policy (`hasPermission('<key>')`).
 3. Run `php artisan mrn:permissions:sync` (new installs get it from the migration). `RouteAuthorizationTest` fails until every staff route names a registry key.
+
+## Session 13 permissions
+`cms.pages.manage`, `cms.faqs.manage`, `cms.blog.manage` (posts, categories, tags, authors), `cms.team.manage`, `cms.promotions.manage` (popups, banners): drafts of that module. `cms.content.publish`: needed in addition to make content public, schedule, archive, or edit content that is already public. `contact.view` (read the inbox, including sender emails), `contact.manage` (status, delete). `settings.mail.manage`, `settings.maps.manage`, `settings.security.manage`, `settings.trust.manage`. Contribution pauses use the existing `users.suspend`. The CMS entry routes are registered per type, each behind its type's permission (route-matrix test), and the controller checks again.
+- Trips: a rider becomes a member only by accepting an invitation; before that they see only the trip title, the inviter's display name and the role. Someone else's invitation answers 404.
+- Contribution pauses never block reading, trips, saved items or events; they block submitting, editing, photos, reports, confirmations and corrections (`can-contribute` middleware).

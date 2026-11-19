@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 /** A riding route ("Route" would clash with Laravel's router). */
 class RideRoute extends Model
 {
-    use HasFactory, HasUuids, SoftDeletes;
+    use \App\Models\Concerns\HasSources, HasFactory, HasUuids, SoftDeletes;
 
     protected $table = 'routes';
 

@@ -28,6 +28,7 @@ class TripPartController extends Controller
                 'day' => ['nullable', 'integer', 'between:1,365'],
                 'destination_id' => ['nullable', 'uuid', Rule::exists('destinations', 'id')->where('status', 'published')],
                 'route_id' => ['nullable', 'uuid', Rule::exists('routes', 'id')->where('status', 'published')],
+                'service_point_id' => ['nullable', 'uuid', Rule::exists('service_points', 'id')->where('status', 'published')],
                 'overnight' => ['sometimes', 'boolean'],
                 'note' => ['nullable', 'string', 'max:1000'],
             ],
@@ -50,6 +51,10 @@ class TripPartController extends Controller
     {
         $this->authorize('edit', $trip);
         $data = $this->clean($trip, $request->validate($this->rules($part, false)));
+        // The same service twice in one trip is a mistake (a destination may repeat: out and back).
+        if ($part === 'stops' && isset($data['service_point_id']) && $trip->stops()->where('service_point_id', $data['service_point_id'])->exists()) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['service_point_id' => ['This service is already a stop on this trip.']]);
+        }
         if ($part === 'stops' && ! isset($data['position'])) {
             $data['position'] = (int) $trip->stops()->max('position') + 1;
         }
