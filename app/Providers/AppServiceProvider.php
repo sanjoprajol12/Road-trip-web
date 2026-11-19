@@ -18,6 +18,10 @@ class AppServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
+        // Staff mail settings (when enabled) replace MAIL_* the first time mail is used in a request or job.
+        $this->app->afterResolving('mail.manager', fn () => \App\Support\MailSettings::apply());
+        // Short, stable type names in `sourceables` (not class names, which would break on a rename).
+        \Illuminate\Database\Eloquent\Relations\Relation::morphMap(['destination' => \App\Models\Destination::class, 'route' => \App\Models\RideRoute::class, 'contribution' => \App\Models\Contribution::class, 'place' => \App\Models\Place::class]);
         // The API is reached through the frontend's same-origin proxy, so every generated link
         // (email confirmation, password reset) uses the public app origin.
         URL::forceRootUrl(config('app.url'));
@@ -37,9 +41,11 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('register', fn (Request $r) => Limit::perHour((int) config('mrn.limits.register_per_hour'))->by($r->ip()));
         // Signed-in requests (password change/confirm) are limited per account, others per email and IP.
         RateLimiter::for('auth-email', fn (Request $r) => Limit::perMinutes(10, 5)->by(($r->user()?->id ?? Str::lower((string) $r->input('email'))).'|'.$r->ip()));
-        RateLimiter::for('staff-login', fn (Request $r) => Limit::perMinute(5)->by('staff|'.Str::lower((string) $r->input('email')).'|'.$r->ip()));
+        RateLimiter::for('staff-login', fn (Request $r) => Limit::perMinute((int) \App\Support\Settings::get('security.login_attempts_per_minute'))->by('staff|'.Str::lower((string) $r->input('email')).'|'.$r->ip()));
         RateLimiter::for('applications', fn (Request $r) => Limit::perDay(5)->by($per($r)));
         RateLimiter::for('contributions', fn (Request $r) => Limit::perDay(30)->by($per($r)));
+        // Contact form: a few messages per address per hour, and a daily cap.
+        RateLimiter::for('contact', fn (Request $r) => [Limit::perHour(config('mrn.limits.contact_per_hour'))->by('contact:'.$r->ip()), Limit::perDay(4 * config('mrn.limits.contact_per_hour'))->by('contact-day:'.$r->ip())]);
         RateLimiter::for('reports', fn (Request $r) => Limit::perDay(30)->by($per($r)));
         RateLimiter::for('uploads', fn (Request $r) => Limit::perHour(60)->by($per($r)));
     }

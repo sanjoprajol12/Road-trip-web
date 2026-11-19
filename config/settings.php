@@ -57,7 +57,44 @@ return [
         'footer.disclaimer' => ['type' => 'string', 'default' => 'Not an emergency service. My Ride Nepal does not dispatch help or track riders. In an emergency, contact local emergency services directly.', 'rules' => ['required', 'string', 'min:20', 'max:400'], 'public' => true],
         'footer.note' => ['type' => 'string', 'default' => 'Rider reports describe the day they were made. Check current conditions locally before you ride.', 'rules' => ['nullable', 'string', 'max:300'], 'public' => true],
         'footer.credits' => ['type' => 'string', 'default' => 'Photos: Igor Ovsyannykov, Maesi64, Sagar Dani, scvishnu7 and phuchche, all CC0 via Wikimedia Commons.', 'rules' => ['nullable', 'string', 'max:300'], 'public' => true],
+
+        // Mail (SMTP). Off: Laravel uses MAIL_* from .env. On: these values replace them at runtime (queue workers
+        // restart on save so they pick the change up). The password is encrypted and never returned.
+        'mail.override' => ['type' => 'bool', 'default' => false, 'rules' => ['required', 'boolean']],
+        'mail.host' => ['type' => 'string', 'default' => null, 'rules' => ['nullable', 'required_if:override,true', 'string', 'max:255', 'regex:/^[a-z0-9.-]+$/i']],
+        'mail.port' => ['type' => 'int', 'default' => 587, 'rules' => ['required', 'integer', 'between:1,65535']],
+        'mail.encryption' => ['type' => 'string', 'default' => 'tls', 'rules' => ['required', 'in:tls,ssl,none']],
+        'mail.username' => ['type' => 'string', 'default' => null, 'rules' => ['nullable', 'string', 'max:255']],
+        'mail.password' => ['type' => 'string', 'default' => null, 'secret' => true, 'rules' => []],
+        'mail.from_address' => ['type' => 'string', 'default' => null, 'rules' => ['nullable', 'required_if:override,true', 'email:rfc', 'max:255']],
+        'mail.from_name' => ['type' => 'string', 'default' => 'My Ride Nepal', 'rules' => ['required', 'string', 'max:100']],
+
+        // Maps. Tiles are loaded by the browser (public); geocoding and routing are called only by Laravel, and only
+        // once a provider is chosen (owner decision D2). "Configured" never means "connected": use the test.
+        'maps.tile_url' => ['type' => 'string', 'default' => 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', 'rules' => ['required', 'string', 'max:300', 'regex:#^https://[a-z0-9.-]+(:[0-9]+)?/\S*\{z\}\S*\{x\}\S*\{y\}\S*$#i'], 'public' => true],
+        'maps.attribution' => ['type' => 'string', 'default' => '© OpenStreetMap contributors', 'rules' => ['required', 'string', 'min:3', 'max:200'], 'public' => true],
+        'maps.attribution_url' => ['type' => 'string', 'default' => 'https://www.openstreetmap.org/copyright', 'rules' => ['nullable', 'url:https', 'max:300'], 'public' => true],
+        'maps.default_lat' => ['type' => 'float', 'default' => 28.2, 'rules' => ['required', 'numeric', 'between:26,31'], 'public' => true],
+        'maps.default_lng' => ['type' => 'float', 'default' => 84.1, 'rules' => ['required', 'numeric', 'between:80,89'], 'public' => true],
+        'maps.default_zoom' => ['type' => 'int', 'default' => 7, 'rules' => ['required', 'integer', 'between:5,14'], 'public' => true],
+        'maps.geocoding_provider' => ['type' => 'string', 'default' => 'none', 'rules' => ['required', 'in:none,nominatim']],
+        'maps.geocoding_url' => ['type' => 'string', 'default' => null, 'rules' => ['nullable', 'required_unless:geocoding_provider,none', 'url:https', 'max:300']],
+        'maps.geocoding_key' => ['type' => 'string', 'default' => null, 'secret' => true, 'rules' => []],
+        'maps.routing_provider' => ['type' => 'string', 'default' => 'none', 'rules' => ['required', 'in:none,osrm,openrouteservice']],
+        'maps.routing_url' => ['type' => 'string', 'default' => null, 'rules' => ['nullable', 'required_unless:routing_provider,none', 'url:https', 'max:300']],
+        'maps.routing_key' => ['type' => 'string', 'default' => null, 'secret' => true, 'rules' => []],
+
+        // Security: staff session limits and sign-in attempts (riders and staff alike, per address and email).
+        'security.staff_idle_minutes' => ['type' => 'int', 'default' => (int) env('STAFF_SESSION_IDLE_MINUTES', 60), 'rules' => ['required', 'integer', 'between:15,240']],
+        'security.staff_max_hours' => ['type' => 'int', 'default' => intdiv((int) env('STAFF_SESSION_MAX_MINUTES', 720), 60), 'rules' => ['required', 'integer', 'between:1,24']],
+        'security.login_attempts_per_minute' => ['type' => 'int', 'default' => 5, 'rules' => ['required', 'integer', 'between:3,20']],
+
+        // Trust: community corroboration. A published report becomes "corroborated by other riders" when this many
+        // distinct eligible riders (confirmed email, not suspended, not the author) said "still accurate" within the
+        // window. Corroboration is never official verification.
+        'trust.corroboration_threshold' => ['type' => 'int', 'default' => 3, 'rules' => ['required', 'integer', 'between:2,20']],
+        'trust.corroboration_window_days' => ['type' => 'int', 'default' => 90, 'rules' => ['required', 'integer', 'between:7,365']],
     ],
 
-    'groups' => ['general', 'maintenance', 'registration', 'storage', 'branding', 'social', 'seo', 'footer'],
+    'groups' => ['general', 'maintenance', 'registration', 'storage', 'branding', 'social', 'seo', 'footer', 'mail', 'maps', 'security', 'trust'],
 ];

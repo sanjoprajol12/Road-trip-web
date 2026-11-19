@@ -89,7 +89,7 @@ class AuthController extends Controller
         $data = $request->validate([
             'token' => ['required', 'string', 'max:200'],
             'email' => ['required', 'string', 'email:rfc', 'max:255'],
-            'password' => ['required', 'string', 'confirmed', PasswordRule::min(12)->max(200)],
+            'password' => ['required', 'string', 'confirmed', PasswordRule::min(8)->max(200)],
         ]);
         $status = Password::broker('staff')->reset(
             ['email' => Str::lower(trim($data['email'])), 'token' => $data['token'], 'password' => $data['password'], 'password_confirmation' => $request->input('password_confirmation')],
@@ -121,7 +121,7 @@ class AuthController extends Controller
     {
         $data = $request->validate([
             'current_password' => ['required', 'string', 'max:200'],
-            'password' => ['required', 'string', 'confirmed', PasswordRule::min(12)->max(200)],
+            'password' => ['required', 'string', 'confirmed', PasswordRule::min(8)->max(200)],
         ]);
         $staff = $request->user();
         if (! Hash::check($data['current_password'], (string) $staff->password)) {
@@ -163,7 +163,7 @@ class AuthController extends Controller
                     throw ValidationException::withMessages(['email' => ['This staff account is deactivated.']]);
                 }
             } else {
-                validator($data, ['display_name' => ['required'], 'password' => [PasswordRule::min(12)->max(200)]],
+                validator($data, ['display_name' => ['required'], 'password' => [PasswordRule::min(8)->max(200)]],
                     ['display_name.required' => 'Enter the name other staff will see.'])->validate();
                 $staff ??= new StaffAccount(['email' => $email]);
                 $staff->forceFill(['display_name' => trim($data['display_name']), 'password' => $data['password']])->save();

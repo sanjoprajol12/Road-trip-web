@@ -113,6 +113,9 @@ class Settings
                     'secret' => $secret && filled($value) ? Crypt::encryptString($value) : null,
                     'updated_by_staff_id' => $actor?->id, 'updated_at' => now(),
                 ]);
+                if (str_ends_with($key, '_media_id')) {
+                    MediaUsages::sync('settings', $key, ['value' => $value]);
+                }
                 $old[$key] = $secret ? (filled($before[$key]) ? '[set]' : '[not set]') : $before[$key];
                 $new[$key] = $secret ? (filled($value) ? '[set]' : '[not set]') : $value;
             }
@@ -139,6 +142,7 @@ class Settings
         return match ($type) {
             'bool' => filter_var($value, FILTER_VALIDATE_BOOL),
             'int' => (int) $value,
+            'float' => (float) $value,
             'list' => array_values(array_unique($value ?? [])),
             default => $value === null ? null : (string) $value,
         };

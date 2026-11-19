@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 11: One dev command | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:60rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; }
+  h2 { font-size:1.3rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.4rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  code { font-size:.88em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; word-break:break-word; }
+  .warn { color:var(--warn); font-weight:700; }
+  .ok { color:var(--ok); font-weight:700; }
+  ul, ol { padding-left:1.3rem; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; margin:.6rem 0 1rem; }
+  th, td { text-align:left; vertical-align:top; padding:.4rem .6rem; border-bottom:1px solid var(--line); }
+  th { background:var(--surface); }
+</style>
+</head>
+<body>
+<main>
+<p class="meta">My Ride Nepal · Session report</p>
+<h1>Session 11: API and public website from one command</h1>
+<p class="meta">2026-11-19 · Claude Code (Opus 5.5) · Nothing committed · No application code changed</p>
+
+<h2>Objective</h2>
+<p>Owner: start the Laravel API and the public website with <code>cd web &amp;&amp; npm run dev</code>, without entering <code>frontend/</code>, keeping the Vue app where it is, the staff portal independent and the separate commands working.</p>
+
+<h2>What changed</h2>
+<ul>
+  <li><code>web/package.json</code>: <code>dev</code> = port guard, then concurrently 10.0.7 (via <code>npx</code>, as <code>composer dev</code> already used it; pinned, no new dependency) running <code>php artisan serve --port=8010 --tries=1</code>, the queue listener, the log tail and the public Vite server on 5180 with <code>--kill-others</code>. Also <code>dev:api</code> (= <code>composer dev</code>) and <code>dev:web</code>.</li>
+  <li><code>web/scripts/dev-ports-free.mjs</code>: refuses to start when 8010 or 5180 is taken, so no second Laravel (which would otherwise move to another port) or Vite server starts.</li>
+  <li>Docs: <code>README.md</code>, <code>DEVELOPMENT_SETUP.md</code>, <code>CLAUDE.md</code>, <code>handoff.md</code>.</li>
+</ul>
+
+<h2>Verification</h2>
+<div class="scroll"><table><thead><tr><th>Check</th><th>Result</th></tr></thead><tbody>
+<tr><td>Identified existing servers before testing</td><td class="ok">8010 (owner's Laravel), 5180 (owner's public Vite), 5181 (owner's staff Vite): not touched</td></tr>
+<tr><td><code>npm run dev</code> while 8010/5180 are taken</td><td class="ok">refused with a clear message, exit 1, nothing started</td></tr>
+<tr><td><code>API_PORT=8020 WEB_PORT=5190 npm run dev</code></td><td class="ok">API health 200 (database ok), website page 200, website → API proxy 200</td></tr>
+<tr><td>Ctrl+C (SIGINT to the command's process group)</td><td class="ok">all 19 started processes gone, both ports closed; owner's 8010, 5180, 5181 still up</td></tr>
+<tr><td>One part crashes (website process killed)</td><td class="ok">the rest stopped, ports closed, exit 1</td></tr>
+<tr><td><code>npm run dev:web</code> from <code>web</code></td><td class="ok">starts the website's Vite (refused 5180 because the owner's server holds it)</td></tr>
+<tr><td>Staff portal <code>npm run dev</code></td><td class="ok">unchanged (Vite only)</td></tr>
+<tr><td>Builds: public, staff</td><td class="ok">pass</td></tr>
+<tr><td><code>php artisan test</code></td><td class="warn">one run 7 failed (not reproduced, output not captured); three later runs 104/104</td></tr>
+</tbody></table></div>
+
+<h2>Notes</h2>
+<ul>
+  <li>The port fallback syntax (<code>${API_PORT:-8010}</code>) needs a POSIX shell (Linux, macOS, WSL), which npm uses there.</li>
+  <li>Production builds and deployment are unchanged and remain separate per app.</li>
+</ul>
+</main>
+</body>
+</html>

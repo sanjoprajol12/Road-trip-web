@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 13: CMS, settings, invitations | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:60rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; }
+  h2 { font-size:1.3rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.4rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  code { font-size:.88em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; word-break:break-word; }
+  .warn { color:var(--warn); font-weight:700; }
+  .ok { color:var(--ok); font-weight:700; }
+  ul, ol { padding-left:1.3rem; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; margin:.6rem 0 1rem; }
+  th, td { text-align:left; vertical-align:top; padding:.4rem .6rem; border-bottom:1px solid var(--line); }
+  th { background:var(--surface); }
+</style>
+</head>
+<body>
+<main>
+<p class="meta">My Ride Nepal · Session report</p>
+<h1>Session 13: CMS, settings, trip consent, trust rules</h1>
+<p class="meta">2026-11-19 · Claude Code (Opus 5.5) · Nothing committed · Two additive migrations · No dependency added · No deployment</p>
+
+<h2>Work completed</h2>
+<ul>
+<li><span class="ok">CMS modules.</span> Pages with content blocks, FAQs, blog posts with categories, tags and authors, team members, popups and banners. They share one table and one config file (<code>config/cms.php</code>), which also drives the staff forms. Each supports drafts, a separate publish permission, schedule and expiry, ordering, SEO fields, slugs, signed preview, search, filters, pagination and an audit trail. Public pages: <code>/pages/:slug</code>, <code>/faq</code>, <code>/blog</code>, <code>/blog/:slug</code>, <code>/team</code>, <code>/contact</code>, plus banners and an accessible popup.</li>
+<li><span class="ok">Contact messages.</span> A public form with a honeypot field and a rate limit, and a staff inbox with read and unread, status, search and delete. Sender emails are visible only with <code>contact.view</code>.</li>
+<li><span class="ok">Settings.</span> Four new groups:
+  <ul>
+  <li>Mail: SMTP override with an encrypted password, connection test, and a test email that goes only to the signed-in staff member.</li>
+  <li>Maps: tile URL, attribution and default view, plus geocoding and routing provider fields with a test that refuses private hosts. Nothing is reported as connected.</li>
+  <li>Security: staff session limits and sign-in attempts.</li>
+  <li>Trust: the corroboration threshold and window.</li>
+  </ul></li>
+<li><span class="ok">Trip invitations with consent.</span> Adding a member now sends an invitation. The rider accepts or declines within 14 days, and the owner can cancel it. Before accepting, the rider sees only the title, the inviter and the role.</li>
+<li><span class="ok">Journey page add-to-trip.</span> Services and destinations can be added to a trip directly; the same service twice on one trip is refused by the API.</li>
+<li><span class="ok">Community corroboration.</span> A published report is marked "corroborated by other riders" once enough distinct eligible riders confirm it within the window (default 3 riders in 90 days). This is never official verification.</li>
+<li><span class="ok">Contribution-only suspension.</span> Staff can pause a rider's contribution rights with a reason and an end date. The rider can appeal once, and staff lift or uphold the pause. Everything is audited and the rider is notified. Account suspension is unchanged.</li>
+<li><span class="ok">Events.</span> Organizers can remove approved riders before the start, and the waitlist moves up. Postponing can set new dates.</li>
+<li><span class="ok">Defects found and fixed:</span>
+  <ul>
+  <li><code>media_usages</code> was never written, so images in use could be deleted. It is now written for CMS entries, homepage sections and settings images.</li>
+  <li>Layout shift was 0.39 on the homepage and 0.23 on Explore; it is now 0.</li>
+  <li>Staff dialogs shared one title id, which confused <code>aria-labelledby</code>.</li>
+  </ul></li>
+</ul>
+
+<h2>Files changed</h2>
+<p>See <code>docs/handoff.md</code> §3 (session 13) for the full list. New backend files: <code>config/cms.php</code>; <code>app/Support/{CmsContent,MediaUsages,MailSettings,ProviderProbe}.php</code>; <code>app/Models/{CmsEntry,ContributionSuspension}.php</code>; controllers <code>Admin/Cms/EntryController</code>, <code>ContentController</code>, <code>ContactController</code>, <code>TripInvitationController</code>; <code>EnsureCanContribute</code> middleware; two notifications; migrations <code>100015</code> and <code>100016</code>. New frontend features: <code>frontend/src/features/content</code>, <code>admin/src/features/cms/content</code>, <code>admin/src/features/contact</code>, and four staff settings pages.</p>
+
+<h2>Architecture decisions</h2>
+<ul>
+<li>One generic CMS table rather than nine modules. Each type's fields are declared once, and both the validation rules and the staff form come from that declaration. Text is plain text (no HTML), so there is no rich-text sanitizer to maintain.</li>
+<li>CMS staff routes are registered once per type, each behind that type's own permission (enforced by the route-matrix test). Publishing is a separate permission.</li>
+<li>Staff mail settings are applied the first time the mail manager is used in a request or job. Saving them restarts queue workers.</li>
+<li>Corroboration counts "still accurate" confirmations from distinct eligible riders, as you directed. Matching independent reports on the same stretch is recorded as a future refinement.</li>
+</ul>
+
+<h2>Tools and skills used</h2>
+<p>Claude Code shell and file tools; PHPUnit on Postgres (<code>myridenepal_test</code>); Playwright on <code>myridenepal_e2e</code>; vue-tsc, oxlint, eslint, Vitest, Vite, composer audit and pnpm audit. No subagents, no external services, no new packages.</p>
+
+<h2>Tests and actual results</h2>
+<div class="scroll"><table>
+<tr><th>Check</th><th>Result</th></tr>
+<tr><td><code>php artisan test</code></td><td class="ok">129 passed (2750 assertions); session 12 ended at 117</td></tr>
+<tr><td><code>composer audit</code>, both <code>pnpm audit --prod</code></td><td class="ok">No advisories</td></tr>
+<tr><td>Public: type-check, lint, unit, build</td><td class="ok">Pass; 7 unit tests</td></tr>
+<tr><td>Staff: type-check, lint, unit, build</td><td class="ok">Pass; 13 unit tests</td></tr>
+<tr><td>Public E2E (Chromium, Firefox, Pixel 7)</td><td class="ok">111 passed, 3 skipped by design (Chromium-only Web Vitals check; keyboard check skipped on the phone profile)</td></tr>
+<tr><td>Staff E2E (Chromium, Firefox)</td><td class="ok">32 passed</td></tr>
+<tr><td>Web Vitals (local preview, Chromium, no throttling)</td><td>LCP 164 to 924 ms; CLS 0 on <code>/</code>, <code>/explore</code>, <code>/routes</code> and <code>/blog</code></td></tr>
+<tr><td>WebKit</td><td class="warn">Not run: the browser does not launch without system libraries (for example <code>libevent-2.1</code>)</td></tr>
+<tr><td>axe, Lighthouse, screen reader</td><td class="warn">Not run: not installed, and adding them needs your approval. The dependency-free structure checks above cover part of this.</td></tr>
+</table></div>
+
+<h2>Failures and resolutions</h2>
+<p>All are listed in <code>docs/handoff.md</code> §5 (session 13). The main ones:</p>
+<ul>
+<li>Route defaults reached the controllers in an unexpected order; the controllers now read the type and answer from the route.</li>
+<li>The route matrix refused unclassified routes and a constrained route that answered 404 before authentication.</li>
+<li>PDO treats <code>?</code> as a placeholder, so the JSON tag query uses <code>jsonb_exists()</code>.</li>
+<li>The contact-form rate limit blocked repeated E2E runs; the E2E API now raises it with <code>CONTACT_PER_HOUR</code>.</li>
+<li>The browser caches the popup list for 60 seconds, so the test creates the popup before the first page visit.</li>
+</ul>
+
+<h2>Security implications</h2>
+<ul>
+<li>Every new endpoint has a permission or policy, validation and tests, including refused cases: riders on staff routes, a staff member without the module permission, an editor without the publish permission, someone else's invitation (404), and a staff member pausing their own linked rider account.</li>
+<li>Secrets (mail password, provider keys) are stored encrypted and returned only as "set or not set". They never appear in audit rows or in <code>/site</code>.</li>
+<li>The provider test calls only https URLs and refuses private, loopback and reserved addresses, so it cannot be used for server-side request forgery. The test email can go only to the signed-in staff member, so it cannot act as an open relay.</li>
+<li>Contact messages store an HMAC of the sender's network address, not the address itself. Sender emails are visible only with <code>contact.view</code>.</li>
+<li>Private trips: membership now requires consent, and before accepting the invitee sees only the title, inviter and role.</li>
+<li>Map attribution is escaped before Leaflet renders it as HTML.</li>
+</ul>
+
+<h2>Database changes</h2>
+<p>Two additive migrations were applied with the owner role to <code>myridenepal</code> and <code>myridenepal_e2e</code>: <code>cms_entries</code> and <code>contact_messages</code>, then <code>trip_invitations</code> and <code>contribution_suspensions</code>. The permission registry was synced (49 keys). Nothing was dropped or reset, and existing trip members remain members. Rollback: each <code>down()</code> drops only its own tables.</p>
+
+<h2>Remaining limitations</h2>
+<ul>
+<li>No places model (viewpoints, temples, lakes, rider-submitted hidden places): this needs PostGIS (D3).</li>
+<li>No geocoding or routing proxy, so no detours or riding times: this needs a provider (D2).</li>
+<li>Durable file storage (D1) and crawler-visible SEO (D4) are not done.</li>
+<li>Branding beyond the share image (logos, favicon, colours) and notification/feature settings are not built.</li>
+<li>About, Privacy and Terms pages need texts written by you.</li>
+<li>WebKit, axe, Lighthouse and a screen-reader check have not been run.</li>
+</ul>
+
+<h2>Owner decisions</h2>
+<ul>
+<li>Architecture and hosting: D3 PostGIS, D2 routing/geocoding provider (options are listed in <code>DEPLOYMENT_READINESS.md</code>; check costs before choosing), D1 storage, AR4 hosting, AR5 production Postgres.</li>
+<li>Policies: D4 SEO prerender, D7 contact-message retention period, AR3 staff two-step sign-in.</li>
+<li>Tooling: approval to add <code>@axe-core/playwright</code> and Lighthouse, and installing the WebKit system libraries (needs sudo).</li>
+</ul>
+
+<h2>Next steps</h2>
+<ol>
+<li>Branding assets (S6), notification and feature settings (S11), and a view of mail delivery failures.</li>
+<li>Saving guides (F8); event completion photos, multi-route events and event reports (D15, D18, D17).</li>
+<li>Account deletion and data export (G19, H11); splitting <code>TripPage</code> and <code>MediaPage</code>.</li>
+<li>After D3 and D2: the places model, provider proxies, and detour distance and time.</li>
+</ol>
+</main>
+</body>
+</html>

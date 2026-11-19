@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Destination extends Model
 {
-    use HasFactory, HasUuids, SoftDeletes;
+    use \App\Models\Concerns\HasSources, HasFactory, HasUuids, SoftDeletes;
 
     protected $fillable = ['slug', 'name', 'province', 'district', 'summary', 'overview', 'elevation_m', 'latitude', 'longitude', 'photo_path', 'photo_alt', 'photo_credit', 'status', 'last_confirmed_on', 'is_dev_seed'];
 

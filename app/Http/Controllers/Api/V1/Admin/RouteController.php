@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\RouteResource;
 use App\Models\RideRoute;
+use App\Models\Source;
 use App\Support\Audit;
+use Illuminate\Support\Arr;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -21,15 +23,21 @@ class RouteController extends Controller
 
     public function show(string $route): RouteResource
     {
-        return new RouteResource(RideRoute::with(['startDestination', 'endDestination', 'segments.servicePoints'])->findOrFail($route));
+        return new RouteResource(RideRoute::with(['startDestination', 'endDestination', 'segments.servicePoints', 'sources'])->findOrFail($route));
     }
 
     public function store(Request $request): JsonResponse
     {
-        $r = new RideRoute($this->validated($request));
-        $r->created_by_staff_id = $request->user()->id;
-        $r->save();
-        Audit::record('route.created', $r, null, $r->only(['name', 'status']));
+        $data = $this->validated($request);
+        $r = DB::transaction(function () use ($request, $data) {
+            $r = new RideRoute(Arr::except($data, 'sources'));
+            $r->created_by_staff_id = $request->user()->id;
+            $r->save();
+            Audit::record('route.created', $r, null, $r->only(['name', 'status']));
+            $r->syncSources($data['sources'] ?? []);
+
+            return $r;
+        });
 
         return $this->show($r->id)->response()->setStatusCode(201);
     }
@@ -37,9 +45,15 @@ class RouteController extends Controller
     public function update(Request $request, string $route): RouteResource
     {
         $r = RideRoute::findOrFail($route);
-        $old = $r->only(['name', 'status', 'distance_km', 'last_confirmed_on']);
-        $r->update($this->validated($request, $r));
-        Audit::record('route.updated', $r, $old, $r->only(['name', 'status', 'distance_km', 'last_confirmed_on']));
+        $data = $this->validated($request, $r);
+        DB::transaction(function () use ($r, $data) {
+            $old = $r->only(['name', 'status', 'distance_km', 'last_confirmed_on']);
+            $r->update(Arr::except($data, 'sources'));
+            Audit::record('route.updated', $r, $old, $r->only(['name', 'status', 'distance_km', 'last_confirmed_on']));
+            if (array_key_exists('sources', $data)) {
+                $r->syncSources($data['sources']);
+            }
+        });
 
         return $this->show($r->id);
     }
@@ -108,6 +122,7 @@ class RouteController extends Controller
             'estimated_hours' => ['nullable', 'numeric', 'between:0.1,500'],
             'status' => [$req, Rule::in(['draft', 'published', 'archived'])],
             'last_confirmed_on' => ['nullable', 'date', 'before_or_equal:today'],
+            ...Source::rules(),
         ]);
     }
 }

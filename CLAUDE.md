@@ -6,7 +6,7 @@ Read first, every session: `docs/handoff.md`, then `docs/audits/PROJECT_AUDIT_CH
 - `web/` (this repo, GitHub Road-trip-web): **Laravel 12 API at the repo root** (REST `/api/v1`, `app/`, `routes/`, `database/`), Fortify + Sanctum, policies, actions, CMS/settings backend, `docs/`, `supabase/config.toml` (local Postgres + Mailpit only), **and the public website in `frontend/`** (Vue 3, its own `package.json`, lockfile, Vite config, `.env`, `vercel.json`, E2E). Laravel never serves the frontend; `frontend/` is excluded from the API image.
 - `../admin/` (GitHub Road-trip-admin): **the staff portal only** (Vue 3, repo root `src/`).
 - **No shared code between the repos** and no third repository or package: the small API client/format helpers exist once per app.
-- Three independent processes: `composer dev` (API :8010), `pnpm dev` in `frontend/` (:5180), `pnpm dev` in `../admin` (:5181). No command starts two apps.
+- `npm run dev` in `web` starts the API (:8010) and the public website (:5180) together (port guard, Ctrl+C stops both); `npm run dev:api` / `npm run dev:web` start one; the staff portal is always separate: `npm run dev` in `../admin` (:5181).
 - `APP_URL` is the public website origin (rider email links), `ADMIN_URL` the staff portal origin. `/var/www/html/Road-trip/CLAUDE.md` and `handoff.md` are symlinks into this repo. Setup: `docs/architecture/DEVELOPMENT_SETUP.md`.
 
 ## Owner rules

@@ -14,3 +14,7 @@ export const removePart = (id: string, part: string, partId: string) => api.dele
 export const addMember = (id: string, body: object) => api.post(`/trips/${id}/members`, body)
 export const setMemberRole = (id: string, userId: string, role: string) => api.patch(`/trips/${id}/members/${userId}`, { role })
 export const removeMember = (id: string, userId: string) => api.delete(`/trips/${id}/members/${userId}`)
+export interface TripInvitation { id: string; role: 'editor' | 'viewer'; expires_at: string; trip_title: string; invited_by: string | null }
+export const myInvitations = async () => (await api.get<{ data: TripInvitation[] }>('/users/me/trip-invitations')).data.data
+export const answerInvitation = async (id: string, answer: 'accept' | 'decline') => (await api.post<{ status: string; trip_id: string | null }>(`/trip-invitations/${id}/${answer}`)).data
+export const cancelInvitation = (tripId: string, id: string) => api.delete(`/trips/${tripId}/invitations/${id}`)

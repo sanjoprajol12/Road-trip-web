@@ -7,6 +7,7 @@ import { endPreview, previewToken } from '@/lib/preview'
 import SiteHeader from '@/components/navigation/SiteHeader.vue'
 import SiteFooter from '@/components/navigation/SiteFooter.vue'
 import NoticeBar from '@/components/navigation/NoticeBar.vue'
+import PopupHost from '@/features/content/components/PopupHost.vue'
 
 // Same rule as the API: during maintenance only a staff preview link shows the site (riders never bypass it).
 const closed = computed(() => !!site.value?.maintenance.enabled && !previewToken.value)
@@ -24,7 +25,8 @@ function leavePreview() {
     </p>
     <NoticeBar />
     <SiteHeader />
-    <main id="main" tabindex="-1" class="flex-1 outline-none">
+    <!-- min-h-svh: the footer starts below the fold, so loading content never pushes it (layout shift). -->
+    <main id="main" tabindex="-1" class="min-h-svh flex-1 outline-none">
       <section v-if="closed" class="wrap grid max-w-xl gap-4 pt-36 pb-24" role="status" aria-labelledby="mt-title">
         <Wrench class="size-8 text-muted" aria-hidden="true" />
         <h1 id="mt-title" class="display text-5xl">Back soon</h1>
@@ -37,5 +39,6 @@ function leavePreview() {
       </RouterView>
     </main>
     <SiteFooter />
+    <PopupHost v-if="!closed" />
   </div>
 </template>

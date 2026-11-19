@@ -46,3 +46,9 @@ Even with the build fixed, a deployment cannot serve requests until the items be
 
 ## Not done yet (blocks a public launch)
 Owner items above; backups and a tested restore; monitoring and alerting; privacy policy, terms and account deletion; Lighthouse and screen-reader passes; WebKit run; real content replacing development seed data; CI never run on GitHub; HTTPS/HSTS verified on a real host.
+
+## Session 13 notes
+- **Mail:** staff can switch on an SMTP override in Settings > Mail (password encrypted with `APP_KEY`). Saving runs `queue:restart` so workers pick it up. The production mail provider and its credentials are still an owner decision; nothing is connected.
+- **Maps:** the tile URL is a setting, but the public website's CSP (`frontend/vercel.json`, `img-src`) must also allow a new tile host, or the map stays blank. Geocoding/routing providers can be configured and tested, but no proxy uses them until D2. Options to evaluate (costs and limits must be checked with each provider before choosing): a Nominatim-compatible service (the public OSM instance has a strict usage policy and is not for production traffic), an OSRM-compatible service (the public demo server is not for production), openrouteservice (API key, quota-based plans), or self-hosting either.
+- **Rate limits:** `CONTACT_PER_HOUR` (default 5 per address, daily cap 4x) for the contact form; raise only for local E2E.
+- **Contact retention (D7):** messages are kept until staff delete them; no automatic deletion until the owner sets a period.

@@ -8,10 +8,12 @@ use App\Enums\ContributionStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ContributionResource;
 use App\Models\Contribution;
+use App\Models\ContributionConfirmation;
 use App\Models\ContributionMedia;
 use App\Models\ContributionReport;
 use App\Models\RouteSegment;
 use App\Support\Audit;
+use App\Support\Settings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -23,7 +25,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ContributionController extends Controller
 {
-    private const WITH = ['author.verifications', 'destination', 'route', 'segment', 'media'];
+    private const WITH = ['author.verifications', 'destination', 'route', 'segment', 'media', 'sources'];
 
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -111,9 +113,12 @@ class ContributionController extends Controller
     public function report(Request $request, Contribution $contribution): JsonResponse
     {
         $this->authorize('report', $contribution);
-        $data = $request->validate(['reason' => ['required', 'string', 'min:10', 'max:1000']]);
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'min:10', 'max:1000'],
+            'category' => ['sometimes', Rule::in(ContributionReport::CATEGORIES)],
+        ]);
         DB::transaction(function () use ($request, $contribution, $data) {
-            ContributionReport::firstOrCreate(['contribution_id' => $contribution->id, 'reporter_id' => $request->user()->id], ['reason' => $data['reason']]);
+            ContributionReport::firstOrCreate(['contribution_id' => $contribution->id, 'reporter_id' => $request->user()->id], ['reason' => $data['reason'], 'category' => $data['category'] ?? 'other']);
             // Three open reports send the contribution back to moderators.
             if ($contribution->reports()->whereNull('resolved_at')->count() >= 3 && $contribution->isVisible()) {
                 $contribution->forceFill(['status' => ContributionStatus::Flagged])->save();
@@ -122,6 +127,58 @@ class ContributionController extends Controller
         });
 
         return response()->json(['message' => 'Thanks. Moderators will look at it.'], 202);
+    }
+
+    /** Another rider says the report is still accurate today. Moves last_confirmed_on; it never changes the status. */
+    public function confirm(Request $request, Contribution $contribution): JsonResponse
+    {
+        $this->authorize('confirm', $contribution);
+        DB::transaction(function () use ($request, $contribution) {
+            ContributionConfirmation::firstOrCreate(['contribution_id' => $contribution->id, 'user_id' => $request->user()->id, 'confirmed_on' => today()->toDateString()]);
+            $contribution->forceFill(['last_confirmed_on' => today()])->save();
+            $this->corroborateIfEnough($contribution);
+        });
+
+        return response()->json(['last_confirmed_on' => today()->toDateString(), 'message' => 'Thanks. Marked as still accurate today.']);
+    }
+
+    /**
+     * The author adds a dated correction under a reviewed report. The original body stays as written; the
+     * correction is public only after a moderator has seen it.
+     */
+    public function correct(Request $request, Contribution $contribution): ContributionResource
+    {
+        $this->authorize('correct', $contribution);
+        $data = $request->validate(['correction' => ['required', 'string', 'min:10', 'max:2000']]);
+        DB::transaction(function () use ($contribution, $data) {
+            $old = $contribution->only(['author_correction', 'author_corrected_at']);
+            $contribution->forceFill(['author_correction' => trim($data['correction']), 'author_corrected_at' => now(), 'author_correction_reviewed_at' => null])->save();
+            Audit::record('contribution.correction_added', $contribution, $old, $contribution->only(['author_correction']));
+        });
+
+        return new ContributionResource($contribution->load(self::WITH));
+    }
+
+    /**
+     * Community corroboration (settings: trust.*): enough distinct eligible riders (confirmed email, active account, not
+     * the author, not paused) confirmed within the window. Moves only "published"; never "officially sourced".
+     */
+    private function corroborateIfEnough(Contribution $c): void
+    {
+        if ($c->status !== ContributionStatus::Published) {
+            return;
+        }
+        $threshold = (int) Settings::get('trust.corroboration_threshold');
+        $riders = DB::table('contribution_confirmations as cc')->join('users as u', 'u.id', '=', 'cc.user_id')
+            ->where('cc.contribution_id', $c->id)->where('cc.confirmed_on', '>=', today()->subDays((int) Settings::get('trust.corroboration_window_days')))
+            ->where('u.id', '!=', $c->author_id)->whereNotNull('u.email_verified_at')->whereNull('u.deactivated_at')
+            ->where(fn ($w) => $w->whereNull('u.suspended_until')->orWhere('u.suspended_until', '<=', now()))
+            ->whereNotExists(fn ($q) => $q->from('contribution_suspensions as s')->whereColumn('s.user_id', 'u.id')->whereNull('s.lifted_at')->where('s.until', '>', now()))
+            ->distinct()->count('cc.user_id');
+        if ($riders >= $threshold) {
+            $c->forceFill(['status' => ContributionStatus::CommunityCorroborated])->save();
+            Audit::record('contribution.community_corroborated', $c, ['status' => 'published'], ['status' => 'community_corroborated', 'reason' => 'threshold', 'riders' => $riders, 'threshold' => $threshold]);
+        }
     }
 
     private function validated(Request $request): array

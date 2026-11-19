@@ -5,7 +5,10 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DestinationResource;
 use App\Models\Destination;
+use App\Models\Source;
 use App\Support\Audit;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -15,26 +18,38 @@ class DestinationController extends Controller
 {
     public function index(): AnonymousResourceCollection
     {
-        return DestinationResource::collection(Destination::orderBy('name')->get());
+        return DestinationResource::collection(Destination::with('sources')->orderBy('name')->get());
     }
 
     public function store(Request $request): DestinationResource
     {
-        $d = new Destination($this->validated($request));
-        $d->created_by_staff_id = $request->user()->id;
-        $d->save();
-        Audit::record('destination.created', $d, null, $d->only(['name', 'status']));
+        $data = $this->validated($request);
+        $d = DB::transaction(function () use ($request, $data) {
+            $d = new Destination(Arr::except($data, 'sources'));
+            $d->created_by_staff_id = $request->user()->id;
+            $d->save();
+            Audit::record('destination.created', $d, null, $d->only(['name', 'status']));
+            $d->syncSources($data['sources'] ?? []);
 
-        return new DestinationResource($d->refresh());
+            return $d;
+        });
+
+        return new DestinationResource($d->refresh()->load('sources'));
     }
 
     public function update(Request $request, Destination $destination): DestinationResource
     {
-        $old = $destination->only(['name', 'status', 'summary', 'overview', 'last_confirmed_on']);
-        $destination->update($this->validated($request, $destination));
-        Audit::record('destination.updated', $destination, $old, $destination->only(['name', 'status', 'summary', 'overview', 'last_confirmed_on']));
+        $data = $this->validated($request, $destination);
+        DB::transaction(function () use ($destination, $data) {
+            $old = $destination->only(['name', 'status', 'summary', 'overview', 'last_confirmed_on']);
+            $destination->update(Arr::except($data, 'sources'));
+            Audit::record('destination.updated', $destination, $old, $destination->only(['name', 'status', 'summary', 'overview', 'last_confirmed_on']));
+            if (array_key_exists('sources', $data)) {
+                $destination->syncSources($data['sources']);
+            }
+        });
 
-        return new DestinationResource($destination);
+        return new DestinationResource($destination->load('sources'));
     }
 
     /** Soft delete only: contributions and trips keep their reference. */
@@ -65,6 +80,7 @@ class DestinationController extends Controller
             'photo_credit' => ['nullable', 'required_with:photo_path', 'string', 'max:255'],
             'status' => [$req, Rule::in(['draft', 'published', 'archived'])],
             'last_confirmed_on' => ['nullable', 'date', 'before_or_equal:today'],
+            ...Source::rules(),
         ]);
     }
 }

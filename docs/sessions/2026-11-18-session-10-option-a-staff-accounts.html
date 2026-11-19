@@ -26,7 +26,7 @@
 <main>
 <p class="meta">My Ride Nepal · Session report</p>
 <h1>Session 10: Option A layout, independent apps, deployment fixes, separate staff authentication</h1>
-<p class="meta">2026-11-18 · Claude Code (Opus 5.5) · Migration stages A1–A6 · Nothing committed · One additive migration (dev and E2E databases)</p>
+<p class="meta">2026-11-18 · Claude Code (Opus 5.5) · Migration stages A1–A8 · Nothing committed · One additive migration (dev and E2E databases)</p>
 
 <h2>Objective</h2>
 <p>Owner: complete the project from the migration plan onward; first finish the Option A migration (public app in <code>web/frontend</code>, staff portal alone in <code>admin</code>), independent dev/build/deploy, separate rider and staff authentication, using only an isolated E2E database.</p>
@@ -41,6 +41,8 @@
 <tr><td>A4 deployment config</td><td class="ok">Done</td><td><code>vercel.json</code> ×2 + guard script, <code>.env.production.example</code>, trusted proxies, CORS closed</td></tr>
 <tr><td>Vercel failure</td><td class="ok">Diagnosed and fixed</td><td>reproduced from <code>git archive HEAD</code>: <code>composer install --no-dev</code> failed on <code>config/scribe.php</code>; fixed; image built and served <code>/api/v1/health</code> 200 against a local database</td></tr>
 <tr><td>A5 route split</td><td class="ok">Done</td><td><code>route:list</code> identical before and after</td></tr>
+<tr><td>A7 feature services</td><td class="ok">Done (two page splits left)</td><td>no page or component calls the raw API client (lint rule); Settings one page per group under tabs; People split into Riders, Staff, Roles, Profile. <code>TripPage</code> and <code>MediaPage</code> splits remain</td></tr>
+<tr><td>A8 dynamic homepage and CMS foundation</td><td class="ok">Done</td><td>9 section types with drafts, publish, order, visibility, schedule, archive and signed preview; menus; notices; branding, social, SEO and footer settings; current copy seeded as published; CmsTest (8), E2E staff edit → publish → public API, public homepage/notices</td></tr>
 <tr><td>A6 staff accounts</td><td class="ok">Done</td><td>96 feature tests (1687 assertions) incl. <code>StaffAuthTest</code> and route-wide 401 checks both ways, mutation-checked</td></tr>
 </tbody></table></div>
 
@@ -55,12 +57,13 @@
 
 <h2>Tests performed</h2>
 <div class="scroll"><table><thead><tr><th>Check</th><th>Result</th></tr></thead><tbody>
-<tr><td><code>php artisan test</code></td><td class="ok">96 passed, 1687 assertions</td></tr>
+<tr><td><code>php artisan test</code></td><td class="ok">104 passed, 1925 assertions (96 / 1687 after A6)</td></tr>
 <tr><td><code>composer audit</code></td><td class="ok">clean</td></tr>
 <tr><td>Public app checks</td><td class="ok">pass</td></tr>
 <tr><td>Staff portal checks</td><td class="ok">pass</td></tr>
-<tr><td>E2E public (Chromium, Firefox, Pixel 7)</td><td class="ok">48/48</td></tr>
-<tr><td>E2E staff (Chromium, Firefox)</td><td class="ok">22/22</td></tr>
+<tr><td>E2E public (Chromium, Firefox, Pixel 7)</td><td class="ok">51/51</td></tr>
+<tr><td>E2E staff (Chromium, Firefox)</td><td class="ok">24/24</td></tr>
+<tr><td><code>composer audit</code>, <code>pnpm audit --prod</code> ×2</td><td class="ok">clean</td></tr>
 <tr><td><code>docker build -f Dockerfile.vercel</code></td><td class="ok">built and run</td></tr>
 <tr><td>WebKit, axe, Lighthouse, CI on GitHub</td><td class="warn">not run</td></tr>
 </tbody></table></div>
@@ -69,11 +72,12 @@
 <ul>
   <li>The owner's old <code>pnpm dev</code> held :5181; it was identified and left running, and the independence check was repeated on spare ports.</li>
   <li>Test harness assumed one shared session for every identity; it now mirrors separate browsers. No assertion was weakened: rider-on-staff-route expectations changed from 403 to the stricter 401, and self-review tests now cover linked and same-email staff.</li>
+  <li>A8: during maintenance the menu and notice requests answered 503 and, loaded together with the settings, hid the "Back soon" page; caught by E2E, fixed by loading them independently.</li>
   <li>Real bugs found and fixed: container build (Scribe), unnamed routes breaking <code>route:cache</code>, audit <code>actor_type</code> not stored, event resource treating staff as participants.</li>
 </ul>
 
 <h2>Next steps</h2>
-<ol><li>A7 feature-module refactor.</li><li>A8 dynamic homepage and CMS foundation.</li><li>Roadmap Stage 4 onward.</li><li>Owner: commit and push both repos; decisions AR3, AR4, AR5, D1–D7.</li></ol>
+<ol><li>Roadmap Stage 4 (trust pipeline), then Stage 8 remaining CMS modules, Stage 9 settings, Stage 11 My Rides and events.</li><li>Owner: commit and push both repos; decisions AR3, AR4, AR5, D1–D7.</li></ol>
 </main>
 </body>
 </html>

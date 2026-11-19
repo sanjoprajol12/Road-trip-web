@@ -25,6 +25,9 @@ class SettingsController extends Controller
     {
         $group = $request->route('group');
         Settings::update($group, $request->except('group'), $request->user());
+        if ($group === 'mail') {
+            \Illuminate\Support\Facades\Artisan::call('queue:restart'); // long-running workers pick up the new mail settings
+        }
 
         return response()->json(['data' => Settings::group($group)]);
     }
@@ -52,6 +55,54 @@ class SettingsController extends Controller
             'by_disk' => DB::table('media_assets')->select('disk', DB::raw('count(*) as files'))->groupBy('disk')->pluck('files', 'disk')
                 ->mergeRecursive(DB::table('contribution_media')->select('disk', DB::raw('count(*) as files'))->groupBy('disk')->pluck('files', 'disk')),
         ]], $ok ? 200 : 502);
+    }
+
+    /** Opens and closes an SMTP connection with the current mail settings (or .env when override is off). */
+    public function testMailConnection(): JsonResponse
+    {
+        try {
+            \App\Support\MailSettings::apply(); // the settings saved just now
+            app('mail.manager')->forgetMailers();
+            $transport = \Illuminate\Support\Facades\Mail::mailer()->getSymfonyTransport();
+            if ($transport instanceof \Symfony\Component\Mailer\Transport\Smtp\SmtpTransport) {
+                $transport->start();
+                $transport->stop();
+                [$ok, $message] = [true, 'The mail server accepted the connection.'];
+            } else {
+                [$ok, $message] = [false, 'The current mailer ('.config('mail.default').') does not send over SMTP, so there is no connection to test.'];
+            }
+        } catch (Throwable $e) {
+            [$ok, $message] = [false, 'The mail server could not be reached or refused the sign-in: '.class_basename($e).'.'];
+        }
+        Audit::record('settings.mail.tested', 'settings', null, ['ok' => $ok, 'kind' => 'connection'], 'mail');
+
+        return response()->json(['ok' => $ok, 'message' => $message], $ok ? 200 : 502);
+    }
+
+    /** Sends a test email to the signed-in staff member only (never to an address typed in: no open relay). */
+    public function sendTestMail(Request $request): JsonResponse
+    {
+        $to = $request->user()->email;
+        try {
+            \App\Support\MailSettings::apply();
+            app('mail.manager')->forgetMailers();
+            \Illuminate\Support\Facades\Mail::raw('This is a test email from the My Ride Nepal staff portal. If you can read it, outgoing mail works.', fn ($m) => $m->to($to)->subject('My Ride Nepal test email'));
+            [$ok, $message] = [true, "Test email sent to {$to}. Check that it arrived."];
+        } catch (Throwable $e) {
+            [$ok, $message] = [false, 'The test email could not be sent: '.class_basename($e).'.'];
+        }
+        Audit::record('settings.mail.tested', 'settings', null, ['ok' => $ok, 'kind' => 'email'], 'mail');
+
+        return response()->json(['ok' => $ok, 'message' => $message], $ok ? 200 : 502);
+    }
+
+    public function testProvider(Request $request): JsonResponse
+    {
+        $which = $request->validate(['which' => ['required', 'in:geocoding,routing']])['which'];
+        $result = \App\Support\ProviderProbe::run($which);
+        Audit::record('settings.maps.tested', 'settings', null, ['which' => $which, 'ok' => $result['ok'], 'status' => $result['status']], 'maps');
+
+        return response()->json($result);
     }
 
     public function clearCache(): JsonResponse

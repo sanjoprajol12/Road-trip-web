@@ -39,7 +39,7 @@ Two separate audiences (owner direction 2026-11-18, migration stage A6). **Rider
 
 ## Provisioning
 - **No staff sign-up** (no route; `RouteAuthorizationTest` and `StaffAuthTest` prove it).
-- First administrator: `php artisan mrn:staff:create-admin <email> --name="…"` on the server (password asked twice, hidden, ≥ 12 characters). Refused once an administrator with a password exists; also completes a carried-over administrator that has no password yet.
+- First administrator: `php artisan mrn:staff:create-admin <email> --name="…"` on the server (password asked twice, hidden, ≥ 8 characters; staff minimum lowered from 12 to 8 by the owner, 2026-11-19). Refused once an administrator with a password exists; also completes a carried-over administrator that has no password yet.
 - Everyone else: invitation from the Staff page (`users.invite` + password confirmation, cannot invite beyond own permissions).
 - Staff who held roles under the old model were carried over by migration `2026_11_18_100011` with the same roles and **no password**; they set one through a staff password link (Staff page, or Forgot password) or the console command. Accounts are never linked by email.
 - Two-factor sign-in for staff is **not enabled** (owner decision AR3 pending). Option: Fortify's TOTP feature on the staff guard; its libraries (`pragmarx/google2fa`, `bacon/bacon-qr-code`) are already installed.

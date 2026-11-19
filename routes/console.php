@@ -30,9 +30,9 @@ Artisan::command('mrn:staff:create-admin {email} {--name=}', function (string $e
         return 1;
     }
     $name = $staff?->display_name ?? trim((string) ($this->option('name') ?: $this->ask('Name other staff will see')));
-    $password = (string) $this->secret('Staff password (at least 12 characters)');
-    if (mb_strlen($password) < 12 || mb_strlen($password) > 200 || $password !== $this->secret('Repeat the password')) {
-        $this->error('The passwords differ or are not 12 to 200 characters long.');
+    $password = (string) $this->secret('Staff password (at least 8 characters)');
+    if (mb_strlen($password) < 8 || mb_strlen($password) > 200 || $password !== $this->secret('Repeat the password')) {
+        $this->error('The passwords differ or are not 8 to 200 characters long.');
 
         return 1;
     }

@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { initAuth, useAuth } from '@/features/authentication/useAuth'
 import HomePage from '@/features/home/pages/HomePage.vue'
-import { site } from '@/lib/site'
+import { setPageMeta, site } from '@/lib/site'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -31,6 +31,7 @@ const router = createRouter({
       props: true,
     },
     { path: '/routes', name: 'routes', component: () => import('@/features/routes/pages/RoutesPage.vue'), meta: { title: 'Routes' } },
+    { path: '/journey', name: 'journey', component: () => import('@/features/journeys/pages/JourneyPage.vue'), meta: { title: 'Explore along my route' } },
     { path: '/routes/:slug', name: 'route', component: () => import('@/features/routes/pages/RoutePage.vue'), props: true },
     { path: '/experiences', name: 'experiences', component: () => import('@/features/experiences/pages/ExperiencesPage.vue'), meta: { title: 'Rider experiences' } },
     { path: '/experiences/:id/edit', name: 'experience-edit', component: () => import('@/features/experiences/pages/ContributePage.vue'), props: true, meta: { title: 'Edit your contribution', requiresAuth: true } },
@@ -44,6 +45,13 @@ const router = createRouter({
     { path: '/preparation', name: 'preparation', component: () => import('@/features/preparation/pages/PreparationPage.vue'), meta: { title: 'Preparation and safety' } },
     { path: '/preparation/:slug', name: 'guide', component: () => import('@/features/preparation/pages/GuidePage.vue'), props: true },
     { path: '/rides', name: 'rides', component: () => import('@/features/rides/pages/RidesPage.vue'), meta: { title: 'My rides', requiresAuth: true } },
+    { path: '/pages/:slug', name: 'page', component: () => import('@/features/content/pages/CmsPage.vue'), props: true },
+    { path: '/faq', name: 'faq', component: () => import('@/features/content/pages/FaqPage.vue'), meta: { title: 'Questions and answers' } },
+    { path: '/blog', name: 'blog', component: () => import('@/features/content/pages/BlogPage.vue'), meta: { title: 'Blog' } },
+    { path: '/blog/:slug', name: 'post', component: () => import('@/features/content/pages/PostPage.vue'), props: true },
+    { path: '/team', name: 'team', component: () => import('@/features/content/pages/TeamPage.vue'), meta: { title: 'Team' } },
+    { path: '/contact', name: 'contact', component: () => import('@/features/content/pages/ContactPage.vue'), meta: { title: 'Contact' } },
+    { path: '/saved', name: 'saved', component: () => import('@/features/saved/pages/SavedPage.vue'), meta: { title: 'Saved', requiresAuth: true } },
     { path: '/rides/:id', name: 'trip', component: () => import('@/features/rides/pages/TripPage.vue'), props: true, meta: { title: 'Trip', requiresAuth: true } },
     { path: '/riders/:username', name: 'rider', component: () => import('@/features/profiles/pages/RiderPage.vue'), props: true, meta: { title: 'Rider' } },
     {
@@ -99,6 +107,7 @@ router.beforeEach(async (to) => {
 })
 
 router.afterEach((to) => {
+  setPageMeta(null) // back to the default description; CMS pages set their own once loaded
   const name = site.value?.general.site_name ?? 'My Ride Nepal'
   document.title = to.meta.title ? `${to.meta.title} | ${name}` : (site.value?.seo.default_title ?? 'My Ride Nepal: motorcycle travel in Nepal')
 })

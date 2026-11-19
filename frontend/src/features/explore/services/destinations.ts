@@ -6,10 +6,18 @@ export async function listDestinations(): Promise<Destination[]> {
 }
 
 /** Null when nothing is published at this address. */
-export async function getDestination(slug: string): Promise<{ destination: Destination; routes: RideRoute[]; services: ServicePoint[] } | null> {
+/** Straight-line neighbours of a destination (null when it has no coordinates). */
+export interface Nearby {
+  radius_km: { destinations: number; services: number; routes: number }
+  destinations: { slug: string; name: string; position: [number, number]; distance_km: number }[]
+  services: { id: string; kind: ServicePoint['kind']; name: string; position: [number, number]; distance_km: number; place: string | null; last_confirmed_on: string | null }[]
+  routes: { slug: string; name: string; distance_km: number }[]
+}
+
+export async function getDestination(slug: string): Promise<{ destination: Destination; routes: RideRoute[]; services: ServicePoint[]; nearby: Nearby | null } | null> {
   try {
-    const { data } = await api.get<{ data: Destination; routes: { data: RideRoute[] } | RideRoute[]; services: ServicePoint[] }>(`/destinations/${encodeURIComponent(slug)}`)
-    return { destination: data.data, routes: Array.isArray(data.routes) ? data.routes : data.routes.data, services: data.services ?? [] }
+    const { data } = await api.get<{ data: Destination; routes: { data: RideRoute[] } | RideRoute[]; services: ServicePoint[]; nearby: Nearby | null }>(`/destinations/${encodeURIComponent(slug)}`)
+    return { destination: data.data, routes: Array.isArray(data.routes) ? data.routes : data.routes.data, services: data.services ?? [], nearby: data.nearby ?? null }
   } catch (e) {
     if ((e as { response?: { status?: number } }).response?.status === 404) return null
     throw e

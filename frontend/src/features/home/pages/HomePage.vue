@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CmsBanners from '@/features/content/components/CmsBanners.vue'
 import type { Component } from 'vue'
 import StatusPanel from '@/components/ui/StatusPanel.vue'
 import { useAsync } from '@/lib/useAsync'
@@ -32,6 +33,7 @@ const home = useAsync(getHome)
       <template v-for="section in home.data.value ?? []" :key="section.id">
         <component :is="views[section.type]" v-if="views[section.type]" :id="section.id" :s="section" />
       </template>
+      <CmsBanners placement="home" />
     </template>
   </div>
 </template>

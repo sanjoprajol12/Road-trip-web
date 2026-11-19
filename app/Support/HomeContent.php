@@ -110,7 +110,7 @@ final class HomeContent
         return $query->whereIn('id', $ids)->get()->sortBy(fn ($r) => array_search($r->id, $ids, true))->values();
     }
 
-    private static function mediaOut(string $id): ?array
+    public static function mediaOut(string $id): ?array
     {
         $a = MediaAsset::whereKey($id)->where('visibility', 'public')->first();
 

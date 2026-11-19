@@ -16,4 +16,14 @@ class ServicePoint extends Model
     {
         return ['status' => PublishStatus::class, 'last_confirmed_on' => 'date:Y-m-d', 'latitude' => 'float', 'longitude' => 'float'];
     }
+
+    public function destination(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Destination::class);
+    }
+
+    public function segment(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(RouteSegment::class, 'route_segment_id');
+    }
 }

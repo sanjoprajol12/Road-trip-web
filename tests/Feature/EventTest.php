@@ -171,6 +171,30 @@ class EventTest extends TestCase
         $this->as($org)->postJson("/api/v1/events/{$id}/status", ['status' => 'published'])->assertOk()->assertJsonPath('data.status', 'published');
     }
 
+    public function test_postponing_sets_new_dates_and_organizers_can_remove_participants(): void
+    {
+        $org = $this->organizer();
+        $id = $this->published($org, ['capacity' => 1, 'waitlist_enabled' => true]);
+        $first = $this->rider();
+        $second = $this->rider();
+        $this->as($first)->postJson("/api/v1/events/{$id}/join")->assertOk()->assertJsonPath('status', 'approved');
+        $this->as($second)->postJson("/api/v1/events/{$id}/join")->assertOk()->assertJsonPath('status', 'waitlisted');
+        $reg = Event::find($id)->registrations()->where('user_id', $first->id)->value('id');
+        $this->as($first)->postJson("/api/v1/events/{$id}/registrations/{$reg}", ['status' => 'declined'])->assertForbidden();
+        $this->as($org)->postJson("/api/v1/events/{$id}/registrations/{$reg}", ['status' => 'declined'])->assertOk()->assertJsonPath('status', 'declined');
+        $this->assertSame('approved', Event::find($id)->registrations()->where('user_id', $second->id)->value('status')->value); // waitlist moved up
+        $this->assertSame('removed', $first->notifications()->latest()->first()->data['change']);
+
+        $start = now()->addMonth()->startOfHour();
+        $this->as($org)->postJson("/api/v1/events/{$id}/status", ['status' => 'cancelled', 'message' => 'Not a postponement at all.', 'starts_at' => $start->toIso8601String(), 'ends_at' => $start->copy()->addDay()->toIso8601String()])
+            ->assertStatus(422)->assertJsonValidationErrors('starts_at');
+        $this->as($org)->postJson("/api/v1/events/{$id}/status", ['status' => 'postponed', 'message' => 'Landslide; moved by a month.', 'starts_at' => $start->toIso8601String()])
+            ->assertStatus(422)->assertJsonValidationErrors('ends_at');
+        $this->as($org)->postJson("/api/v1/events/{$id}/status", ['status' => 'postponed', 'message' => 'Landslide; moved by a month.', 'starts_at' => $start->toIso8601String(), 'ends_at' => $start->copy()->addDay()->toIso8601String()])
+            ->assertOk()->assertJsonPath('data.status', 'postponed');
+        $this->assertTrue(Event::find($id)->starts_at->equalTo($start));
+    }
+
     public function test_attendance_and_completion_after_the_start(): void
     {
         $org = $this->organizer();

@@ -18,6 +18,20 @@ class ProfileController extends Controller
         return new UserResource($request->user());
     }
 
+    /** One appeal per contribution pause; staff with users.suspend review it. */
+    public function appealContributionSuspension(Request $request): JsonResponse
+    {
+        $s = \App\Models\ContributionSuspension::activeFor($request->user()->id) ?? abort(404, 'Your contribution rights are not paused.');
+        abort_if($s->appealed_at, 422, 'You have already appealed. A moderator will review it.');
+        $data = $request->validate(['appeal' => ['required', 'string', 'min:20', 'max:2000']]);
+        \Illuminate\Support\Facades\DB::transaction(function () use ($s, $data) {
+            $s->forceFill(['appeal' => trim($data['appeal']), 'appealed_at' => now()])->save();
+            \App\Support\Audit::record('user.contributions_appealed', 'contribution_suspensions', null, ['user_id' => $s->user_id], $s->id);
+        });
+
+        return response()->json(['data' => $s->toRider(), 'message' => 'Appeal sent. A moderator will review it.']);
+    }
+
     /** Riders edit only these four fields; email, roles and verification are not writable here. */
     public function update(Request $request): UserResource
     {

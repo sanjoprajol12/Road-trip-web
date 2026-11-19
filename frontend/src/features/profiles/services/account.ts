@@ -13,3 +13,4 @@ export const addContact = (body: object) => api.post('/users/me/emergency-contac
 export const deleteContact = (id: string) => api.delete(`/users/me/emergency-contacts/${id}`)
 export const riderProfile = async (username: string) =>
   (await api.get<{ data: PublicUser; contributions: Contribution[] | { data: Contribution[] } }>(`/riders/${encodeURIComponent(username)}`)).data
+export const appealContributionPause = async (appeal: string) => (await api.post<{ message: string }>('/users/me/contribution-appeal', { appeal })).data.message

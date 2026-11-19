@@ -164,7 +164,7 @@ class StaffAuthTest extends TestCase
     public function test_the_setup_command_creates_only_the_first_administrator_or_completes_a_carried_over_one(): void
     {
         $this->artisan('mrn:staff:create-admin', ['email' => 'First@Example.test', '--name' => 'First Admin'])
-            ->expectsQuestion('Staff password (at least 12 characters)', 'first-admin-pass')
+            ->expectsQuestion('Staff password (at least 8 characters)', 'first-admin-pass')
             ->expectsQuestion('Repeat the password', 'first-admin-pass')
             ->assertSuccessful();
         $first = StaffAccount::where('email', 'first@example.test')->sole();
@@ -176,7 +176,7 @@ class StaffAuthTest extends TestCase
         $carried = StaffAccount::forceCreate(['display_name' => 'Carried Admin', 'email' => 'carried.admin@example.test']);
         DB::table('staff_account_roles')->insert(['staff_account_id' => $carried->id, 'role' => 'admin', 'granted_at' => now()]);
         $this->artisan('mrn:staff:create-admin', ['email' => 'carried.admin@example.test'])
-            ->expectsQuestion('Staff password (at least 12 characters)', 'carried-admin-pass')
+            ->expectsQuestion('Staff password (at least 8 characters)', 'carried-admin-pass')
             ->expectsQuestion('Repeat the password', 'carried-admin-pass')
             ->assertSuccessful();
         $this->fresh()->postJson('/api/v1/admin/auth/login', ['email' => 'carried.admin@example.test', 'password' => 'carried-admin-pass'])->assertOk();

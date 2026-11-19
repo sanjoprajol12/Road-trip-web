@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 12: Trust, saved services, route explorer | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:60rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; }
+  h2 { font-size:1.3rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.4rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  code { font-size:.88em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; word-break:break-word; }
+  .warn { color:var(--warn); font-weight:700; }
+  .ok { color:var(--ok); font-weight:700; }
+  ul, ol { padding-left:1.3rem; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; margin:.6rem 0 1rem; }
+  th, td { text-align:left; vertical-align:top; padding:.4rem .6rem; border-bottom:1px solid var(--line); }
+  th { background:var(--surface); }
+</style>
+</head>
+<body>
+<main>
+<p class="meta">My Ride Nepal · Session report</p>
+<h1>Session 12: trust pipeline, saved services, Explore Along My Route</h1>
+<p class="meta">2026-11-19 · Claude Code (Opus 5.5) · Nothing committed · Two additive migrations · No dependency added</p>
+
+<h2>Work completed</h2>
+<ul>
+<li><span class="ok">Dev commands verified.</span> <code>npm run dev</code> in <code>web</code> (added by session 11) started the API and public site on spare ports 8020/5190, the proxy reached the API, Ctrl+C stopped only its own four children, and the port guard refused a duplicate start. <code>npm run dev</code> in <code>admin</code> starts only the staff portal. The owner's running servers (:8010, :5180, :5181) were not touched.</li>
+<li><span class="ok">Roadmap Stage 4, trust pipeline.</span> Status transition rules (rejected is final); report categories with "dangerous" first in the queue; dismissing a single report; staff correction requests (rider notified in the app) and an author addendum that becomes public only after a moderator accepts it (the original text is never edited, and declined text stays in the audit log); "still accurate" from other riders (one per day) and from moderators; moderation history for moderators; rejected and flagged counts on the staff Riders list; structured sources on destinations, routes and officially sourced contributions.</li>
+<li><span class="ok">Saved items (mandatory saved services).</span> Riders save services, destinations, routes and experiences. A Saved page filters by type and service kind, removes items, and adds a service or destination to a private or group trip as a stop.</li>
+<li><span class="ok">Explore Along My Route, curated mode.</span> Choose a start and a destination: the page shows the published routes between them (either direction), the services on the route, and published services and destinations within 5 to 50 km of the recorded line, with a map, category filters and Save. Distances are straight-line and labelled as such. No travel time, detour or alternative is invented.</li>
+</ul>
+
+<h2>Files changed</h2>
+<div class="scroll"><table>
+<tr><th>Area</th><th>Files</th></tr>
+<tr><td>Database</td><td><code>database/migrations/2026_11_19_100013_create_trust_pipeline.php</code>, <code>2026_11_19_100014_create_saved_items.php</code></td></tr>
+<tr><td>Backend</td><td><code>app/Enums/ContributionStatus.php</code>, <code>app/Models/{Source,ContributionConfirmation,Concerns/HasSources,Contribution,ContributionReport,ServicePoint,TripStop,User,Destination,RideRoute}.php</code>, <code>app/Actions/Contributions/ModerateContribution.php</code>, <code>app/Support/Geo.php</code>, <code>app/Notifications/ContributionCorrectionRequested.php</code>, controllers <code>ContributionController</code>, <code>SavedItemController</code>, <code>JourneyController</code>, <code>TripPartController</code>, <code>DestinationController</code>, <code>RouteController</code>, <code>Admin/{ContributionController,DestinationController,RouteController,UserController}</code>, <code>app/Http/Resources/{Contribution,Destination,Route}Resource.php</code>, <code>app/Policies/ContributionPolicy.php</code>, <code>app/Providers/AppServiceProvider.php</code> (morph map), <code>routes/api/{public,rider,staff}.php</code></td></tr>
+<tr><td>Backend tests</td><td><code>tests/Feature/{TrustPipelineTest,SavedItemsTest,JourneyTest}.php</code> (new), <code>tests/Unit/GeoTest.php</code> (new), <code>tests/Feature/RouteAuthorizationTest.php</code> (new routes classified)</td></tr>
+<tr><td>Public website</td><td><code>frontend/src/features/saved/**</code>, <code>frontend/src/features/journeys/**</code> (new), <code>experiences/components/ContributionActions.vue</code> (new), <code>experiences/pages/ExperiencePage.vue</code>, <code>explore/pages/DestinationPage.vue</code>, <code>routes/pages/{RoutePage,RoutesPage}.vue</code>, <code>routes/components/RouteMap.vue</code>, <code>components/ui/SourceList.vue</code>, <code>profiles/{pages/AccountPage,components/MyActivity}.vue</code>, <code>app/router/index.ts</code>, <code>types/api.ts</code>; E2E <code>frontend/e2e/{trust,saved,journey}.spec.ts</code></td></tr>
+<tr><td>Staff portal</td><td><code>admin/src/features/moderation/{components/ModerationItem.vue,labels.ts,pages/ModerationPage.vue,services/moderation.ts}</code>, <code>admin/src/features/content/{components/SourcesEditor.vue,pages/DestinationsPage.vue,pages/RouteEditorPage.vue}</code>, <code>admin/src/features/riders/{types.ts,pages/RidersPage.vue}</code>, <code>admin/src/types/api.ts</code>, <code>admin/e2e/verification.spec.ts</code></td></tr>
+<tr><td>Docs</td><td><code>docs/handoff.md</code>, <code>docs/audits/COMPLETE_PRODUCT_REQUIREMENTS_AUDIT.md</code> (22 rows), <code>docs/api/API_DOCUMENTATION.md</code>, <code>docs/database/DATABASE_DESIGN.md</code>, this report</td></tr>
+</table></div>
+
+<h2>Architecture decisions</h2>
+<ul>
+<li>Sources are one table plus a morph pivot with short type names (<code>destination</code>, <code>route</code>, <code>contribution</code>), so renaming a class cannot break stored rows. Orphaned sources are deleted when a record's list changes, and every change is audited.</li>
+<li>Geography without PostGIS (D3 pending): a bounding-box filter in SQL, then exact straight-line distance in PHP (<code>App\Support\Geo</code>, unit-tested). It is marked as a shortcut to replace with PostGIS <code>ST_Distance</code> once D3 is approved.</li>
+<li>Saved items are one table with a type column (not a morph relation), checked against published content on write and filtered again on read, so items that are later unpublished drop out.</li>
+<li>The author's addendum is a separate field shown under the report, never a change to the body. It is public only after review, so riders cannot bypass moderation.</li>
+</ul>
+
+<h2>Tools and skills used</h2>
+<p>Claude Code shell and file tools; PHPUnit on real Postgres (<code>myridenepal_test</code>); Playwright on the isolated <code>myridenepal_e2e</code>; vue-tsc, oxlint, eslint, Vitest, Vite, composer and pnpm audit. No subagents, no external services.</p>
+
+<h2>Commands executed (main ones)</h2>
+<ul>
+<li><code>API_PORT=8020 WEB_PORT=5190 npm run dev</code> (with SIGINT), <code>npm run dev -- --port 5191</code> in admin, <code>npm run dev</code> on occupied ports (guard check)</li>
+<li><code>php artisan migrate --database=pgsql_owner</code> and the same with <code>DB_DATABASE=myridenepal_e2e</code> (after a <code>--pretend</code> dry run)</li>
+<li>The checks listed in <code>CLAUDE.md</code>, run one at a time</li>
+</ul>
+
+<h2>Tests and actual results</h2>
+<div class="scroll"><table>
+<tr><th>Check</th><th>Result</th></tr>
+<tr><td>Baseline <code>php artisan test</code></td><td>104 passed (1925 assertions)</td></tr>
+<tr><td>Final <code>php artisan test</code></td><td class="ok">117 passed (2117 assertions)</td></tr>
+<tr><td><code>composer audit</code></td><td class="ok">No advisories</td></tr>
+<tr><td>Public: type-check, lint, unit, build, <code>pnpm audit --prod</code></td><td class="ok">All pass; 7 unit tests; no known vulnerabilities</td></tr>
+<tr><td>Staff: type-check, lint, unit, build, <code>pnpm audit --prod</code></td><td class="ok">All pass; 13 unit tests; no known vulnerabilities</td></tr>
+<tr><td>Public E2E (Chromium, Firefox, Pixel 7)</td><td class="ok">60/60 (was 51; +trust, saved, journey)</td></tr>
+<tr><td>Staff E2E (Chromium, Firefox)</td><td class="ok">26/26 (was 24; +moderation trust flow)</td></tr>
+<tr><td>Not run</td><td class="warn">WebKit, axe, screen reader, Lighthouse, load tests</td></tr>
+</table></div>
+
+<h2>Failures and resolutions</h2>
+<ul>
+<li>The experience page and the moderation queue showed their loading state on every refresh. That unmounted the content, so confirmation messages and an open history panel disappeared. Both now keep their content during a refresh (found by the new E2E tests).</li>
+<li>The moderation card read its item once and then ignored updates; it now follows the prop via <code>toRef</code>.</li>
+<li>The route-authorization matrix test refused the new routes until they were classified (<code>journeys</code> public, <code>users/me/saved</code> account-level). This is the intended safety net.</li>
+<li>A Playwright label locator also matched the swap button; fixed with exact matching.</li>
+<li>One chained check command was killed (exit 137, low memory with the owner's servers running); the checks were rerun one at a time.</li>
+<li>Another session had written "session 11" entries to the handoff in parallel. This session's entries were relabelled session 12; the other session's text was left as it was.</li>
+</ul>
+
+<h2>Security implications</h2>
+<ul>
+<li>Every new endpoint has a policy or permission, validation and a feature test, including refusal cases (guests 401; other riders 403; riders on staff routes 401; wrong report parent 404). Staff decisions write audit rows.</li>
+<li>No self-review: corrections, confirmations and reports go through <code>ContributionPolicy</code> (the author cannot confirm or report their own item); moderation keeps the existing no-self-review rule.</li>
+<li>Correction requests and moderation notes are visible only to the author and moderators. Moderator names appear only in the staff history, never to riders.</li>
+<li>Saved rows are owner-only and never exposed publicly; drafts and archived items cannot be saved. Source links are validated as http(s) in Laravel and with a database check.</li>
+<li>The public <code>journeys</code> endpoint returns only published rows, validates slugs and radius (1 to 50 km), and caps result sizes.</li>
+</ul>
+
+<h2>Database changes</h2>
+<p>Two additive migrations were applied with the owner role to <code>myridenepal</code> and <code>myridenepal_e2e</code>: new nullable columns on <code>contributions</code>, <code>contribution_reports</code> and <code>trip_stops</code>; new tables <code>contribution_confirmations</code>, <code>sources</code>, <code>sourceables</code>, <code>saved_items</code>. Existing reports became category <code>other</code>. Nothing was dropped or reset. Rollback: each migration's <code>down()</code> drops only what it added.</p>
+
+<h2>Remaining limitations</h2>
+<ul>
+<li>No <code>places</code> model yet (viewpoints, temples, lakes, rider-submitted hidden places), so the route explorer lists services and destinations only.</li>
+<li>No detour distance or time, no route alternatives beyond recorded ones, no free-text or geocoded start (needs D2).</li>
+<li>Add to trip works from the Saved page, not yet directly from the journey page.</li>
+<li>Corroboration rule (Stage 6), per-fact sources, saving guides, and contribution-only suspension are not done.</li>
+<li>CMS modules (pages, FAQs, blog, team, popups, banners, contact inbox), mail and map settings screens, and trip invitations with consent are still to do.</li>
+</ul>
+
+<h2>Owner decisions</h2>
+<ul>
+<li><strong>D3 PostGIS</strong>: enables the places model, geometry, and indexed distance queries.</li>
+<li><strong>D2 routing/geocoding provider</strong>: detour distance and time, alternatives, free-text start.</li>
+<li><strong>Q4</strong> corroboration rule; <strong>H9</strong> whether to add contribution-only suspension.</li>
+<li>Still open from earlier: AR3 staff MFA, AR4 hosting plan, AR5 production Postgres, D1 storage, D4 SEO prerender, D6 banners, D7 contact retention.</li>
+</ul>
+
+<h2>Next steps</h2>
+<ol>
+<li>Add to trip directly from the journey page and destination service lists.</li>
+<li>Stage 8 CMS modules: pages with content blocks, FAQs, blog with categories, tags and authors, team, popups, banners, contact messages with inbox.</li>
+<li>Stage 9 settings screens: mail with test connection, map, security, notifications.</li>
+<li>Stage 11 remainder: trip invitations with consent, notes, trip contacts, budget, event participant management, postponement dates.</li>
+</ol>
+</main>
+</body>
+</html>

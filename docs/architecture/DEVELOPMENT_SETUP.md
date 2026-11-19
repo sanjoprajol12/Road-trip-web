@@ -4,14 +4,15 @@ Architecture Option A (owner, 2026-11-18): three independent applications.
 - `web/` (repo Road-trip-web): the **Laravel API** at the repo root, and the **public website** in `web/frontend/` (its own `package.json`, lockfile, Vite config, `.env`, `vercel.json`, tests).
 - `admin/` (repo Road-trip-admin): the **staff portal** only, at the repo root.
 
-No command starts more than one application. Stopping a frontend never stops the API or the other frontend; stopping the API only makes API calls fail (502 from the dev proxy) while both frontends keep running (verified 2026-11-18).
+`npm run dev` in `web` starts the API and the public website together (owner request 2026-11-19); everything else is one application per command, and the staff portal always has its own. Stopping a frontend never stops the API or the other frontend; stopping the API only makes API calls fail (502 from the dev proxy) while both frontends keep running (verified 2026-11-18).
 
 ## What runs where
 | Process | Folder | Command | Port |
 |---|---|---|---|
 | PostgreSQL + Mailpit (Supabase CLI, Docker) | `web` | `pnpm db:start` | 54322 (Postgres), 54324 (Mailpit inbox), 54325 (SMTP) |
-| Laravel API (+ queue listener + log tail) | `web` | `composer dev` (or only the server: `php artisan serve --port=8010`) | 8010 |
-| Public website | `web/frontend` | `pnpm dev` | 5180 (proxies /api, /sanctum to `API_TARGET`, default :8010) |
+| **API + public website together** | `web` | `npm run dev` (port guard, then concurrently 10.0.7 via npx: API, queue, logs, website; Ctrl+C stops all; one crash stops all; `API_PORT` / `WEB_PORT` to move them) | 8010 + 5180 |
+| Laravel API only (+ queue listener + log tail) | `web` | `npm run dev:api` = `composer dev` | 8010 |
+| Public website only | `web` | `npm run dev:web` (or `pnpm dev` in `web/frontend`) | 5180 (proxies /api, /sanctum to `API_TARGET`, default :8010) |
 | Staff portal | `admin` | `pnpm dev` | 5181 (proxies /api, /sanctum to `API_TARGET`, default :8010) |
 
 `APP_URL` in `web/.env` is the public website origin (`http://127.0.0.1:5180`): rider email links. `ADMIN_URL` is the staff portal origin (`http://127.0.0.1:5181`): staff invitations and staff password resets. Each frontend's own `.env` (copy `.env.example`) holds only `API_TARGET`; nothing in a frontend `.env` is bundled.
@@ -62,3 +63,7 @@ No remote project is linked. Never point `.env` at the remote Supabase project, 
 ## Known local quirks
 - Laravel loads `.env.{APP_ENV}` instead of `.env` when such a file exists: never create `web/.env.local`.
 - The old combined command (`pnpm dev` = both apps from `admin`) no longer exists. A staff dev server started with the old script before 2026-11-18 serves deleted folders: stop it and start `pnpm dev` in `admin`.
+
+## Quality checks without extra tools (session 13)
+- `frontend/e2e/quality.spec.ts`: on 13 public pages, one h1, `lang`, one main landmark, alt text, labelled controls, named buttons and links, unique ids; keyboard skip link; reduced motion; LCP and CLS in Chromium on the production build (budgets 2.5 s and 0.1). `admin/e2e/quality.spec.ts`: the same structure rules on 13 staff screens.
+- axe-core and Lighthouse are not installed (new dependencies need the owner's approval). WebKit fails to launch here: it needs system libraries (for example `libevent-2.1`) that need sudo (`npx playwright install-deps webkit`, owner).

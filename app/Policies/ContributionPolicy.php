@@ -25,6 +25,18 @@ class ContributionPolicy
         return $c->author_id !== $user->id && $c->isVisible();
     }
 
+    /** "Still accurate": another rider, on something anyone can see. */
+    public function confirm(User $user, Contribution $c): bool
+    {
+        return $this->report($user, $c);
+    }
+
+    /** After review the author cannot rewrite the report, only add a dated correction underneath it. */
+    public function correct(User $user, Contribution $c): bool
+    {
+        return $c->author_id === $user->id && ($c->isVisible() || $c->status === ContributionStatus::Flagged);
+    }
+
     /** Staff with the permission, never on content of their own rider account (linked, or with their email). */
     public function moderate(StaffAccount $staff, Contribution $c): bool
     {

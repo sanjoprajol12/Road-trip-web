@@ -34,15 +34,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('users/me/events', [V1\EventController::class, 'mine']);
     Route::get('users/me/notifications', [V1\NotificationController::class, 'index']);
     Route::post('users/me/notifications/read', [V1\NotificationController::class, 'markRead']);
+    Route::post('users/me/contribution-appeal', [V1\ProfileController::class, 'appealContributionSuspension'])->middleware('throttle:applications');
+    Route::get('users/me/saved', [V1\SavedItemController::class, 'index']);
+    Route::post('users/me/saved', [V1\SavedItemController::class, 'store']);
+    Route::delete('users/me/saved/{type}/{id}', [V1\SavedItemController::class, 'destroy']);
     Route::apiResource('users/me/emergency-contacts', V1\EmergencyContactController::class)->except('show')->parameters(['emergency-contacts' => 'contact']);
 
     Route::middleware(['verified', 'not-suspended'])->group(function () {
         Route::post('users/me/verifications', [V1\VerificationController::class, 'store'])->middleware('throttle:applications');
 
-        Route::post('contributions', [V1\ContributionController::class, 'store'])->middleware('throttle:contributions');
-        Route::patch('contributions/{contribution}', [V1\ContributionController::class, 'update']);
-        Route::post('contributions/{contribution}/media', [V1\ContributionController::class, 'upload'])->middleware('throttle:uploads');
-        Route::post('contributions/{contribution}/reports', [V1\ContributionController::class, 'report'])->middleware('throttle:reports');
+        Route::post('contributions', [V1\ContributionController::class, 'store'])->middleware(['throttle:contributions', 'can-contribute']);
+        Route::patch('contributions/{contribution}', [V1\ContributionController::class, 'update'])->middleware('can-contribute');
+        Route::post('contributions/{contribution}/media', [V1\ContributionController::class, 'upload'])->middleware(['throttle:uploads', 'can-contribute']);
+        Route::post('contributions/{contribution}/reports', [V1\ContributionController::class, 'report'])->middleware(['throttle:reports', 'can-contribute']);
+        Route::post('contributions/{contribution}/confirmations', [V1\ContributionController::class, 'confirm'])->middleware(['throttle:reports', 'can-contribute']);
+        Route::post('contributions/{contribution}/correction', [V1\ContributionController::class, 'correct'])->middleware(['throttle:contributions', 'can-contribute']);
 
         Route::post('events', [V1\EventController::class, 'store']);
         Route::patch('events/{event}', [V1\EventController::class, 'update']);
@@ -60,6 +66,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('trips/{trip}', [V1\TripController::class, 'update']);
         Route::delete('trips/{trip}', [V1\TripController::class, 'destroy']);
         Route::post('trips/{trip}/members', [V1\TripController::class, 'addMember']);
+        Route::delete('trips/{trip}/invitations/{invitation}', [V1\TripInvitationController::class, 'cancel'])->whereUuid('invitation');
+        Route::get('users/me/trip-invitations', [V1\TripInvitationController::class, 'mine']);
+        Route::post('trip-invitations/{invitation}/accept', [V1\TripInvitationController::class, 'respond'])->defaults('answer', 'accept');
+        Route::post('trip-invitations/{invitation}/decline', [V1\TripInvitationController::class, 'respond'])->defaults('answer', 'decline');
         Route::patch('trips/{trip}/members/{user}', [V1\TripController::class, 'updateMember']);
         Route::delete('trips/{trip}/members/{user}', [V1\TripController::class, 'removeMember']);
         Route::post('trips/{trip}/{part}', [V1\TripPartController::class, 'store'])->whereIn('part', ['stops', 'expenses', 'checklist']);

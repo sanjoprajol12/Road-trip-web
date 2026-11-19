@@ -8,6 +8,7 @@ return [
         // All API requests per signed-in account (or per IP for guests) per minute. Raise only for local E2E,
         // where every test browser shares 127.0.0.1.
         'api_per_minute' => (int) env('API_PER_MINUTE', 120),
+        'contact_per_hour' => (int) env('CONTACT_PER_HOUR', 5),
     ],
     // Origin of the staff app (links in staff invitation emails). APP_URL is the public website.
     'admin_url' => rtrim((string) env('ADMIN_URL', 'http://127.0.0.1:5181'), '/'),

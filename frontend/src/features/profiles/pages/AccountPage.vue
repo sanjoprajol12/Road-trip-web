@@ -6,6 +6,7 @@ import VerificationPanel from '@/features/verification/components/VerificationPa
 import AccountSecurity from '../components/AccountSecurity.vue'
 import EmergencyContacts from '../components/EmergencyContacts.vue'
 import MyActivity from '../components/MyActivity.vue'
+import ContributionPause from '../components/ContributionPause.vue'
 import { signOut, useAuth } from '@/features/authentication/useAuth'
 import { updateOwnProfile, type ProfileEdit } from '../services/profile'
 import { errorMessage, fieldErrors } from '@/lib/api/client'
@@ -75,6 +76,7 @@ async function doSignOut() {
       <a href="#activity" class="link">Notifications and contributions</a>
       <a href="#emergency" class="link">Emergency contacts</a>
       <a href="#security" class="link">Password and sessions</a>
+      <RouterLink to="/saved" class="link">Saved</RouterLink>
       <RouterLink v-if="user?.username" :to="`/riders/${user.username}`" class="link">Your public profile</RouterLink>
     </nav>
 
@@ -114,6 +116,7 @@ async function doSignOut() {
     </form>
 
     <VerificationPanel />
+    <ContributionPause />
     <MyActivity />
     <EmergencyContacts />
     <AccountSecurity />
