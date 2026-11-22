@@ -13,7 +13,12 @@ const editing = ref<string | null>(null)
 const edit = reactive({ label: '', section: 'motorcycle' as Item['section'] })
 const items = computed(() => props.trip.checklist ?? [])
 const done = computed(() => items.value.filter((c) => c.done).length)
-const add = async () => (await props.run(() => addPart(props.trip.id, 'checklist', item))) && (item.label = '')
+const adding = ref(false)
+async function add() {
+  adding.value = true
+  if (await props.run(() => addPart(props.trip.id, 'checklist', item))) item.label = ''
+  adding.value = false
+}
 const toggle = (id: string, value: boolean) => props.run(() => updatePart(props.trip.id, 'checklist', id, { done: value }))
 function startEdit(c: Item) {
   editing.value = c.id
@@ -26,7 +31,7 @@ const remove = (c: Item) => props.run(() => removePart(props.trip.id, 'checklist
 <template>
   <section aria-labelledby="chk">
     <h2 id="chk" class="display text-3xl">Checklist</h2>
-    <p class="mt-2 text-sm" :class="items.length ? '' : 'text-muted'" data-testid="checklist-progress">{{ items.length ? `${done} of ${items.length} done` : 'No items yet. Add what to check or pack before the ride.' }}</p>
+    <p class="tabular mt-2 text-sm" :class="items.length ? '' : 'text-muted'" data-testid="checklist-progress">{{ items.length ? `${done} of ${items.length} done` : 'No items yet. Add what to check or pack before the ride.' }}</p>
     <div v-for="(label, sec) in sections" :key="sec" class="mt-4">
       <h3 class="label text-muted">{{ label }}</h3>
       <ul v-if="items.some((x) => x.section === sec)" class="mt-2 grid gap-1" :aria-label="`${label} checklist`">
@@ -50,7 +55,7 @@ const remove = (c: Item) => props.run(() => removePart(props.trip.id, 'checklist
     <form v-if="canEdit" class="mt-4 grid gap-3 sm:grid-cols-[1fr_10rem_auto] sm:items-end" @submit.prevent="add">
       <div class="field"><label for="cl">Item</label><input id="cl" v-model="item.label" class="input" maxlength="200" placeholder="For example: spare clutch cable" /></div>
       <div class="field"><label for="cs">Section</label><select id="cs" v-model="item.section" class="input"><option v-for="(l, s) in sections" :key="s" :value="s">{{ l }}</option></select></div>
-      <button type="submit" class="btn btn-quiet" :disabled="item.label.trim().length < 2">Add</button>
+      <button type="submit" class="btn btn-quiet" :disabled="adding || item.label.trim().length < 2" :aria-busy="adding">{{ adding ? 'Adding…' : 'Add' }}</button>
     </form>
   </section>
 </template>

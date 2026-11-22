@@ -40,6 +40,8 @@
 
 @layer base {
   html {
+    /* Keeps focused and scrolled-to elements clear of the fixed header (WCAG 2.4.11 focus not obscured). */
+    scroll-padding-top: 5.5rem;
     background: var(--color-paper);
     color: var(--color-ink);
     font-family: var(--font-sans);
@@ -158,7 +160,9 @@
   .input:hover {
     border-color: var(--color-muted);
   }
-  .input:focus-visible {
+  /* A date field's calendar button sits inside the field: keep the ring on the field while it has focus. */
+  .input:focus-visible,
+  .input:is([type='date'], [type='time'], [type='datetime-local']):focus-within {
     outline: none;
     border-color: var(--color-crimson);
     box-shadow: 0 0 0 1px var(--color-crimson);
@@ -212,6 +216,41 @@
 .reveal.is-visible {
   opacity: 1;
   transform: none;
+}
+
+/* Success and error messages after an action: a short settle-in so the change is noticed. */
+.feedback-in {
+  animation: feedback-in 220ms var(--ease-out-quint);
+}
+@keyframes feedback-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+/*
+ * The one texture: topographic contour lines (DESIGN_SYSTEM.md, "Texture"). Static, behind content, on night surfaces only.
+ * A mask, so the line colour is a token; fixed size so line density is the same in a footer and a small plate.
+ */
+.texture-contours {
+  position: relative;
+  isolation: isolate;
+}
+.texture-contours::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--color-night-line);
+  -webkit-mask: url('/images/textures/contours.svg') right top / 75rem auto no-repeat;
+  mask: url('/images/textures/contours.svg') right top / 75rem auto no-repeat;
+}
+@media (forced-colors: active) {
+  .texture-contours::before {
+    display: none;
+  }
 }
 
 .page-enter-active,

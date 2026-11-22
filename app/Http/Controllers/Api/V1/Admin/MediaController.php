@@ -46,14 +46,21 @@ class MediaController extends Controller
     {
         $data = $request->validate(['file' => ['required', 'file', 'max:'.config('mrn.uploads.max_kb')]] + $this->rules(),
             ['license.in' => 'Only CC0, public domain or owner-supplied images may be used.']);
-        $img = Images::reencode($request->file('file'), 'file');
-        $disk = Images::disk();
-        $path = 'library/'.now()->format('Y/m').'/'.Str::uuid().'.webp';
-        Storage::disk($disk)->put($path, $img['bytes']);
-        $m = new MediaAsset($data);
-        $m->forceFill(['disk' => $disk, 'path' => $path, 'visibility' => 'public', 'mime' => 'image/webp', 'size_bytes' => strlen($img['bytes']),
-            'width' => $img['width'], 'height' => $img['height'], 'uploaded_by_staff_id' => $request->user()->id])->save();
-        Audit::record('media.uploaded', $m, null, $m->only(['alt', 'credit', 'license']));
+        $stored = Images::store($request->file('file'), 'library/'.now()->format('Y/m'), 'file');
+        try {
+            $m = DB::transaction(function () use ($data, $stored, $request) {
+                $m = new MediaAsset($data);
+                $m->forceFill(['disk' => $stored['disk'], 'path' => $stored['path'], 'visibility' => 'public', 'mime' => 'image/webp', 'size_bytes' => $stored['bytes_size'],
+                    'width' => $stored['width'], 'height' => $stored['height'], 'uploaded_by_staff_id' => $request->user()->id])->save();
+                Audit::record('media.uploaded', $m, null, $m->only(['alt', 'credit', 'license']));
+
+                return $m;
+            });
+        } catch (\Throwable $e) {
+            Images::discard($stored); // no file without its row
+
+            throw $e;
+        }
 
         return response()->json(['data' => $m->toApi()], 201);
     }

@@ -33,7 +33,11 @@ return [
 
         // Storage. Only the local disk exists until a provider is chosen (decision D1); upload limits never
         // exceed the server cap in config/mrn.php.
+        // Only "local" until a durable provider is chosen (decision D1); adding it means adding its disk here.
+        // App\Support\UploadPolicy refuses uploads until the chosen disk is configured and, in production, durable.
         'storage.driver' => ['type' => 'string', 'default' => 'local', 'rules' => ['required', 'in:local']],
+        'storage.uploads_enabled' => ['type' => 'bool', 'default' => true, 'rules' => ['required', 'boolean']],
+        'storage.uploads_paused_message' => ['type' => 'string', 'default' => 'Photo uploads are paused for now. Everything else works, and you can send your report without photos.', 'rules' => ['required', 'string', 'min:10', 'max:200']],
         'storage.max_upload_kb' => ['type' => 'int', 'default' => 8192, 'rules' => ['required', 'integer', 'between:256,8192']],
         'storage.image_types' => ['type' => 'list', 'default' => ['image/jpeg', 'image/png', 'image/webp'], 'rules' => ['required', 'array', 'min:1'], 'item_rules' => ['string', 'in:image/jpeg,image/png,image/webp']],
 

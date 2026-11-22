@@ -67,3 +67,26 @@ Authority: `web/database/migrations` (Laravel). Local database `myridenepal` (te
 - Rollback: `down()` refuses while any row has no amount, so it never invents one. Otherwise it drops both checks and the column and restores NOT NULL. Rollback and re-apply verified on `myridenepal_e2e`.
 - No schema change for days, overnight stops or notes. Per-day totals are computed from `trip_stops.day` and recorded route values.
 
+## Session 21 additions (2026-11-22, migration `2026_11_22_100023_add_home_planner_and_tools`)
+- The `home_sections_type` check now also allows `planner` and `tools`. Content only: no new columns.
+- **Inserts:** one `planner` and one `tools` section, published, directly after the hero. Later sections move down two places, in both draft and published order.
+- **Hero:** it gets the new headline only while it is the untouched seeded copy (`updated_by_staff_id` null and the original lines). Staff-edited copy is never changed.
+- **Idempotent:** if either section type already exists, only the check is updated.
+- **Rollback:** removes the two sections, closes the gaps, restores the original hero copy if it still has the session 21 headline, and restores the old type check. Up, down and up verified on `myridenepal_e2e`, with identical order and copy.
+
+## Session 25 additions (2026-11-22, migration `2026_11_22_100024_add_account_deletion`)
+- **`users.deletion_scheduled_for`:** set during the 30-day cooling-off.
+- **`account_deletion_requests`:**
+  - `user_id` has no FK, so the row outlives the user.
+  - Status is `scheduled`, `cancelled` or `done`; a partial unique index allows one scheduled request per user.
+  - It holds `choices` (ids only), `counts`, `attempts` and `last_error`.
+- **`ownership_transfers`:** offers for events or trips; one open offer per subject (partial unique); cascades with either account.
+- **`moderation_evidence`:**
+  - a snapshot and files, both nulled at disposal; `disposition` is `expired` or `released`;
+  - a check `held_until <= created_at + 30 days` (no extension).
+- **`pending_file_deletions`:** files to remove after a commit, with retry counts.
+- **Constraint changes:**
+  - `contributions.author_id` and `events.organizer_id` are now nullable, set null.
+  - Checks: `contributions_author_or_deleted` (a null author only with `author_deleted_at`) and `events_organizer_or_cancelled` (a null organizer only on a cancelled event).
+  - A raw delete of a rider who still authors contributions or organizes an event that is not cancelled now fails instead of cascading.
+- **Permissions:** `users.deletions.view` and `moderation.evidence.view` (administrators only by default).

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 21: Homepage | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:60rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; }
+  h2 { font-size:1.3rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.4rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  code { font-size:.88em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; word-break:break-word; }
+  .warn { color:var(--warn); font-weight:700; }
+  .ok { color:var(--ok); font-weight:700; }
+  ul, ol { padding-left:1.3rem; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; margin:.6rem 0 1rem; }
+  th, td { text-align:left; vertical-align:top; padding:.4rem .6rem; border-bottom:1px solid var(--line); }
+  th { background:var(--surface); }
+</style>
+</head>
+<body>
+<main>
+<p class="meta">My Ride Nepal · Session report</p>
+<h1>Session 21: complete verification, then a homepage that shows the product</h1>
+<p class="meta">2026-11-22 · Claude Code (Opus 5.5) · Nothing committed · One content migration · No dependency · No invented data</p>
+
+<h2>Project progress</h2>
+<ul>
+<li><strong>Verified completion: 67.8%</strong> (177 / 261), <strong>unchanged</strong>.</li>
+<li><strong>Implementation coverage: 81.9%</strong>, unchanged.</li>
+<li>As the owner asked, visual and presentation work does not move the figure. No audited requirement changed status this session.</li>
+</ul>
+
+<h2>1. Complete verification (before any homepage change)</h2>
+<div class="scroll"><table>
+<tr><th>Command</th><th>Exit</th><th>Result</th></tr>
+<tr><td><code>php artisan test</code></td><td>0</td><td>157 passed (3351 assertions)</td></tr>
+<tr><td><code>composer audit</code></td><td>0</td><td>no advisories</td></tr>
+<tr><td>public type-check, lint, unit, build, <code>pnpm audit --prod</code></td><td>0 (all)</td><td>30 unit tests passed</td></tr>
+<tr><td>staff type-check, lint, unit, build, <code>pnpm audit --prod</code></td><td>0 (all)</td><td>13 unit tests passed</td></tr>
+<tr><td>public E2E (Chromium, Firefox, mobile)</td><td>0</td><td>144 passed, 3 skipped by design, 0 failed</td></tr>
+<tr><td>staff E2E (Chromium, Firefox)</td><td>0</td><td>48 passed, 0 failed</td></tr>
+</table></div>
+<p>No regressions. This baseline includes the session 20 polish of the trip screens.</p>
+
+<h2>2. Homepage: what changed</h2>
+<p>Before, the homepage explained how information is organised (destination, route, segment, observation) but never showed the planning tools. Now:</p>
+<ul>
+<li><strong>Specific headline:</strong> "Plan the ride / stretch by stretch." The lead says what you actually get. The main button "Plan a route" opens Explore Along My Route; the second is "Browse routes". The seeded hero was untouched, so only it was changed; staff-edited copy is never overwritten.</li>
+<li><strong>The main feature, working and enlarged (new <code>planner</code> section):</strong>
+  <ul>
+  <li>Choose a start and a destination from the published destinations; "Show routes and stops" opens <code>/journey</code> with both chosen.</li>
+  <li>Swap and same-place checks behave as on the full page.</li>
+  <li>Beside it is the plan of a <em>real</em> published route: stretches in riding order, recorded km, distance from the start, time estimates, surface and fuel, with a link to the full plan.</li>
+  <li>With no route published, it lists what every plan shows and says none is published yet. It never shows an invented example.</li>
+  </ul></li>
+<li><strong>The tools (new <code>tools</code> section):</strong> routes, trips, places, rider reports, organised rides and preparation, each with one sentence about what it does today and a link to the real page. The icons are Lucide, chosen by link, so they stay consistent. It is a ruled two-column list, not a card grid.</li>
+<li><strong>Kept:</strong> the original "how the road is organised" and "every observation carries its date" sections, now after the product sections.</li>
+<li><strong>Staff control:</strong> both new sections are editable and orderable in the staff portal, and validated on the server: at most one route, only internal or https links.</li>
+</ul>
+
+<h2>3. Database</h2>
+<ul>
+<li>Migration <code>2026_11_22_100023_add_home_planner_and_tools</code>: content only, plus the section-type check.</li>
+<li>Applied to dev and E2E. Up, down and up verified on E2E, with identical order and copy.</li>
+</ul>
+
+<h2>4. Verification after the homepage change</h2>
+<div class="scroll"><table>
+<tr><th>Command</th><th>Exit</th><th>Result</th></tr>
+<tr><td><code>php artisan test</code></td><td>0</td><td>159 passed (3371 assertions), including the new <code>HomeProductTest</code> (real or no route, published only, unpublished choice dropped, validation)</td></tr>
+<tr><td><code>composer audit</code></td><td>0</td><td>clean</td></tr>
+<tr><td>public type-check, lint, unit (30), build, audit</td><td>0 (all)</td><td>—</td></tr>
+<tr><td>staff type-check, lint, unit (13), build, audit</td><td>0 (all)</td><td>—</td></tr>
+<tr><td>public E2E</td><td>0</td><td><span class="ok">147 passed</span>, 3 skipped by design, 0 failed (new: the homepage planner on Chromium, Firefox and mobile)</td></tr>
+<tr><td>staff E2E</td><td>0</td><td><span class="ok">48 passed</span></td></tr>
+</table></div>
+<p><strong>Screenshots inspected:</strong> the planner and the tools on desktop and mobile. The first captures were taken mid reveal-animation and looked blank; the test now waits for the reveal.</p>
+
+<h2>Not done or not checked</h2>
+<ul>
+<li>The dev database has no published routes, so a local homepage shows the "what a plan shows" state until staff publish one.</li>
+<li>The new copy is proposed and needs the owner's review.</li>
+<li>Not run: WebKit, axe, Lighthouse, a screen reader.</li>
+</ul>
+</main>
+</body>
+</html>

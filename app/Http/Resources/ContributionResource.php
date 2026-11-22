@@ -30,7 +30,8 @@ class ContributionResource extends JsonResource
             'correction_pending_review' => $this->when($insider, fn () => $this->hasCorrectionToReview()),
             'correction_request' => $this->when($insider, $this->correction_request),
             'sources' => $this->whenLoaded('sources', fn () => $this->sources->map->toPublic()->values()),
-            'author' => $this->whenLoaded('author', fn () => (new PublicUserResource($this->author))->toArray($request)),
+            // Loaded but null: the author deleted their account and kept it anonymously (shown as "Former rider").
+            'author' => $this->when($this->resource->relationLoaded('author'), fn () => (new PublicUserResource($this->author))->toArray($request)),
             'place' => $this->whenLoaded('place', fn () => $this->place ? ['slug' => $this->place->slug, 'name' => $this->place->name] : null),
             'destination' => $this->whenLoaded('destination', fn () => $this->destination ? ['slug' => $this->destination->slug, 'name' => $this->destination->name] : null),
             'route' => $this->whenLoaded('route', fn () => $this->route ? ['slug' => $this->route->slug, 'name' => $this->route->name] : null),

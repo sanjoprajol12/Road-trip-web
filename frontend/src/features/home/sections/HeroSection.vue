@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { ArrowRight } from 'lucide-vue-next'
 import SiteLink from '@/components/ui/SiteLink.vue'
+import { heroesOnScreen } from '@/lib/site'
 import type { HeroData } from '../types'
 
 const props = defineProps<{ s: HeroData }>()
+onMounted(() => heroesOnScreen.value++)
+onBeforeUnmount(() => heroesOnScreen.value--)
 // Bundled photos come in fixed widths; a library image is one re-encoded file.
 const bg = computed(() => props.s.background)
 const src = computed(() => (bg.value.kind === 'bundled' ? `${bg.value.base}-${bg.value.widths.includes(1920) ? 1920 : bg.value.widths.at(-1)}.webp` : bg.value.url))

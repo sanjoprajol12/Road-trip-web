@@ -5,7 +5,7 @@ defineProps<{ s: FreshnessData; id: string }>()
 </script>
 
 <template>
-    <section class="on-night bg-night text-night-text" :aria-labelledby="`fresh-${id}`">
+    <section class="on-night texture-contours bg-night text-night-text" :aria-labelledby="`fresh-${id}`">
       <div class="wrap grid gap-12 py-20 sm:py-28 md:grid-cols-2">
         <div>
           <h2 :id="`fresh-${id}`" v-reveal class="display text-[clamp(2.25rem,1.6rem+2.6vw,4rem)]">

@@ -38,6 +38,8 @@ return [
         'users.sessions.revoke' => 'Sign an account out everywhere',
         'users.roles.manage' => 'Give and remove staff roles',
         'users.invite' => 'Invite new staff by email',
+        'users.deletions.view' => 'See account deletion requests and their outcome (dates and counts only, no content)',
+        'moderation.evidence.view' => 'Read moderation evidence kept for at most 30 days after a rider deleted their account (every view is audited)',
 
         'roles.manage' => 'Create, edit and delete roles and their permissions',
 

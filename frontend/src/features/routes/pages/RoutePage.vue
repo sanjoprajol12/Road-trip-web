@@ -44,7 +44,7 @@ watch(r, (v) => v && (document.title = `${v.name} | My Ride Nepal`))
       <header class="mt-8 grid gap-6 border-b border-line pb-10 lg:grid-cols-[1.4fr_1fr] lg:items-end">
         <div>
           <p class="label text-muted"><template v-if="r.start || r.end">{{ r.start?.name ?? '?' }} to {{ r.end?.name ?? '?' }}</template></p>
-          <h1 class="display mt-3 text-[clamp(3rem,2rem+4vw,6rem)]">{{ r.name }}</h1>
+          <h1 class="display mt-3 text-[clamp(3rem,2rem+4vw,6rem)] text-balance wrap-anywhere">{{ r.name }}</h1>
           <p v-if="r.summary" class="lead mt-4 max-w-xl text-muted">{{ r.summary }}</p>
           <SaveButton class="mt-6" type="route" :id="r.id" :name="r.name" />
         </div>

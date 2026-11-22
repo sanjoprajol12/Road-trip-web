@@ -86,6 +86,14 @@ class RouteAuthorizationTest extends TestCase
         'PUT api/v1/users/me/emergency-contacts/{contact}',
         'PATCH api/v1/users/me/emergency-contacts/{contact}',
         'DELETE api/v1/users/me/emergency-contacts/{contact}',
+        // Deleting or exporting one's own account works while suspended or in the cooling-off (D-01).
+        'GET api/v1/users/me/deletion',
+        'POST api/v1/users/me/deletion',
+        'DELETE api/v1/users/me/deletion',
+        'POST api/v1/users/me/export',
+        'POST api/v1/users/me/deletion/offers',
+        'DELETE api/v1/users/me/deletion/offers/{offer}',
+        'GET api/v1/users/me/ownership-offers',
     ];
 
     /** A signed-in staff account, with or without a role (so it can always sign out or fix its own password). */
@@ -172,6 +180,7 @@ class RouteAuthorizationTest extends TestCase
             'role' => 'admin',
             'group' => 'general',
             'location' => 'header',
+            'index' => '0',
             default => (string) Str::uuid(),
         }, $route->uri());
     }

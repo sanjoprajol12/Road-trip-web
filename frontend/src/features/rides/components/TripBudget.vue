@@ -18,10 +18,13 @@ const edit = reactive(blank())
 const npr = (n: number) => `NPR ${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
 const memberName = (id: string | null) => props.trip.members?.find((m) => m.id === id)?.display_name ?? 'a former member'
 const body = (f: ReturnType<typeof blank>) => ({ label: f.label, category: f.category, status: f.status, amount_npr: f.amount_npr === '' ? null : Number(f.amount_npr), paid_by: f.status === 'spent' && f.paid_by ? f.paid_by : null })
+const adding = ref(false)
 async function add() {
   const sent = body(draft)
+  adding.value = true
   // Clear the form only if nothing new was typed while saving.
   if ((await props.run(() => addPart(props.trip.id, 'expenses', sent))) && draft.label === sent.label) Object.assign(draft, blank())
+  adding.value = false
 }
 function startEdit(x: Expense) {
   editing.value = x.id
@@ -78,7 +81,7 @@ const spent = computed(() => props.trip.expenses?.filter((x) => x.status === 'sp
       <div class="field"><label for="ec">Category</label><select id="ec" v-model="draft.category" class="input"><option v-for="c in categories" :key="c" :value="c">{{ c }}</option></select></div>
       <div class="field"><label for="ea">Amount (NPR)</label><input id="ea" v-model="draft.amount_npr" type="number" min="0" step="1" class="input" :placeholder="draft.status === 'planned' ? 'if known' : ''" /></div>
       <div class="field"><label for="es">Status</label><select id="es" v-model="draft.status" class="input"><option value="planned">Planned</option><option value="spent">Spent</option></select></div>
-      <button type="submit" class="btn btn-quiet" :disabled="draft.label.trim().length < 2 || (draft.status === 'spent' && draft.amount_npr === '')">Add</button>
+      <button type="submit" class="btn btn-quiet" :disabled="adding || draft.label.trim().length < 2 || (draft.status === 'spent' && draft.amount_npr === '')" :aria-busy="adding">{{ adding ? 'Adding…' : 'Add' }}</button>
       <div v-if="draft.status === 'spent'" class="field sm:col-span-2"><label for="ep">Paid by</label><select id="ep" v-model="draft.paid_by" class="input"><option v-for="m in trip.members" :key="m.id" :value="m.id">{{ m.display_name }}</option></select></div>
     </form>
   </section>

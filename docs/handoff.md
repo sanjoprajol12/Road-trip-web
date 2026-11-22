@@ -1,6 +1,6 @@
 # Handoff
 
-Last updated: 2026-11-21, session 20 (F4 and F15: trip days, overnight stops, planned and spent costs, checklist and notes; recorded tracks on the trip map). Session 19 (F3: whole routes, stretches and checkpoints in trips; stop reordering). Session 18 (route planning: plan table, fuel gaps, riding time per stretch, route filters, service markers with details; verification and audit closure). Session 17 follow-up (places.review for moderators; correction of the session 17 test report). Session 17 (places in trips and trip maps; real route tracks drawn on destination and route maps; place permission audit). Session 16 (places of interest: staff management, rider suggestions and corrections, public pages, maps, journeys, saved items, experiences; map stacking fix). Session 15 (destination maps: staff map picker, public map and nearby lists; progress measurement baseline; edit-form crash fixed). Session 14 (PostGIS pre-activation audit, inspection only: nothing changed). Session 13 (CMS modules and contact inbox; mail, maps, security, trust settings; trip invitations with consent; journey add-to-trip; corroboration threshold; contribution-only suspensions; event removal and postponement dates; accessibility and Web Vitals checks). Session 12 (Stage 4 trust pipeline; saved services; Explore Along My Route in curated mode). Session 11 (one command for API + public website: `npm run dev` in `web`). Session 10 (migration stages A1–A8 done: Option A layout, independent apps, deployment config, route split, separate staff authentication, feature services, dynamic homepage and CMS foundation). Session 9: architecture investigation. Session 8: roadmap Stages 1, 2 and 3 done (Stage 3 for the local disk only). Earlier sessions: 1 foundation, 2 Supabase auth and verification, 3 removed shared package, 4 Laravel and product areas, 5 Vercel container prep, 6 requirements audit, 7 scope expansion + architecture Option B.
+Last updated: 2026-11-22, session 27 (independent review of session 26: O8 and D-10 verified with conditions; D-11 defect found (moderator confirmation date reset); H11 back to Partial, progress 178/261). Earlier: 2026-11-22, session 26 (owner addendum built: O8 audit text redaction through a privileged audited database function, D-10 deletion records kept one year with categories and counts only, D-11 corroboration recalculated; append-only audit privilege restored in dev and E2E). Session 25 (account deletion step 2: request with per-contribution choices, 30-day cooling-off, explicit cancel, export, event and trip handover by acceptance with cancel/delete fallback, restricted 30-day moderation evidence, retryable file cleanup; tested; `web/CLAUDE.md` restored). Session 24 upload safety switch (central upload policy: production never accepts uploads on the local disk, staff and environment pause switches, critical alert, no orphans; tested; no storage provider configured). Session 24 owner decisions (recorded: Q9 option D, 30-day cooling-off, event and trip transfers, 30-day moderation hold, contact retention periods, mandatory staff MFA, P1 hosting candidate with no budget; four plans updated, no code). Session 23 (infrastructure and privacy readiness: plans for hosting, uploads, account deletion and export, staff MFA, contact retention; CI workflows updated). Session 22 (production-readiness audit: accessibility, performance, browsers, security, infrastructure, data; 2 accessibility defects fixed). Session 21 (complete verification; homepage shows the product: specific headline, working route planner with a real route preview, tools list). Session 20 (F4 and F15: trip days, overnight stops, planned and spent costs, checklist and notes; recorded tracks on the trip map). Session 19 (F3: whole routes, stretches and checkpoints in trips; stop reordering). Session 18 (route planning: plan table, fuel gaps, riding time per stretch, route filters, service markers with details; verification and audit closure). Session 17 follow-up (places.review for moderators; correction of the session 17 test report). Session 17 (places in trips and trip maps; real route tracks drawn on destination and route maps; place permission audit). Session 16 (places of interest: staff management, rider suggestions and corrections, public pages, maps, journeys, saved items, experiences; map stacking fix). Session 15 (destination maps: staff map picker, public map and nearby lists; progress measurement baseline; edit-form crash fixed). Session 14 (PostGIS pre-activation audit, inspection only: nothing changed). Session 13 (CMS modules and contact inbox; mail, maps, security, trust settings; trip invitations with consent; journey add-to-trip; corroboration threshold; contribution-only suspensions; event removal and postponement dates; accessibility and Web Vitals checks). Session 12 (Stage 4 trust pipeline; saved services; Explore Along My Route in curated mode). Session 11 (one command for API + public website: `npm run dev` in `web`). Session 10 (migration stages A1–A8 done: Option A layout, independent apps, deployment config, route split, separate staff authentication, feature services, dynamic homepage and CMS foundation). Session 9: architecture investigation. Session 8: roadmap Stages 1, 2 and 3 done (Stage 3 for the local disk only). Earlier sessions: 1 foundation, 2 Supabase auth and verification, 3 removed shared package, 4 Laravel and product areas, 5 Vercel container prep, 6 requirements audit, 7 scope expansion + architecture Option B.
 
 ## 1. Goal
 My Ride Nepal, a motorcycle travel platform for Nepal: public website + rider platform, Laravel API, staff portal and CMS, all requirements in `docs/architecture/REQUIREMENTS_GAP_ANALYSIS.md` (261 rows). **Architecture Option A** (owner direction 2026-11-18, replaces Option B):
@@ -10,6 +10,150 @@ My Ride Nepal, a motorcycle travel platform for Nepal: public website + rider pl
 - Supabase = local Postgres + Mailpit only. No code shared between repos. Hosting target Vercel (nothing deployed).
 
 ## 2. Current State
+- **Session 27 (independent review of session 26; no code changed):** report `docs/sessions/2026-11-22-session-27-independent-review.html`.
+  - **Verdict: accepted with conditions.**
+    - O8 and D-10 are verified. D-11 is accepted except for defect R8.
+    - Security hardening R1, R2 and R5 is needed before production.
+    - A separate focused implementation task is requested (see §6).
+  - **Privilege evidence (as `mrn_app` in `myridenepal`, `myridenepal_test`, `myridenepal_e2e`):**
+    - `audit_logs` grants are INSERT and SELECT only. Direct UPDATE, DELETE and TRUNCATE are refused.
+    - The function is executable by `mrn_owner` and `mrn_app` only. The role cannot create in public or create temp tables, and holds no elevated attributes.
+    - `scripts/setup-local-db.sh` was run twice; the privileges were unchanged afterwards. The E2E redaction check record is kept.
+  - **Findings:**
+    - **R8 (medium):** the deletion run sets `last_confirmed_on` from rider confirmations only, so a moderator's "still accurate" date is lost. Reproduced: today → null.
+    - **R1 (medium):** the app role can insert forged `audit.redacted` or `system` rows.
+    - **R2 (medium):** the function cannot tell whether the entry belongs to a deleted account, so any app-role caller can redact a live contribution's history (the redaction is still recorded).
+    - **R5 (medium):** a failed run writes the full exception (SQL with bindings) to the Laravel log, outside D-10.
+    - **Low:**
+      - R3: `place.suggested` (name, coordinates) is not redacted.
+      - R4: docs and the staff audit page say entries "cannot be edited".
+      - R6: handover counts include an earlier cancelled request.
+      - R7: the purge audit is labelled actor `user`.
+      - R9: the D-11 count ignores the window (an interpretation).
+  - **HMAC assessment:** feasible. Its value is limited while `audit_logs.actor_id` keeps the raw id. A restore cannot reproduce per-contribution choices (D-10 keeps categories only), and no restore tool or runbook exists. Owner decision needed; no schema change made.
+  - **Production:** nothing is activated (no host, no cron, and the dev scripts don't run the scheduler). The schedule is registered without an env switch.
+  - **Progress corrected:** 178/261 = 68.2%, coverage 82.3% (H11 back to Partial).
+- **Session 26 (owner addendum O8, D-10, D-11; code, tested):** record in `docs/product/OWNER_DECISIONS_2026-11-22_ADDENDUM.md` (with the implementation notes).
+  - **O8:** migration `2026_11_22_100025` adds `mrn_redact_audit_text(entry, reason)`, a security definer function owned by the table owner.
+    - The app role may execute it, but still has no update or delete on `audit_logs`.
+    - It accepts one reason (`account_deletion`) and three entry types (contribution edits and corrections, place resubmissions). It replaces only text fields with `"[redacted]"` and writes a separate `audit.redacted` entry (actor type `system`, which is new in the actor check) naming the entry and fields.
+    - It is idempotent. The deletion run calls it for every contribution of the rider and for the place suggestions it deletes.
+    - Integrity: there is no hash chain today; the design note says what a future chain needs.
+  - **D-10:** finished requests keep only choice categories and counts (handovers included). The daily command deletes `done` and `cancelled` records a year after they finished, and audits the number deleted. The pseudonymous `user_id` stays for that year so a deletion can be re-applied after a backup restore.
+  - **D-11:** a threshold corroboration falls back to `published` when the remaining distinct confirmers (not the author; no window) drop below the threshold, audited as `contribution.corroboration_withdrawn`. Moderator corroborations and `officially_sourced` are kept.
+  - **Found and fixed:**
+    - In `myridenepal` and `myridenepal_e2e`, the app role could update and delete audit rows, because `scripts/setup-local-db.sh` re-grants every table after the migrations.
+    - The script now re-applies the revoke, and the revoke was restored in both databases (the test DB was already correct).
+    - Checked as `mrn_app` in the E2E DB: a direct update is refused and the function redacts. Those two check rows stay there (append-only).
+    - **Production must check this privilege before launch.**
+  - **Progress:** 179/261 = 68.6% (was 68.2%), coverage 82.5%. H11 moved from partial to complete, tested.
+- **Session 25 (account deletion, step 2 of the decision record; code, tested):**
+  - **Rules file:** `web/CLAUDE.md` was a symlink to itself (commit `02402ff`). It is restored from commit `54a9c4e`, the last version with content, and the root symlink `/var/www/html/Road-trip/CLAUDE.md -> web/CLAUDE.md` is recreated as the rules describe. Git sees `web/CLAUDE.md` as a type change (link to file).
+  - **Built:** see "As built" in `docs/architecture/ACCOUNT_DELETION_AND_EXPORT.md`.
+    - **Request:** password plus confirmation, and a choice for every public contribution (none pre-selected).
+    - **Cooling-off (30 days):** the rider can sign in, read, export, cancel and offer handovers; taking part is blocked. Signing in never cancels.
+    - **Cancel:** an explicit cancel with the password.
+    - **Daily run (`mrn:accounts:process-deletions`):**
+      - one transaction per request, retried after a failure;
+      - choices applied, and a public contribution without a choice is deleted;
+      - events with no accepted handover are cancelled with notice and kept without an organizer; group trips with none are deleted with notice;
+      - confirmations given are removed and `last_confirmed_on` recomputed;
+      - restricted evidence is kept for open cases;
+      - files are removed after the commit and retried.
+    - **Export:** a ZIP streamed in the response, never stored.
+    - **Staff:** the "Deletions and evidence" page.
+  - **Interpretations used (from the session brief):**
+    - Evidence is held 30 days from the actual deletion; a database check caps it, and staff can release it earlier.
+    - Event recipients are approved organizers who are not suspended, deactivated or leaving.
+    - Trip recipients are any member, viewers included.
+    - Transfers apply when accepted.
+  - **Open, for the owner:**
+    - **O8 (new):** append-only `audit_logs` entries keep edited contribution text after a deletion.
+    - The retention period of deletion request rows.
+    - Whether a `community_corroborated` report should lose that status when removed confirmations drop it below the threshold (unchanged today).
+    - The 3-day reminder email and a signed cancel link (not built).
+  - **Database:** dev and E2E migrated (`2026_11_22_100024`). A raw `delete from users` for a rider with contributions, or with an event that is not cancelled, now fails by design. The E2E cleanup deletes that content first.
+  - **Progress:** 178/261 = 68.2% (was 67.8%), coverage 82.3% (was 81.9%). Only G19 changed (not built → complete, tested). H11 stays Partial (O8, retention).
+- **Session 24, upload safety switch (code, tested):**
+  - **Policy:** `app/Support/UploadPolicy.php`. One check for every new file. In order: `UPLOADS_ENABLED` env, staff setting `storage.uploads_enabled`, the chosen disk is configured, and the `local` disk is used only in `local`/`testing` (O6, no override). There is no fallback disk.
+  - **One write path:** `Images::store()` (policy → re-encode/EXIF strip → write) is used by rider contribution photos and the staff media library. A failed write gives a 422 and no row. A failed row deletes the file (`Images::discard`).
+  - **Alert:** `Log::critical` with only reason, disk, driver and environment, at most once an hour per reason. Deliberate pauses do not alert.
+  - **Visible state:** `/site` `uploads {enabled, message}`, `/health` `uploads: enabled|paused`, staff `GET admin/settings/storage/upload-status` (`settings.storage.manage`). The public contribute page and the staff media library replace the picker with the message. Staff Settings → Storage shows why, plus the toggle and message.
+  - **Existing images** are served in every state. No media migrated.
+  - **Safe production config:** `APP_ENV=production`, `UPLOADS_ENABLED=false`, `FILESYSTEM_DISK=local` (in `.env.production.example`). Even with `UPLOADS_ENABLED=true`, production refuses the local disk.
+  - **No persistent storage provider is configured or verified.** `storage.driver` still accepts only `local` (D1/O6 open).
+  - Progress unchanged at 177/261 = 67.8% (coverage 81.9%). No audited requirement row was re-assessed.
+- **Checks (session 24, all exit 0):** Laravel 169 passed (3521 assertions; `UploadPolicyTest` 7 tests, 105 assertions); `composer audit` clean; public type-check, lint, unit (30), build, `pnpm audit --prod`; staff type-check, lint, unit (13), build, `pnpm audit --prod`; public E2E 155 passed, 10 skipped (Chromium, Firefox, mobile); staff E2E 53 passed, 1 skipped (Chromium, Firefox). WebKit still cannot launch locally (missing system libraries).
+- **Session 24 (owner decisions, documentation only):**
+  - **Record:** `docs/product/OWNER_DECISIONS_2026-11-22.md` (approved decisions, approval boundaries, open items O1–O7).
+  - **Updated to match:** `DECISION_Q9_CONTRIBUTIONS_ON_DELETION.md` (decided), `ACCOUNT_DELETION_AND_EXPORT.md` (rewritten: per-contribution choice, 30-day cooling-off with explicit cancel, event and trip transfers with acceptance, `moderation_evidence` held at most 30 days, two cascade-to-set-null changes), `STAFF_MFA_PLAN.md` (required, 14-day grace, no disable, env switch), `CONTACT_RETENTION_PLAN.md` (approved periods, open messages never purged, legal hold deferred, purge switch off by default), `INFRASTRUCTURE_OPTIONS.md` (P1 candidate, verification list, no budget).
+  - **Interpretations to confirm with the owner:** the moderation hold runs at most 30 days *after* the deletion (the deletion itself is never delayed past day 30); signing in does not cancel a deletion; transfer eligibility (O2) as proposed in the design §2.3.
+  - **Found:** `web/CLAUDE.md` is a symlink to itself (`web/CLAUDE.md -> web/CLAUDE.md`), so the project rules file cannot be read. Restore it.
+  - No application code changed; no tests run. Progress unchanged at 177/261.
+- **Session 23 (infrastructure and privacy readiness, planning only):**
+  - **Infrastructure:** `docs/architecture/INFRASTRUCTURE_OPTIONS.md` compares frontends, API, Postgres, storage, email, monitoring and jobs, with sourced prices (third-party summaries, 2026-11-22; verify on official pages) and three costed profiles.
+    - **Proposed (owner decides):** P1, about $28–40/month: Cloudflare Pages, a DigitalOcean Droplet in Bangalore, DO Managed Postgres, Cloudflare R2, Amazon SES, Sentry free.
+    - **Key constraint found:** a personal Nepal dollar card is reportedly limited to about USD 500/year.
+  - **Uploads:** `docs/architecture/UPLOAD_SAFETY_DESIGN.md`.
+    - Only rider contribution photos and the staff media library write files; place images reuse the library, and tracks are parsed into the database.
+    - The design: one switch (setting plus an environment override that can only turn it off), enforcement in `Images::reencode` plus route middleware, production refusing the `local` disk (uploads auto-paused, never lost), and frontends hiding pickers. Reads and existing content are untouched.
+  - **Account deletion and export:** `docs/architecture/ACCOUNT_DELETION_AND_EXPORT.md` inventories 30 references to riders and designs the flow (re-authentication, pre-checks, cooling-off, an idempotent transaction, file cleanup after commit, retention exceptions, ZIP export).
+    - **Found:** today, deleting a rider would cascade-delete their contributions, the events they organise (with other riders' registrations) and group trips they own (for all members). Notifications would be orphaned, and photo files would stay on disk.
+  - **Q9:** `docs/product/DECISION_Q9_CONTRIBUTIONS_ON_DELETION.md` sets out options A, B, C and D plus sub-decisions Q9a–Q9d. Nothing is decided.
+  - **Staff MFA:** `docs/security/STAFF_MFA_PLAN.md`. TOTP and hashed recovery codes on the custom staff guard; no new package (google2fa and bacon are already installed through Fortify); optional, then required, with admin reset and a break-glass command. Riders unchanged.
+  - **Contact retention:** `docs/product/CONTACT_RETENTION_PLAN.md`. Placeholder periods (spam 30 days, done 12 months), holds, a daily purge with dry-run, **purge off by default**, counts-only audit. The dev database has 0 messages.
+  - **CI:** both `.github/workflows/ci.yml` files updated locally (not pushed, not run):
+    - least-privilege `permissions`, `concurrency`, and `composer validate --strict`;
+    - per-browser E2E matrix (public: chromium, firefox, mobile, webkit; staff: chromium, firefox, webkit), with WebKit non-blocking until its first green run.
+    - Pint left out because 58 files need a one-off formatting commit.
+    - Both files parse as valid YAML.
+  - **Progress unchanged at 177/261 = 67.8%** (planning and documentation only).
+- **Checks (session 23):** `composer validate --strict` exit 0. `pint --test` exit 1 (58 files, style only). Both workflow files parse as valid YAML.
+  - No application code changed. The last full suite run (session 22) stands: Laravel 162 passed, public E2E 152 passed, staff E2E 51 passed, all exit 0.
+- **Session 22 (production-readiness audit):**
+  - **Verdict: not ready for a public launch.**
+    - The code is in good shape and well tested.
+    - The blockers are owner decisions and infrastructure: hosting and production Postgres with backups (AR4, AR5), durable file storage (D1), account deletion and export (G19, H11), an email provider, and error monitoring.
+    - The product has almost no published content.
+    - Full risk register: `docs/sessions/2026-11-22-session-22-production-readiness.html`.
+  - **Accessibility:** a new dependency-free audit (`e2e/production-audit.spec.ts` in both apps) checks WCAG AA text contrast, focus visibility and obstruction, and phone tap targets.
+    - Two defects were found and fixed:
+      - Keyboard focus could land under the fixed header (WCAG 2.4.11): fixed with `scroll-padding-top` on `html`.
+      - Date fields lost their focus ring when focus moved to the built-in calendar button: fixed with `:focus-within`, in both apps.
+    - Contrast had 0 failures across 30 screens.
+  - **Security:** new `SecurityPostureTest` proves security headers (HSTS over HTTPS only), generic production error messages, and EXIF/GPS stripping from photos.
+    - CSRF was probed live: 419 without the token, 422 with it.
+    - CORS: a foreign origin gets no allowance.
+    - Cookies are `httponly` and `samesite=lax`.
+    - Found: no production switch to disable uploads; `X-Powered-By` reveals the PHP version.
+  - **WebKit:** the browser binary is present; launching needs `libevent-2.1-7t64` and `libmanette-0.2-0` (sudo, not run).
+  - **Performance (lab, not Lighthouse):** throttled phone LCP is 2.48 s on the home page and 3.74 s on a route page; CLS ≤ 0.048; initial load about 79 KB JS + 9 KB CSS gzipped.
+  - **Progress unchanged at 177/261 = 67.8%** (an audit session; fixes are defects in existing features, and no requirement changed status).
+- **Checks (session 22, every exit code captured, full logs read):**
+  - `php artisan test` exit 0, **162 passed (3409 assertions)**; `composer audit` exit 0.
+  - Public site: type-check, lint, unit (30), build all exit 0; `pnpm audit --prod` exit 0. The full `pnpm audit` exits 1 with 2 moderate dev-only advisories.
+  - Staff portal: the same: all exit 0 (13 unit); the full audit has the same 2 dev-only advisories.
+  - **Public E2E exit 0: 152 passed, 10 skipped by design, 0 failed. Staff E2E exit 0: 51 passed, 1 skipped by design.**
+  - WebKit attempt: exit 1 (missing system libraries).
+- **Session 21 (complete verification, then the homepage shows the product):**
+  - **Verification first** (before any homepage change, every exit code captured):
+    - Laravel 157 passed; `composer audit` clean.
+    - Public site: type-check, lint, unit (30), build and audit all exit 0. Staff portal: the same, all exit 0 (13 unit).
+    - Public E2E 144 passed, 3 skipped by design, 0 failed. Staff E2E 48 passed.
+    - No regressions.
+  - **Homepage:**
+    - **Hero headline:** "Plan the ride / stretch by stretch.", with a specific lead and the main button "Plan a route" going to `/journey`. Changed only because the seeded copy was untouched; staff can edit it.
+    - **New `planner` section (the main feature, enlarged):**
+      - A working start and destination picker over the published destinations; it opens Explore Along My Route with both chosen.
+      - Beside it, a real published route's plan: stretches, recorded km, distance from the start, time estimates, surface, fuel.
+      - With no route published it lists what a plan shows, never an invented example.
+    - **New `tools` section:** six tools (routes, trips, places, reports, events, preparation), each linking to the real page. The icon follows the link.
+    - Both are staff-editable (`config/home.php`, staff portal `sectionSchemas.ts`) and validated: one route at most, safe links only.
+  - **Progress unchanged at 177/261 = 67.8%** (coverage 81.9%). The homepage work is presentation; no audited requirement changed status.
+- **Checks after the homepage change** (every exit code captured, full logs read):
+  - `php artisan test` exit 0, **159 passed (3371 assertions)**; `composer audit` exit 0.
+  - Public site: type-check, lint, unit (30), build and audit all exit 0. Staff portal: the same, all exit 0 (13 unit).
+  - **Public E2E exit 0: 147 passed, 3 skipped by design, 0 failed.** **Staff E2E exit 0: 48 passed.**
 - **Session 20 (trip planning, F4 and F15):**
   - **Evidence first:** `docs/audits/TRIP_PLANNING_GAP_ASSESSMENT.md` (gap table per acceptance criterion, written before any change, with the outcome). Real gaps:
     - Stops could not be edited in the UI.
@@ -144,6 +288,43 @@ My Ride Nepal, a motorcycle travel platform for Nepal: public website + rider pl
 - Nothing committed. The owner's `composer dev` (Laravel :8010) and `vite --mode public` (:5180) were running; this session left no server of its own running. Recovery archive of the pre-Option-B layout still in `/var/www/html/Road-trip/_backups/2026-11-18-pre-option-b/` until the owner commits.
 
 ## 3. Active Files
+- Session 27: `docs/audits/COMPLETE_PRODUCT_REQUIREMENTS_AUDIT.md` (H11 row); the report. Review probes in the session scratchpad (`review/*.php`; read-only, or a single rolled-back transaction as `mrn_app`).
+- Session 26:
+  - Migration `2026_11_22_100025_add_audit_redaction.php`.
+  - `app/Actions/Accounts/{ProcessAccountDeletion,ScheduleAccountDeletion}.php`, `routes/console.php`, `scripts/setup-local-db.sh`.
+  - `tests/Feature/AccountDeletionTest.php` (18 tests).
+  - Docs: `docs/product/OWNER_DECISIONS_2026-11-22_ADDENDUM.md` (new), `OWNER_DECISIONS_2026-11-22.md`, `ACCOUNT_DELETION_AND_EXPORT.md`, `COMPLETE_PRODUCT_REQUIREMENTS_AUDIT.md` (H11, G19).
+- Session 25:
+  - Laravel:
+    - migration `2026_11_22_100024_add_account_deletion.php`;
+    - `app/Actions/Accounts/*`, `app/Support/PendingFiles.php`;
+    - models `AccountDeletionRequest`, `OwnershipTransfer`, `ModerationEvidence` (plus `User`, `Contribution` casts);
+    - controllers `V1/{AccountDeletionController,OwnershipTransferController}.php`, `Admin/PrivacyController.php`;
+    - notifications `AccountDeletionMail`, `OwnershipOffer`, `TripClosed`;
+    - edited: `EnsureNotSuspended`, `PublicUserResource`, `UserResource`, `ContributionResource`, `ProfileController`, `TripController`, `EventRegistrations`, `AppServiceProvider` (limiters);
+    - `routes/{api/rider,api/staff,console}.php`, `config/permissions.php`;
+    - tests `AccountDeletionTest` (new), `RouteAuthorizationTest` (new routes, `index` placeholder).
+  - Public site: `profiles/components/{AccountDeletion,OwnershipOffers}.vue` (new), `AccountPage.vue`, `MyActivity.vue`, `services/account.ts`, `types/api.ts`, `e2e/account-deletion.spec.ts` (new), `e2e/support/local.ts`.
+  - Staff portal: `features/privacy/*` (new), `app/navigation.ts`, `app/router/index.ts`, `e2e/privacy.spec.ts` (new), `e2e/support/local.ts`, `e2e/settings.spec.ts`.
+  - Docs: `ACCOUNT_DELETION_AND_EXPORT.md` (as built), `API_DOCUMENTATION.md`, `DATABASE_DESIGN.md`, `COMPLETE_PRODUCT_REQUIREMENTS_AUDIT.md` (G19, H11), `REQUIREMENTS_GAP_ANALYSIS.md`; `CLAUDE.md` restored.
+- Session 24, upload safety:
+  - Laravel: `app/Support/{UploadPolicy,Images}.php`, `app/Actions/Contributions/StoreContributionPhoto.php`, `Api/V1/Admin/{MediaController,SettingsController}.php`, `Api/V1/{SiteController,HealthController}.php`, `routes/api.php`, `config/{mrn,settings,filesystems}.php`, `.env.example`, `.env.production.example`, `tests/Feature/UploadPolicyTest.php` (new).
+  - Public site: `lib/site.ts`, `ContributePage.vue`, `playwright.config.ts` (`LOCAL_DISK_ROOT=app/e2e`), `e2e/uploads.spec.ts` (new).
+  - Staff portal: `media/services/media.ts`, `MediaPage.vue`, `settings/services/settings.ts`, `StorageSettingsPage.vue`, `playwright.config.ts`, `e2e/uploads.spec.ts` (new).
+  - Docs: `UPLOAD_SAFETY_DESIGN.md` (rewritten as implemented), `DEPLOYMENT_READINESS.md`, `API_DOCUMENTATION.md`.
+- Session 23:
+  - New docs: `docs/architecture/{INFRASTRUCTURE_OPTIONS,UPLOAD_SAFETY_DESIGN,ACCOUNT_DELETION_AND_EXPORT}.md`, `docs/product/{DECISION_Q9_CONTRIBUTIONS_ON_DELETION,CONTACT_RETENTION_PLAN}.md`, `docs/security/STAFF_MFA_PLAN.md`.
+  - CI: `web/.github/workflows/ci.yml`, `admin/.github/workflows/ci.yml`.
+- Session 22:
+  - Public site: `assets/styles/main.css` (scroll padding, date focus), `e2e/production-audit.spec.ts` (new).
+  - Staff portal: `assets/styles/main.css` (date focus), `e2e/production-audit.spec.ts` (new).
+  - Laravel: `tests/Feature/SecurityPostureTest.php` (new).
+  - Docs: `PROJECT_AUDIT_CHECKLIST.md` rows A, E, F, G.
+- Session 21:
+  - Migration `2026_11_22_100023_add_home_planner_and_tools.php`; `config/home.php`; `app/Support/HomeContent.php`.
+  - Tests `HomeProductTest` (new) and `CmsTest` (seeded order and headline).
+  - Public site: `home/sections/{PlannerSection,ToolsSection}.vue` (new), `home/pages/HomePage.vue`, `home/types.ts`, `e2e/home.spec.ts`.
+  - Staff portal: `cms/home/sectionSchemas.ts`.
 - Session 20:
   - Migration `2026_11_21_100022_add_trip_expense_status.php`.
   - `app/Models/{TripExpense,TripStop}.php`, `TripPartController.php`, `TripResource.php`.
@@ -176,6 +357,39 @@ My Ride Nepal, a motorcycle travel platform for Nepal: public website + rider pl
 - Stage 2 frontend: `admin/src/apps/admin/{app/navigation.ts,app/router/index.ts,app/layouts/AdminLayout.vue,features/users/pages/{PeoplePage,RolesPage,AcceptInvitationPage}.vue,features/authentication/staffAccess.ts,types/api.ts}`, `admin/e2e/admin/roles.spec.ts`, `admin/playwright.config.ts` (`E2E_API_PORT`, `ADMIN_URL`).
 
 ## 4. Changes Made
+- Session 27: documentation only (H11 status, handoff, report).
+  - `scripts/setup-local-db.sh` was run twice on the local databases to verify it; nothing changed.
+  - Probes wrote nothing that persisted (rolled back).
+  - No code, schema, data or dependency change; no commit or push.
+- Session 26c (texture evaluation, UI only): all 22 directions of the owner's texture brief evaluated in `docs/design/DESIGN_SYSTEM.md` ("Texture"). One chosen: contour lines, on night surfaces only (home freshness band, footer, Explore "no photo" plate).
+  - Files: `frontend/src/assets/styles/main.css` (`.texture-contours`), `frontend/public/images/textures/contours.svg` (generated, about 16 KB gzipped), `scripts/contours-svg.mjs`, `FreshnessSection.vue`, `SiteFooter.vue`, `ExplorePage.vue`.
+  - Checks: public type-check, lint, unit (30), build exit 0. E2E `production-audit`, `home`, `quality` (Chromium, Firefox, mobile): 55 passed, 10 skipped, 1 failed. The failure is Firefox "keyboard focus…", a `networkidle` timeout; it fails the same way with the texture disabled, so it is not caused by this change. Another Claude session was editing `DestinationPage.vue` at the time. Not investigated further.
+  - Report `docs/sessions/2026-11-22-session-26c-texture.html`.
+- Session 26 polish (UI only, after owner feedback): rider `AccountDeletion.vue` and `OwnershipOffers.vue`, staff `privacy/pages/PrivacyPage.vue`.
+  - Busy labels on offer, withdraw, accept, decline and evidence view; `feedback-in` on status and error messages; long titles wrap (`text-balance wrap-anywhere`); choice cards inside the form use the 2px radius; tabular counts; check icon on the offer result.
+  - Unchanged on purpose: no accent colour (marigold fails contrast on paper), no new badges or embellishments; the page already had one emphasised action per state.
+  - Checks: public and staff type-check, lint, unit (30 and 13), build exit 0; E2E `account-deletion` 4 passed and `privacy` 2 passed (Chromium, Firefox), exit 0. Report `docs/sessions/2026-11-22-session-26b-deletion-ui-polish.html`.
+- Session 26: as in §2.
+  - Schema: one migration (a function, and `system` added to the audit actor check). Dev and E2E were migrated, and the audit revoke was restored there.
+  - No dependency, remote service, deployment or push; no production data touched.
+  - Report: `docs/sessions/2026-11-22-session-26-owner-addendum.html`.
+- Session 25: as in §2.
+  - **Schema:** one migration, additive except two foreign keys that change from cascade to set null, with check constraints. Two permissions, administrators only.
+  - **Unchanged:** no dependency added; no remote service, deployment or push; no real data deleted. Deletions ran only in `myridenepal_test` and on E2E test accounts in `myridenepal_e2e`.
+  - **Business rules (documented):** writes are blocked during the cooling-off; anonymised content shows as "Former rider"; organizer-less cancelled events.
+  - Report: `docs/sessions/2026-11-22-session-25-account-deletion.html`.
+- Session 24, upload safety: as in §2. Two new staff settings (`storage.uploads_enabled`, `storage.uploads_paused_message`; defaults keep uploads on in development); one new env variable (`UPLOADS_ENABLED`, default true) and `LOCAL_DISK_ROOT` (default `app/private`, E2E uses `app/e2e`). No migration, no dependency, no permission added, no remote service, no media migrated. **Business-rule change (documented):** the local disk is refused outside `local` and `testing`. Report `docs/sessions/2026-11-22-session-24-upload-safety.html`.
+- Session 23: documents and CI workflow files only. No application code, migration, dependency, data, remote service, purchase or push. Report `docs/sessions/2026-11-22-session-23-infrastructure-privacy.html`.
+- Session 22: audit plus two accessibility fixes (CSS only) and new tests. No migration, no dependency, no data change, no remote service. Report `docs/sessions/2026-11-22-session-22-production-readiness.html`.
+- Session 21: as in §2. One content migration (no schema columns); no dependency; no permission change.
+  - Proposed copy (hero, planner, tools) describes features that exist; staff can change all of it.
+  - Report `docs/sessions/2026-11-22-session-21-homepage-product.html`.
+- Session 20 polish (2026-11-22, after owner feedback):
+  - Trip and route-to-trip screens: one emphasised action at a time on "Add to a trip"; "Adding…" states on add buttons; status and error messages settle in (`.feedback-in`, removed under reduced motion).
+  - Long titles wrap (`text-balance wrap-anywhere`); tabular numbers on totals, progress and days.
+  - The add-stop form sits under the stop list, with the map and day view after it; icon buttons are consistently 36px; checkpoint rows are aligned; the visible "stretch" word is now for screen readers only.
+  - Unchanged on purpose: no new accent colour (the design system allows crimson only on paper; marigold fails contrast there); no filter badges, italics or mono text existed. Radii stay 2–4px, so inner corners never exceed outer ones.
+  - Checks: public type-check, lint, unit (30), build exit 0; E2E trip-planning, trip-route-parts, trip-places, features, route-planning (Chromium, Firefox, mobile) 27 passed, exit 0.
 - Session 20: as in §2. One additive migration; no dependency; no permission change; no real data.
   - Documented rule changes: expenses can be planned without an amount, and spent ones need one; existing expenses became planned.
   - Report `docs/sessions/2026-11-21-session-20-trip-planning.html`.
@@ -198,6 +412,49 @@ My Ride Nepal, a motorcycle travel platform for Nepal: public website + rider pl
 - Session 5: Vercel container preparation. Session 4: Laravel 12 API for all areas.
 
 ## 5. List of Failed Attempts
+- Session 27:
+  - **Another session was active:** it ran public E2E and edited frontend styling (sessions 26b and 26c) during the review. The frontend and E2E runs waited until it had been quiet for 5 minutes.
+  - **Full public E2E:** exit 1 (158 passed, 3 failed, 10 skipped). The rerun of the failing specs gave exit 1 (5 passed, 1 failed, 4 skipped).
+    - The remaining failure is the Firefox keyboard-focus audit. It waits for network idle on a route page that loads external OpenStreetMap tiles; it passed earlier today and is not caused by session 26.
+    - The Chromium LCP (4468 ms > 4000) and upload sign-in failures passed on rerun.
+- Session 26 (fixed):
+  - Three new test mistakes: an unedited field was expected in the audit diff; the D-10 timeline mixed the ages of the cancelled and done records; counts compared in key order. The code was right.
+  - Verification showed the app role could change audit rows in dev and E2E (the setup-script cause is in §2).
+- Session 25 (all fixed):
+  - **psql and information_schema:**
+    - Reading `.env` for psql was refused by the permission system, so queries go through `php artisan tinker`.
+    - `information_schema.constraint_column_usage` hides foreign keys from the app role, so `pg_constraint` is used.
+  - **The route authorization test:** it put a UUID in the numeric `{index}` route parameter (404 before the guard); it now uses a numeric placeholder.
+  - **"Former rider":** `whenLoaded('author')` skips the closure when the author is null, so the placeholder never appeared. It now uses `when(relationLoaded(...))`.
+  - **File-removal retries:** one command run counted three retries (flushed three times); files are now flushed once per run.
+  - **Feature tests:**
+    - Travelling 30 days expired the test sessions (401); the helper now flushes the session after the run.
+    - A deliberate constraint violation aborted the test transaction; it now runs in a savepoint.
+  - A cooling-off test compared timestamps a second apart when the clock ticked; the class now freezes time to the second (3 reruns green).
+  - **E2E:**
+    - A text match anchored with `^` missed text after an icon.
+    - Signing in again raced the unfinished sign-out (Chromium).
+    - "Delete your account" also matched the auth spec's "Your account" heading; it is renamed "Account deletion".
+    - The staff evidence row is now targeted by `data-evidence-id`.
+- Session 24, upload safety (all fixed):
+  - Allowing `s3` as a `storage.driver` value broke the D1 rule test; reverted to `local` only, and the durable-disk test writes the setting directly.
+  - Environment-switching tests got 419, because CSRF applies outside `testing`; those tests skip the CSRF middleware.
+  - A planned `UPLOADS_LOCAL_DISK_IS_PERSISTENT` override was dropped because O6 says the local disk is development only.
+  - The public E2E photo fetch with `page.request` got 403 (no Origin, so no session); it now fetches from inside the page.
+- Session 23:
+  - Two names in my first drafts didn't exist in the code (`people.manage`; a `user` morph alias for notifications). Both were corrected after checking `config/permissions.php` and the morph map.
+  - Pricing sources disagree in places (Flare, Neon base, Postmark at volume); the docs show the ranges and say to verify.
+  - GitHub Actions cannot be run locally, so the workflows are syntax-checked only.
+- Session 22 (all fixed or explained):
+  - **First contrast run:** it timed out, and it misread Tailwind 4 `oklab()` colours as near-black, producing false failures on the header. Colours are now converted by the browser's canvas, and see-through fixed layers are not judged.
+  - **First tap-target run:** it ignored WCAG 2.5.8's spacing exception (text links 20 px tall with space around them pass).
+  - **The `:focus` fix for date fields didn't work:** focus on the calendar button leaves the field matching only `:focus-within`, found by tabbing segment by segment.
+  - **WebKit cannot launch here:** missing system libraries.
+- Session 21 (fixed):
+  - The CMS ordering test assumed exactly four sections; it is now scoped to the original four.
+  - jsonb reorders keys, so one assertion now compares values, not key order.
+  - E2E label clash: "Start" also matched "Swap start and destination".
+  - The first screenshots were taken mid reveal-animation, so sections looked blank. The test now waits for the reveal; items below the fold correctly stay hidden until scrolled to.
 - Session 20 (all fixed):
   - My test assumed a deleted destination nulls the stop link. Destinations are soft-deleted, so the link stays and the stop is flagged as unavailable, which is correct; the test was fixed.
   - An E2E label clash ("Stop" also matched "Overnight stop").
@@ -226,6 +483,61 @@ My Ride Nepal, a motorcycle travel platform for Nepal: public website + rider pl
 - Earlier: `.env.local` trap, `whereILike`, Fortify reset-link binding, route-name prefix, CSP for the SPA page, pnpm 12 audit config, Kong, rate-limiter bucket.
 
 ## 6. Next Steps
+0. **After session 27: one focused implementation task (not started):**
+   - **Must:**
+     - R8: keep the moderator's `last_confirmed_on`. Recompute only when the leaving rider's confirmation set it, taking the later of the remaining confirmations and the latest `contribution.confirmed`.
+   - **Should:**
+     - R2: the function refuses entries whose subject still exists with an author; run the redaction after the delete and anonymise step.
+     - R1: a trigger rejecting `system` or `audit.redacted` inserts unless they come from the function.
+     - R5: report a sanitised exception.
+   - **Could:** R3, R4, R6, R7.
+   - **Owner:**
+     - HMAC for the account id (with a restore runbook, and a decision on the raw id in `audit_logs.actor_id`).
+     - Whether the daily run needs an env switch.
+     - Confirm R9.
+   - Make the focus audit test independent of external map tiles.
+0. **After session 26:**
+   - The addendum is done.
+   - Next in the decision record: contact retention (step 5; purge off by default), then staff MFA (step 6).
+   - Before production: check `has_table_privilege('mrn_app', 'audit_logs', 'update')` is false; set the scheduler cron.
+   - Optional: the 3-day reminder email and a signed cancel link.
+0. **After session 25:**
+   1. **Owner:** decide O8 (audit entries that hold contribution text: keep, or redact by a privileged job), the request-row retention period, and whether corroboration should drop below the threshold.
+   2. Optional, no decision needed: the 3-day reminder email and a signed cancel link.
+   3. Continue the decision-record order: contact retention (step 5; purge off by default), then staff MFA (step 6). Steps 3 and 4 (transfers, evidence) were built with step 2.
+   4. At hosting time: cron `schedule:run` (the deletion command runs daily at 02:30), a production mail provider (O5), durable storage (O6).
+0. **After the session 24 upload switch:** the uploads item from the session 23 roadmap is done. Continue with the decision-record order (account deletion first). When a storage provider is approved: approved package, disk config, allow the value in `storage.driver`, choose it, run "Test storage", then set `UPLOADS_ENABLED=true` and verify before claiming persistent storage. Fix `web/CLAUDE.md` (self-symlink).
+0. **After session 24 (order from the decision record §3):**
+   1. Account deletion, 30-day cooling-off, contribution choices and export (design §2.1, §2.2, §5).
+   2. Event and group-trip transfers (owner confirms O2 first).
+   3. Moderation evidence and its purge.
+   4. Contact retention (spam and closed).
+   5. Mandatory staff MFA with the 14-day grace.
+   6. Full regression, authorisation, privacy, retention and browser tests.
+   7. P1 verification list, then a final cost proposal for owner approval (no purchase before).
+   8. Pre-production readiness once O1–O7 are resolved. Fix `web/CLAUDE.md` before anything else.
+0. **After session 23 (ordered roadmap):**
+   1. **Owner decisions:** Q9 (and Q9a–d), D7 periods, AR3 approval, hosting profile (P1, P2 or P3, or other), email provider, Sentry yes or no, the S3 package (`league/flysystem-aws-s3-v3`) for D1, and the Pint formatting commit. Confirm the dollar-card limit with the bank.
+   2. **Build, no further decision needed:** the uploads kill switch and production `local`-disk guard (about 1 session).
+   3. **Build after Q9:** account deletion and export (about 2 sessions).
+   4. **Build after AR3:** staff MFA (about 1.5 sessions).
+   5. **Build after D7:** contact retention (about 0.5 session).
+   6. **Owner:** commit and push both repos. The first CI run shows whether WebKit passes; make WebKit blocking once green.
+   7. **After the hosting choice (pre-production, with approval):** provision, set the S3 disk, scheduler and `expose_php=Off`, run a restore drill, connect email and Sentry, staging smoke test.
+   8. Then the remaining feature work (F8, F10, F6) and real content entry.
+0. **After session 22, in order:**
+   1. **Owner decisions that block launch:** AR4 hosting, AR5 production Postgres with automated backups and a tested restore, D1 storage (until then, add and use an "uploads off" switch), email provider, error monitoring, AR3 staff MFA.
+   2. **Build, no decision needed:**
+      - G19 and H11 account deletion and data export (needs Q9: what happens to a deleted rider's contributions).
+      - A production uploads kill switch.
+      - `expose_php=Off` in the production image.
+   3. **Approve and add:** `@axe-core/playwright` and Lighthouse CI; install the WebKit system libraries (or rely on CI's `--with-deps`).
+   4. **Content:** staff to enter real routes with stretches, services, places and events. A clearly labelled dev dataset (fictional "[DEV]" names, `is_dev_seed`) needs owner approval.
+   5. **Performance:** look at route-page LCP on phones (Leaflet and API waterfall) and the home menu-tap latency.
+0. **After session 21:**
+   - Real published routes and destinations make the homepage planner preview meaningful. Until staff publish a route with stretches, it shows what a plan contains.
+   - Owner: review the proposed homepage copy in the staff portal.
+   - Then, no decision needed: F8 saved guides, G19 and H11 account deletion and export, F10 private notes, F6 budget target.
 0. **After session 20:**
    - Owner Q6 (difficulty) and seasonal data are still open.
    - No decision needed: saving guides (F8); account deletion and export (G19, H11); per-member private notes (F10); a budget target and per-person split (F6).

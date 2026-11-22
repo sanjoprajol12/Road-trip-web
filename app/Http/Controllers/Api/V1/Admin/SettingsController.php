@@ -32,6 +32,12 @@ class SettingsController extends Controller
         return response()->json(['data' => Settings::group($group)]);
     }
 
+    /** Staff with the storage permission see why uploads are on or off (reason code, disk, driver, environment). */
+    public function uploadStatus(): JsonResponse
+    {
+        return response()->json(['data' => \App\Support\UploadPolicy::status() + ['environment' => app()->environment()]]);
+    }
+
     /** Writes, reads back and deletes a small probe file on the configured disk, and reports usage. */
     public function testStorage(): JsonResponse
     {

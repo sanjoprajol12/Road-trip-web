@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 27: Independent review | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:60rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; }
+  h2 { font-size:1.3rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.4rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  code { font-size:.88em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; word-break:break-word; }
+  .warn { color:var(--warn); font-weight:700; }
+  .ok { color:var(--ok); font-weight:700; }
+  ul, ol { padding-left:1.3rem; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; margin:.6rem 0 1rem; }
+  th, td { text-align:left; vertical-align:top; padding:.4rem .6rem; border-bottom:1px solid var(--line); }
+  th { background:var(--surface); }
+  svg text { font: 13px system-ui, sans-serif; fill: var(--ink); }
+  svg .muted { fill: var(--muted); }
+  .crit { color:#a51d2d; font-weight:700; } .high { color:#8a5a00; font-weight:700; }
+</style>
+</head>
+<body>
+<main>
+<p class="meta">My Ride Nepal · Independent review</p>
+<h1>Session 27: independent review of session 26 (O8, D-10, D-11)</h1>
+<p class="meta">2026-11-22 22:40 +0545 · Claude Code (Opus 5.5) · Verification and security review · No code, schema, data or dependency change · Nothing committed or pushed</p>
+
+<h2>Verdict</h2>
+<ul>
+<li><strong>Session 26 is accepted with conditions.</strong></li>
+<li><strong>O8 and D-10 are verified.</strong> Their protections hold when tested as the real application role.</li>
+<li><strong>D-11 is accepted except for one defect (R8).</strong> The deletion run erases a moderator's "still accurate" date, which breaks the requirement to keep independent staff decisions.</li>
+<li><strong>Before production:</strong> fix R8 and harden R1, R2 and R5. A separate focused implementation task is requested; nothing was changed in this review.</li>
+<li><strong>Progress corrected:</strong> 178 / 261 = 68.2%, coverage 82.3%. H11 is back to Partial, from 179 / 68.6%.</li>
+</ul>
+
+<h2>Preparation</h2>
+<ul>
+<li>Read the root and <code>web/CLAUDE.md</code>, the handoff, the decision record and addendum, and the session 26 report. Checked <code>git status</code> in both repositories (all earlier uncommitted work is kept).</li>
+<li><strong>Another Claude session was active</strong> during the review. It ran public E2E and edited frontend styling (its reports are 26b and 26c). None of its files are under review. The frontend and E2E suites were run only after the project had been quiet for 5 minutes, and that session's changes are kept.</li>
+<li><strong>Method:</strong> the probes are scripts that boot the Laravel app and use its own connection (<code>mrn_app</code>). They are either read-only, or run inside one transaction that is rolled back; each one confirms afterwards that nothing was left. The existing E2E redaction check record was not touched.</li>
+</ul>
+
+<h2>Database privilege evidence (as <code>mrn_app</code>)</h2>
+<div class="scroll"><table>
+<tr><th>Database</th><th>audit_logs grants</th><th>update / delete / truncate</th><th>execute redaction</th><th>create in public</th><th>elevated role</th><th>redaction records</th></tr>
+<tr><td><code>myridenepal</code></td><td>INSERT, SELECT</td><td>no / no / no</td><td>yes</td><td>no</td><td>no</td><td>0</td></tr>
+<tr><td><code>myridenepal_test</code></td><td>INSERT, SELECT</td><td>no / no / no</td><td>yes</td><td>no</td><td>no</td><td>0</td></tr>
+<tr><td><code>myridenepal_e2e</code></td><td>INSERT, SELECT</td><td>no / no / no</td><td>yes</td><td>no</td><td>no</td><td>1 (the session 26 check, kept)</td></tr>
+</table></div>
+<ul>
+<li><strong>The function:</strong> <code>security definer</code>, owned by <code>mrn_owner</code>, with <code>search_path=public, pg_temp</code>. Its access list is <code>{mrn_owner, mrn_app}</code>, so public is revoked. There are no triggers on <code>audit_logs</code>.</li>
+<li><strong>The setup script:</strong> <code>scripts/setup-local-db.sh</code> was run twice. It completed both times, and afterwards the grants in all three databases were unchanged (INSERT and SELECT only). Running it again does not grant UPDATE or DELETE.</li>
+<li><strong>Production:</strong> checking this privilege stays a pre-launch requirement. No production database exists yet.</li>
+</ul>
+
+<h2>O8: audit redaction</h2>
+<div class="scroll"><table>
+<tr><th>Check (as <code>mrn_app</code>)</th><th>Result</th></tr>
+<tr><td>Direct UPDATE, DELETE, TRUNCATE</td><td class="ok">refused: permission denied</td></tr>
+<tr><td>Replace the function; create a shadowing table in public; create a temp table</td><td class="ok">refused: no rights on the schema or for temporary tables</td></tr>
+<tr><td>Reason <code>tidy_up</code>; reason null; unknown entry</td><td class="ok">refused by the function</td></tr>
+<tr><td>Entry types <code>account.deleted</code>, <code>contribution.published</code>, <code>audit.redacted</code></td><td class="ok">refused (a redaction record cannot itself be redacted)</td></tr>
+<tr><td>Approved entry with title, body, details and non-text fields</td><td class="ok">6 text fields became <code>[redacted]</code>; <code>observed_on</code> and <code>route_id</code> kept; id, actor, action, subject, IP and time unchanged; no key removed</td></tr>
+<tr><td>Second call on the same entry</td><td class="ok">0 fields; still one redaction record</td></tr>
+<tr><td>Redaction record</td><td class="ok">actor <code>system</code>, no actor id or IP; it names the entry, its action, the fields and the reason; no original text appears anywhere in <code>audit_logs</code></td></tr>
+<tr><td>Rollback of migration <code>100025</code></td><td class="ok">refused (by reading the code) once any <code>system</code> row exists; it never touches the revoke, which lives in <code>100008</code></td></tr>
+<tr><td>App role inserts its own <code>audit.redacted</code> row with actor <code>system</code></td><td class="crit">allowed (R1)</td></tr>
+<tr><td>Redact a live contribution's history (the author still exists)</td><td class="crit">allowed (R2): the function cannot tell</td></tr>
+</table></div>
+<p><strong>Integrity:</strong> there is no hash chain or signature on the audit log, so redaction breaks no verification. A deep rollback that reaches migration <code>100008</code> would re-grant update and delete. That was already the case before session 26, needs the owner role, and is deliberate.</p>
+
+<h2>D-10: one-year retention</h2>
+<p>The real daily command was run as <code>mrn_app</code> in a rolled-back transaction, with the clock fixed at 2027-11-22 02:30:</p>
+<div class="scroll"><table>
+<tr><th>Record</th><th>Result</th></tr>
+<tr><td>done 1 year + 1 minute ago; done exactly 1 year ago; cancelled 2 years ago</td><td class="ok">purged (3)</td></tr>
+<tr><td>done 1 year − 1 minute ago; cancelled 364 days ago</td><td class="ok">kept</td></tr>
+<tr><td>scheduled, requested 3 years ago, not due</td><td class="ok">kept</td></tr>
+<tr><td>Second run</td><td class="ok">0 purged; no second audit entry</td></tr>
+<tr><td>Audit entry</td><td><code>account.deletion_records_purged</code> {records: 3, older_than: 1 year}; labelled actor type <code>user</code> with no actor (R7)</td></tr>
+</table></div>
+<ul>
+<li><strong>Feature tests:</strong> choice categories without contribution ids, handover counts, and <code>last_error</code> holding only the exception class are all covered and pass.</li>
+<li><strong>Not activated:</strong> no host and no cron, and the dev scripts don't run the scheduler. The daily schedule is registered without an environment switch, so a production cron would start both the deletions and the purge at once (owner decision).</li>
+</ul>
+<h3>Replacing the raw account id with a keyed HMAC</h3>
+<ul>
+<li><strong>Feasible:</strong>
+  <ul>
+  <li>store <code>HMAC-SHA256(dedicated key, user_id)</code> when a request finishes, and keep the raw id only while it is scheduled;</li>
+  <li>after a backup restore, compute the HMAC of each restored user id and match it against records less than a year old.</li>
+  </ul></li>
+<li><strong>Safe implementation needs:</strong>
+  <ul>
+  <li>a key separate from <code>APP_KEY</code> (rotating that would break matching), kept outside the database and its backups;</li>
+  <li>old keys kept, because re-keying is impossible once the raw ids are gone;</li>
+  <li>a migration that adds the column, backfills finished rows, makes <code>user_id</code> nullable and clears it;</li>
+  <li>a tested restore runbook.</li>
+  </ul></li>
+<li><strong>Value is limited today:</strong>
+  <ul>
+  <li><code>audit_logs.actor_id</code> keeps the same raw id indefinitely;</li>
+  <li>D-10 keeps choices as categories only, so re-applying a deletion after a restore cannot reproduce the rider's choices. The code would delete every public contribution, including ones kept anonymously: privacy-safe, but content is lost;</li>
+  <li>no restore tool or runbook exists yet.</li>
+  </ul></li>
+<li><strong>Not changed.</strong> This needs an owner decision.</li>
+</ul>
+
+<h2>D-11: corroboration</h2>
+<ul>
+<li><strong>Verified</strong> by the code and <code>test_d11…</code>:
+  <ul>
+  <li>the departing rider's confirmations are removed, and the remaining distinct confirmers (not the author) are counted;</li>
+  <li>the current threshold is respected (exactly at the threshold keeps the status);</li>
+  <li>below it, the report goes back to published, with an audit entry, and the API shows the new status;</li>
+  <li>moderator corroborations and officially sourced reports are kept;</li>
+  <li>a finished request is skipped, so confirmations are never removed twice (test re-runs the command).</li>
+  </ul></li>
+<li><strong>R8 (defect, reproduced):</strong> when a moderator marks a report "still accurate", <code>last_confirmed_on</code> is set without a confirmation row. The run recomputes the date from rider confirmations only. In the probe, a report confirmed by staff today became <code>null</code> after the deletion of a rider who had confirmed it 10 days earlier. This breaks "preserve independent staff decisions", and has been there since session 25.</li>
+<li><strong>R9 (interpretation):</strong> the count ignores the corroboration window and other riders' current standing, as documented. The rule going forward does apply them. Owner to confirm.</li>
+</ul>
+
+<h2>Security and privacy findings</h2>
+<div class="scroll"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Suggested fix (separate task)</th></tr>
+<tr><td>R8</td><td class="crit">medium</td><td>The deletion run resets a moderator's "still accurate" date.</td><td>Lower the date only when the leaving rider's confirmation set it; use the later of the remaining confirmations and the latest <code>contribution.confirmed</code>.</td></tr>
+<tr><td>R1</td><td class="high">medium</td><td>The app role can insert forged <code>audit.redacted</code> or <code>system</code> rows.</td><td>A trigger rejecting those inserts unless <code>current_user</code> is the table owner (that is, inside the function).</td></tr>
+<tr><td>R2</td><td class="high">medium</td><td>The function cannot tell whether the entry belongs to a deleted account, so any app-role caller (a bug, or SQL injection) can redact a live contribution's history. The redaction is still recorded.</td><td>The function refuses entries whose contribution still exists with an author; run the redaction after the delete and anonymise step.</td></tr>
+<tr><td>R5</td><td class="high">medium</td><td>A failed run calls <code>report($e)</code>. The full exception, including SQL with bound values (which can hold emails or text), goes to the Laravel log, which D-10 does not cover.</td><td>Report a sanitised exception (class only), or attach no bindings.</td></tr>
+<tr><td>R3</td><td>low</td><td><code>place.suggested</code> entries (name, coordinates) are not redacted; nor are coordinates in <code>place.resubmitted</code>.</td><td>Add the entry type and coordinate fields, if the owner wants that.</td></tr>
+<tr><td>R4</td><td>low</td><td>The staff Audit log page says "Entries cannot be edited or deleted"; <code>DATABASE_DESIGN.md</code> and <code>BACKEND_ARCHITECTURE.md</code> say "append-only" without mentioning redaction; the session 25 part of the handoff still lists O8 as open.</td><td>Reword the page and the docs.</td></tr>
+<tr><td>R6</td><td>low</td><td>Handover counts include transfers accepted under an earlier, cancelled request.</td><td>Count only transfers since this request.</td></tr>
+<tr><td>R7</td><td>low</td><td>System jobs are audited as actor type <code>user</code> with no actor.</td><td>Use <code>system</code>.</td></tr>
+</table></div>
+
+<h2>Tests and results</h2>
+<div class="scroll"><table>
+<tr><th>Command</th><th>Exit</th><th>Result</th></tr>
+<tr><td><code>php artisan test</code></td><td>0</td><td class="ok">187 passed (3889 assertions)</td></tr>
+<tr><td><code>composer audit</code></td><td>0</td><td>no advisories</td></tr>
+<tr><td>public: <code>pnpm type-check</code>, <code>lint</code>, <code>test:unit</code>, <code>build</code>, <code>audit --prod</code></td><td>0 each</td><td>30 unit tests passed; no vulnerabilities</td></tr>
+<tr><td>staff: <code>pnpm type-check</code>, <code>lint</code>, <code>test:unit</code>, <code>build</code>, <code>audit --prod</code></td><td>0 each</td><td>13 unit tests passed; no vulnerabilities</td></tr>
+<tr><td>public <code>npx playwright test --project=chromium --project=firefox --project=mobile</code></td><td><span class="crit">1</span></td><td>158 passed, <strong>3 failed</strong>, 10 skipped (15.8 min): Chromium throttled LCP 4468 ms &gt; 4000; Chromium upload spec sign-in; Firefox keyboard-focus audit timed out waiting for network idle</td></tr>
+<tr><td>rerun: <code>production-audit.spec.ts uploads.spec.ts --project=chromium --project=firefox</code></td><td><span class="crit">1</span></td><td>5 passed, 1 failed, 4 skipped: only the Firefox focus audit failed again. Its route page loads external OpenStreetMap tiles before network idle. It passed earlier today and is not caused by session 26.</td></tr>
+<tr><td>staff <code>npx playwright test --project=chromium --project=firefox</code></td><td>0</td><td class="ok">55 passed, 1 skipped</td></tr>
+<tr><td>WebKit</td><td>—</td><td><span class="warn">not run</span>: system libraries are missing locally</td></tr>
+</table></div>
+<p>The account deletion and privacy browser specs passed in every run. No test servers were left running.</p>
+
+<h2>Unresolved risks</h2>
+<ul>
+<li>R8, R1, R2 and R5 are not fixed. A separate focused implementation task is requested.</li>
+<li>The production audit-log privilege is not verified (there is no production database yet).</li>
+<li>The account-id HMAC, a restore runbook, and an env switch for the daily run need owner decisions.</li>
+<li>The focus audit test depends on an external tile server, and the full public browser suite is not green in this run (3 failures above).</li>
+</ul>
+</main>
+</body>
+</html>

@@ -47,6 +47,8 @@ class AppServiceProvider extends ServiceProvider
         // Contact form: a few messages per address per hour, and a daily cap.
         RateLimiter::for('contact', fn (Request $r) => [Limit::perHour(config('mrn.limits.contact_per_hour'))->by('contact:'.$r->ip()), Limit::perDay(4 * config('mrn.limits.contact_per_hour'))->by('contact-day:'.$r->ip())]);
         RateLimiter::for('reports', fn (Request $r) => Limit::perDay(30)->by($per($r)));
+        RateLimiter::for('account-deletion', fn (Request $r) => Limit::perHour(5)->by($per($r)));
+        RateLimiter::for('account-export', fn (Request $r) => Limit::perDay(5)->by($per($r)));
         RateLimiter::for('uploads', fn (Request $r) => Limit::perHour(60)->by($per($r)));
     }
 }

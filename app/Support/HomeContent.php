@@ -35,7 +35,7 @@ final class HomeContent
                 $errors['media_id'] = ['Every image must be a public image from the media library.'];
             }
         }
-        $table = ['featured_destinations' => 'destinations', 'featured_routes' => 'routes', 'featured_experiences' => 'contributions'][$type] ?? null;
+        $table = ['featured_destinations' => 'destinations', 'featured_routes' => 'routes', 'featured_experiences' => 'contributions', 'planner' => 'routes'][$type] ?? null;
         if ($table && ($clean['ids'] ?? []) && DB::table($table)->whereIn('id', $clean['ids'])->count() !== count($clean['ids'])) {
             $errors['ids'] = ['Some featured items do not exist.'];
         }
@@ -95,6 +95,15 @@ final class HomeContent
         if ($type === 'featured_experiences') {
             $rows = self::ordered(Contribution::visible()->with(['author.verifications', 'destination', 'route']), $d['ids'], 6);
             $d['items'] = ContributionResource::collection($rows)->toArray($request);
+        }
+
+        if ($type === 'planner') {
+            // A real published route with its stretches (or none): the homepage never shows an invented example.
+            $q = RideRoute::published()->with(['startDestination', 'endDestination', 'segments.servicePoints' => fn ($s) => $s->where('status', 'published')]);
+            $route = $d['ids'] ? $q->whereKey($d['ids'][0])->first() : $q->whereHas('segments')->latest()->first();
+            $d['route'] = $route ? (new RouteResource($route))->resolve($request) : null;
+            // Places a rider can pick as start or destination (published destinations, by name).
+            $d['places'] = Destination::published()->orderBy('name')->get(['slug', 'name'])->map(fn ($x) => ['slug' => $x->slug, 'name' => $x->name])->all();
         }
 
         return $d;

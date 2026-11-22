@@ -19,6 +19,9 @@ class HealthController extends Controller
             $db = 'unavailable';
         }
 
-        return response()->json(['status' => $db === 'ok' ? 'ok' : 'degraded', 'database' => $db], $db === 'ok' ? 200 : 503);
+        // Uploads paused is not an outage (the site works); monitoring can alert on it. No reason or disk here.
+        $uploads = $db === 'ok' && \App\Support\UploadPolicy::status()['allowed'] ? 'enabled' : 'paused';
+
+        return response()->json(['status' => $db === 'ok' ? 'ok' : 'degraded', 'database' => $db, 'uploads' => $uploads], $db === 'ok' ? 200 : 503);
     }
 }

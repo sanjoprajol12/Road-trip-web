@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 24: Upload safety | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:60rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; }
+  h2 { font-size:1.3rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.4rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  code { font-size:.88em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; word-break:break-word; }
+  .warn { color:var(--warn); font-weight:700; }
+  .ok { color:var(--ok); font-weight:700; }
+  ul, ol { padding-left:1.3rem; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; margin:.6rem 0 1rem; }
+  th, td { text-align:left; vertical-align:top; padding:.4rem .6rem; border-bottom:1px solid var(--line); }
+  th { background:var(--surface); }
+  svg text { font: 13px system-ui, sans-serif; fill: var(--ink); }
+  svg .muted { fill: var(--muted); }
+  .crit { color:#a51d2d; font-weight:700; } .high { color:#8a5a00; font-weight:700; }
+</style>
+</head>
+<body>
+<main>
+<p class="meta">My Ride Nepal · Session report</p>
+<h1>Session 24: production upload safety switch</h1>
+<p class="meta">2026-11-22 · Claude Code (Opus 5.5) · Code and tests · Nothing committed, pushed, purchased, deployed or connected · No media migrated</p>
+
+<p><strong class="warn">No persistent storage provider is configured or verified.</strong> Until one is approved, configured and checked (D1 / O6), production accepts no new uploads, and nothing is lost.</p>
+
+<h2>Progress</h2>
+<ul>
+<li><strong>Verified completion: 67.8%</strong> (177 / 261), <strong>unchanged</strong>.</li>
+<li><strong>Implementation coverage: 81.9%</strong>, unchanged.</li>
+<li>This is a safety guard. No audited requirement row was re-assessed, so the figures do not move.</li>
+</ul>
+
+<h2>What was built</h2>
+<ul>
+<li><strong>One policy</strong> (<code>App\Support\UploadPolicy</code>) is checked before every new file, in this order:
+  <ol>
+  <li><code>UPLOADS_ENABLED</code> (env) is on;</li>
+  <li>the staff setting <code>storage.uploads_enabled</code> is on;</li>
+  <li>the chosen disk is configured;</li>
+  <li>the <code>local</code> disk is used only in <code>local</code> or <code>testing</code>. There is no override (O6).</li>
+  </ol>
+  If any check fails, the upload is refused with a 422 and the staff-set message. <strong>There is no fallback disk.</strong></li>
+<li><strong>One write path:</strong> <code>Images::store()</code> runs the policy, then the existing validation, re-encoding and EXIF stripping, then the write.
+  <ul>
+  <li>It serves rider photos and the staff media library.</li>
+  <li>A failed write leaves no database row.</li>
+  <li>A failed row deletes the file.</li>
+  </ul></li>
+<li><strong>Critical log</strong> when storage is unusable, with only the reason, disk, driver and environment. It is written at most once an hour per reason. A deliberate pause writes no log.</li>
+<li><strong>Visible state:</strong>
+  <ul>
+  <li><code>/site</code> and <code>/health</code> report whether uploads are paused.</li>
+  <li>The public site and the staff media library show the message in place of the picker. The report form still sends.</li>
+  <li>Staff Settings → Storage shows why uploads are paused, with a toggle and an editable message.</li>
+  <li>Existing images are served in every state.</li>
+  </ul></li>
+<li><strong>Isolation:</strong> browser tests store files under <code>storage/app/e2e</code> (<code>LOCAL_DISK_ROOT</code>), apart from development files.</li>
+</ul>
+
+<h2>Environment variables</h2>
+<div class="scroll"><table>
+<tr><th>Variable or setting</th><th>Default</th><th>Meaning</th></tr>
+<tr><td><code>UPLOADS_ENABLED</code></td><td><code>true</code></td><td><code>false</code> stops all new uploads, and no setting can override it.</td></tr>
+<tr><td><code>LOCAL_DISK_ROOT</code></td><td><code>app/private</code></td><td>Where the local disk is, inside <code>storage/</code>. E2E uses <code>app/e2e</code>.</td></tr>
+<tr><td><code>AWS_*</code></td><td>empty</td><td>For an S3-compatible disk, once a provider is approved.</td></tr>
+<tr><td>setting <code>storage.uploads_enabled</code></td><td>on</td><td>The staff pause switch.</td></tr>
+<tr><td>setting <code>storage.uploads_paused_message</code></td><td>"Photo uploads are paused for now. …"</td><td>Shown in both apps and returned with the 422.</td></tr>
+<tr><td>setting <code>storage.driver</code></td><td><code>local</code></td><td>Still the only allowed value until D1.</td></tr>
+</table></div>
+
+<h2>Safe production configuration</h2>
+<pre><code>APP_ENV=production
+UPLOADS_ENABLED=false
+FILESYSTEM_DISK=local</code></pre>
+<p>This is also in <code>.env.production.example</code>. If <code>UPLOADS_ENABLED</code> is left <code>true</code> by mistake, production still refuses the local disk, and each refusal is logged as critical.</p>
+
+<h2>Verification</h2>
+<div class="scroll"><table>
+<tr><th>Check</th><th>Exit</th><th>Result</th></tr>
+<tr><td>Laravel tests</td><td>0</td><td class="ok">169 passed (3521 assertions); <code>UploadPolicyTest</code> 7 tests, 105 assertions</td></tr>
+<tr><td><code>composer audit</code></td><td>0</td><td>no advisories</td></tr>
+<tr><td>Public site: type-check, lint, unit, build</td><td>0</td><td>30 unit tests passed</td></tr>
+<tr><td>Public site: <code>pnpm audit --prod</code></td><td>0</td><td>no advisories</td></tr>
+<tr><td>Staff portal: type-check, lint, unit, build</td><td>0</td><td>13 unit tests passed</td></tr>
+<tr><td>Staff portal: <code>pnpm audit --prod</code></td><td>0</td><td>no advisories</td></tr>
+<tr><td>Public E2E (Chromium, Firefox, mobile)</td><td>0</td><td class="ok">155 passed, 10 skipped (existing skips), including <code>uploads.spec.ts</code> 3/3</td></tr>
+<tr><td>Staff E2E (Chromium, Firefox)</td><td>0</td><td class="ok">53 passed, 1 skipped (existing skip), including <code>uploads.spec.ts</code> 2/2</td></tr>
+<tr><td>WebKit</td><td>—</td><td><span class="warn">not run</span>: system libraries are missing locally (sudo not approved)</td></tr>
+</table></div>
+<p>Screenshots were inspected for the public paused state on mobile and the staff status box on desktop. No test servers were left running on ports 8011, 4180 or 4181.</p>
+
+<h2>Business-rule change</h2>
+<p>The local disk is refused outside <code>local</code> and <code>testing</code>. Staging and preview are included, following O6: "the local disk stays in development only".</p>
+
+<h2>Not done (by instruction)</h2>
+<ul><li>No storage provider, account or connection.</li><li>No media migration.</li><li>No deployment, commit or push.</li></ul>
+
+<h2>Next</h2>
+<p>To add a provider:</p>
+<ol>
+<li>get the package approved;</li>
+<li>configure the disk;</li>
+<li>allow its value in <code>storage.driver</code>;</li>
+<li>choose it in Settings and run "Test storage";</li>
+<li>set <code>UPLOADS_ENABLED=true</code> and verify uploads.</li>
+</ol>
+<p>Only then may persistent storage be called operational. Otherwise, continue with the decision-record order, starting with account deletion.</p>
+</main>
+</body>
+</html>

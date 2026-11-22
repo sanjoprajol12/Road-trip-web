@@ -32,6 +32,7 @@ export default defineConfig({
         ADMIN_URL: 'http://127.0.0.1:4181',
         API_PER_MINUTE: '5000', // every test browser shares 127.0.0.1
         CONTACT_PER_HOUR: '1000',
+        LOCAL_DISK_ROOT: 'app/e2e', // uploads from browser tests never mix with development files
         SANCTUM_STATEFUL_DOMAINS: '127.0.0.1:4180,localhost:4180,127.0.0.1:4181,localhost:4181',
       },
       url: `${API}/api/v1/health`,

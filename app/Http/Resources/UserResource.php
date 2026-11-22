@@ -24,6 +24,7 @@ class UserResource extends JsonResource
             'suspended_until' => $this->isSuspended() ? $this->suspended_until?->toIso8601String() : null,
             // Only on the rider's own profile (UserResource is used for /users/me).
             'contribution_suspension' => \App\Models\ContributionSuspension::activeFor($this->id)?->toRider(),
+            'deletion_scheduled_for' => $this->deletion_scheduled_for?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
         ];
     }

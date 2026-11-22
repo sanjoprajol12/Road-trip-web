@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 26b: Deletion UI polish | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:60rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; text-wrap:balance; }
+  table { border-collapse:collapse; width:100%; } td, th { border-bottom:1px solid var(--line); padding:.5rem; text-align:left; vertical-align:top; }
+  .muted { color:var(--muted); } code { font-size:.9em; }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 26b: account deletion UI polish</h1>
+<p class="muted">2026-11-22. UI only: no API, schema, data, dependency or permission change. No commit or push.</p>
+
+<h2>Changed</h2>
+<ul>
+  <li><code>web/frontend/src/features/profiles/components/AccountDeletion.vue</code>: busy labels on offer and withdraw; <code>feedback-in</code> on status and error messages; rider-entered titles wrap; choice cards nested in the form use the 2px radius (outer 4px minus padding); tabular count in the "still needs a choice" message.</li>
+  <li><code>web/frontend/src/features/profiles/components/OwnershipOffers.vue</code>: separate "Accepting…" / "Declining…" states; check icon on the result, matching the other success messages; titles wrap; buttons no longer shrink.</li>
+  <li><code>admin/src/features/privacy/pages/PrivacyPage.vue</code>: "Opening…" state on evidence view; tabular counts; evidence title wraps.</li>
+</ul>
+
+<h2>Checklist items not applied, and why</h2>
+<table>
+  <tr><th>Item</th><th>Reason</th></tr>
+  <tr><td>Filter badges, italics, mono, embellishments</td><td>None present on these screens.</td></tr>
+  <tr><td>Accent colour</td><td>The design system allows marigold only on night backgrounds (fails contrast on paper).</td></tr>
+  <tr><td>Show the product, enlarge main feature, specific headline</td><td>Page-level marketing items; these are account settings screens, done for the homepage in session 21.</td></tr>
+  <tr><td>Emphasise the CTA</td><td>Each state already has exactly one primary button.</td></tr>
+  <tr><td>Text contrast</td><td>Muted text is 6.2:1 on paper; unchanged.</td></tr>
+</table>
+
+<h2>Checks</h2>
+<table>
+  <tr><th>Command</th><th>Result</th></tr>
+  <tr><td><code>web/frontend: pnpm type-check &amp;&amp; pnpm lint &amp;&amp; pnpm test:unit &amp;&amp; pnpm build</code></td><td>exit 0; 30 unit tests passed</td></tr>
+  <tr><td><code>admin: pnpm type-check &amp;&amp; pnpm lint &amp;&amp; pnpm test:unit &amp;&amp; pnpm build</code></td><td>exit 0; 13 unit tests passed</td></tr>
+  <tr><td><code>web/frontend: pnpm test:e2e e2e/account-deletion.spec.ts --project=chromium --project=firefox</code></td><td>exit 0; 4 passed, 0 failed, 0 skipped</td></tr>
+  <tr><td><code>admin: pnpm test:e2e e2e/privacy.spec.ts --project=chromium --project=firefox</code></td><td>exit 0; 2 passed, 0 failed, 0 skipped</td></tr>
+</table>
+<p class="muted">Not run: Laravel suite (no backend change), full E2E suites, mobile project, WebKit. Progress unchanged at 179/261.</p>
+</main>
+</body>
+</html>

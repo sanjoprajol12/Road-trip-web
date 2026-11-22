@@ -7,6 +7,9 @@ import AccountSecurity from '../components/AccountSecurity.vue'
 import EmergencyContacts from '../components/EmergencyContacts.vue'
 import MyActivity from '../components/MyActivity.vue'
 import ContributionPause from '../components/ContributionPause.vue'
+import AccountDeletion from '../components/AccountDeletion.vue'
+import OwnershipOffers from '../components/OwnershipOffers.vue'
+import { formatDay } from '@/lib/format'
 import { signOut, useAuth } from '@/features/authentication/useAuth'
 import { updateOwnProfile, type ProfileEdit } from '../services/profile'
 import { errorMessage, fieldErrors } from '@/lib/api/client'
@@ -70,12 +73,17 @@ async function doSignOut() {
       Your account is suspended. You can read and plan, but cannot contribute, apply or join events until the suspension ends.
     </p>
 
+    <p v-if="user?.deletion_scheduled_for" class="mt-6 rounded-md border border-warning/40 bg-surface px-4 py-3 text-sm" role="alert">
+      Your account will be deleted on {{ formatDay(user.deletion_scheduled_for) }}. You can still download your data or <a href="#delete" class="link font-semibold">cancel the deletion</a>.
+    </p>
+
     <nav aria-label="Account sections" class="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-sm">
       <a href="#profile" class="link">Profile</a>
       <a href="#verify-title" class="link">Verification</a>
       <a href="#activity" class="link">Notifications and contributions</a>
       <a href="#emergency" class="link">Emergency contacts</a>
       <a href="#security" class="link">Password and sessions</a>
+      <a href="#delete" class="link">Your data and deletion</a>
       <RouterLink to="/saved" class="link">Saved</RouterLink>
       <RouterLink v-if="user?.username" :to="`/riders/${user.username}`" class="link">Your public profile</RouterLink>
     </nav>
@@ -119,6 +127,8 @@ async function doSignOut() {
     <ContributionPause />
     <MyActivity />
     <EmergencyContacts />
+    <OwnershipOffers />
     <AccountSecurity />
+    <AccountDeletion />
   </div>
 </template>

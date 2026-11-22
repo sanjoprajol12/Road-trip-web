@@ -3,6 +3,9 @@
 namespace App\Support;
 
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Throwable;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -48,8 +51,35 @@ class Images
     }
 
     /** The Laravel disk for new files. Only `local` exists until a storage provider is chosen (decision D1). */
-    public static function disk(): string
+    /**
+     * Checks the upload policy, re-encodes and writes the image. Throws before anything is written when uploads are
+     * not allowed; a failed write leaves nothing behind. Callers create their database row afterwards and call
+     * discard() if that fails, so neither orphaned rows nor orphaned files remain.
+     *
+     * @return array{disk: string, path: string, bytes_size: int, width: int, height: int}
+     */
+    public static function store(UploadedFile $file, string $directory, string $field = 'photo'): array
     {
-        return Settings::get('storage.driver');
+        $disk = UploadPolicy::ensureAllowed($field);
+        $img = self::reencode($file, $field);
+        $path = trim($directory, '/').'/'.Str::uuid().'.webp';
+        try {
+            $ok = Storage::disk($disk)->put($path, $img['bytes']);
+        } catch (Throwable) {
+            $ok = false;
+        }
+        if (! $ok) {
+            UploadPolicy::alert(UploadPolicy::STORAGE_WRITE_FAILED, $disk);
+            rescue(fn () => Storage::disk($disk)->delete($path), report: false);
+            throw ValidationException::withMessages([$field => ['The image could not be stored right now. Try again later.']]);
+        }
+
+        return ['disk' => $disk, 'path' => $path, 'bytes_size' => strlen($img['bytes']), 'width' => $img['width'], 'height' => $img['height']];
+    }
+
+    /** Removes a file written by store() when the database step after it failed. */
+    public static function discard(array $stored): void
+    {
+        rescue(fn () => Storage::disk($stored['disk'])->delete($stored['path']), report: false);
     }
 }

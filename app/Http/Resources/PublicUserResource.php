@@ -20,8 +20,18 @@ class PublicUserResource extends JsonResource
         return $r;
     }
 
+    /** Shown where an author or organizer deleted their account (anonymised contribution, cancelled event). */
+    public static function former(): array
+    {
+        return ['id' => null, 'display_name' => 'Former rider', 'username' => null, 'joined' => null, 'verified' => []];
+    }
+
     public function toArray(Request $request): array
     {
+        if ($this->resource === null) {
+            return self::former();
+        }
+
         return [
             'id' => $this->id,
             'display_name' => $this->display_name,

@@ -24,7 +24,7 @@ Counted by script over the audit tables (225 rows) plus the 36 new rows below (N
 
 ## 1. Not implemented
 
-**Documented in an agreed document, not built (15):** A4 attractions, A6 permits, A8 seasons, A9 expenses, F8 saved services/guides/experiences, F19 Offline Ride Pack (agreed for a later milestone; still mandatory), G19 account deletion and data export, H12 staleness thresholds, L4 nearby attractions, L9 seasonal information, L10 permits, L11 cost estimates, SV1–SV3 saved services (restored by the owner).
+**Documented in an agreed document, not built (15):** A4 attractions, A6 permits, A8 seasons, A9 expenses, F8 saved services/guides/experiences, F19 Offline Ride Pack (agreed for a later milestone; still mandatory), G19 account deletion and data export (built and tested in session 25), H12 staleness thresholds, L4 nearby attractions, L9 seasonal information, L10 permits, L11 cost estimates, SV1–SV3 saved services (restored by the owner).
 
 **Missing (45 from the audit):**
 - Routes: B7 alternative routes (agreed via R14).

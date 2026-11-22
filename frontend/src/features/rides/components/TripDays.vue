@@ -24,7 +24,7 @@ const list = (xs: number[]) => xs.join(', ')
     </ul>
     <ol class="mt-4 grid gap-3 md:grid-cols-2" aria-label="Days">
       <li v-for="d in plan.days" :key="d.day" class="rounded-md border border-line bg-surface p-4 text-sm">
-        <p class="font-semibold">Day {{ d.day }}<span v-if="d.date" class="font-normal text-muted"> · {{ formatDay(d.date) }}</span></p>
+        <p class="tabular font-semibold">Day {{ d.day }}<span v-if="d.date" class="font-normal text-muted"> · {{ formatDay(d.date) }}</span></p>
         <p class="mt-1 text-muted">{{ d.stops.map((s) => s.name).join(' · ') }}</p>
         <p class="tabular mt-2">
           <template v-if="d.totals.parts">{{ n(d.totals.km) }} km recorded<template v-if="d.totals.hours">, about {{ n(d.totals.hours) }} h riding (estimate)</template><template v-if="d.totals.withoutKm || d.totals.withoutHours"><span class="text-muted">; recorded values only<template v-if="d.totals.withoutKm">, {{ d.totals.withoutKm }} without a distance</template><template v-if="d.totals.withoutHours">, {{ d.totals.withoutHours }} without a time estimate</template></span></template>.</template>

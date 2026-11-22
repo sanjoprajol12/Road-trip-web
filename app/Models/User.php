@@ -31,6 +31,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'suspended_until' => 'datetime',
             'deactivated_at' => 'datetime',
+            'deletion_scheduled_for' => 'datetime',
             'password' => 'hashed',
         ];
     }
@@ -38,6 +39,12 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isDeactivated(): bool
     {
         return $this->deactivated_at !== null;
+    }
+
+    /** Requested deletion, in the 30-day cooling-off: can sign in to cancel or export, cannot take part. */
+    public function isDeletionScheduled(): bool
+    {
+        return $this->deletion_scheduled_for !== null;
     }
 
     public function verifications(): HasMany

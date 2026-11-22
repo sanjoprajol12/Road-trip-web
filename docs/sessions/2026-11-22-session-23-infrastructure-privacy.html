@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 23: Infrastructure and privacy | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:60rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; }
+  h2 { font-size:1.3rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.4rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  code { font-size:.88em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; word-break:break-word; }
+  .warn { color:var(--warn); font-weight:700; }
+  .ok { color:var(--ok); font-weight:700; }
+  ul, ol { padding-left:1.3rem; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; margin:.6rem 0 1rem; }
+  th, td { text-align:left; vertical-align:top; padding:.4rem .6rem; border-bottom:1px solid var(--line); }
+  th { background:var(--surface); }
+  svg text { font: 13px system-ui, sans-serif; fill: var(--ink); }
+  svg .muted { fill: var(--muted); }
+  .crit { color:#a51d2d; font-weight:700; } .high { color:#8a5a00; font-weight:700; }
+</style>
+</head>
+<body>
+<main>
+<p class="meta">My Ride Nepal · Session report</p>
+<h1>Session 23: infrastructure and privacy readiness</h1>
+<p class="meta">2026-11-22 · Claude Code (Opus 5.5) · Planning only · Nothing committed, pushed, purchased, deployed or connected · No application code changed</p>
+
+<h2>Progress</h2>
+<ul>
+<li><strong>Verified completion: 67.8%</strong> (177 / 261), <strong>unchanged</strong>.</li>
+<li><strong>Implementation coverage: 81.9%</strong>, unchanged.</li>
+<li>This session produced plans and CI files, so the figures do not move.</li>
+</ul>
+
+<h2>Deliverables</h2>
+<div class="scroll"><table>
+<tr><th>Deliverable</th><th>File</th></tr>
+<tr><td>Infrastructure comparison, proposed architecture, cost estimates</td><td><code>docs/architecture/INFRASTRUCTURE_OPTIONS.md</code></td></tr>
+<tr><td>Upload safety design</td><td><code>docs/architecture/UPLOAD_SAFETY_DESIGN.md</code></td></tr>
+<tr><td>Account deletion and export design</td><td><code>docs/architecture/ACCOUNT_DELETION_AND_EXPORT.md</code></td></tr>
+<tr><td>Q9 decision document</td><td><code>docs/product/DECISION_Q9_CONTRIBUTIONS_ON_DELETION.md</code></td></tr>
+<tr><td>Staff MFA implementation plan</td><td><code>docs/security/STAFF_MFA_PLAN.md</code></td></tr>
+<tr><td>Contact retention plan</td><td><code>docs/product/CONTACT_RETENTION_PLAN.md</code></td></tr>
+<tr><td>CI workflows (local only)</td><td><code>web/.github/workflows/ci.yml</code>, <code>admin/.github/workflows/ci.yml</code></td></tr>
+<tr><td>Data lifecycle diagram, roadmap</td><td>below; also in the handoff</td></tr>
+</table></div>
+
+<h2>1. Infrastructure</h2>
+<p><strong>Two constraints shape every option:</strong></p>
+<ul>
+<li><strong>Payment.</strong> Recent guides say a personal Nepal "dollar card" is capped at about <strong>USD 500 a year</strong> for all online payments, roughly $41 a month. Confirm with the bank.</li>
+<li><strong>Location.</strong> The nearest cloud regions are India and Singapore. Measure latency from Kathmandu and Pokhara before choosing; I measured nothing.</li>
+</ul>
+<div class="scroll"><table>
+<tr><th></th><th>P1: managed VPS (proposed)</th><th>P2: managed Laravel platform</th><th>P3: lowest cost</th></tr>
+<tr><td>Frontends</td><td>Cloudflare Pages (free)</td><td>Cloudflare Pages (free)</td><td>Cloudflare Pages (free)</td></tr>
+<tr><td>API</td><td>DigitalOcean Droplet 2 GB, Bangalore, $12</td><td>Laravel Cloud Starter, $5 + usage</td><td>Droplet 2 GB, $12</td></tr>
+<tr><td>Database</td><td>DO Managed Postgres, ~$15.15, daily backups</td><td>Neon Launch, usage-based, point-in-time restore up to 7 days</td><td>Postgres on the droplet + nightly dump to Backblaze B2</td></tr>
+<tr><td>Storage</td><td colspan="3">Cloudflare R2 (10 GB free; then ~$0.015/GB-month; no egress fees)</td></tr>
+<tr><td>Email</td><td colspan="3">Amazon SES (~$0.10 per 1,000; new 2026 plans from $0.16), or Postmark $15/month</td></tr>
+<tr><td>Monitoring</td><td colspan="3">Sentry Developer, free (1 user, ~5,000 errors)</td></tr>
+<tr><td><strong>Estimate</strong></td><td><strong>~$28/month</strong> ($40 with Forge)</td><td><strong>~$10–30/month</strong></td><td><strong>~$13/month</strong></td></tr>
+<tr><td>Main risk</td><td>you patch the OS</td><td>cold starts; platform lock-in</td><td>you own database backups and restores</td></tr>
+</table></div>
+<ul>
+<li><strong>Why P1 is proposed:</strong> a persistent disk, so the API works as built; a managed database with backups; a likely-near region; a flat cost inside the card limit; and low lock-in.</li>
+<li><strong>The current Vercel container plan</strong> needs Pro ($20/seat) for commercial use and has an ephemeral disk and no scheduler.</li>
+<li><strong>Remote Supabase</strong> stays excluded by your rule.</li>
+<li>All prices are from third-party summaries collected 2026-11-22: <strong>verify on the official pages</strong>.</li>
+</ul>
+
+<h2>2. Upload safety</h2>
+<ul>
+<li><strong>Which uploads keep files:</strong> only rider contribution photos and the staff media library. Place, CMS and destination images reuse the library; GPX and GeoJSON tracks are parsed into the database.</li>
+<li><strong>The risk:</strong> <code>storage.driver</code> allows only <code>local</code>, which disappears on container or serverless hosts.</li>
+<li><strong>The design:</strong>
+  <ul>
+  <li>One effective switch: the <code>storage.uploads_enabled</code> setting combined with an <code>UPLOADS_ENABLED</code> environment variable that can only turn uploads off.</li>
+  <li>Enforced in <code>Images::reencode</code> plus route middleware.</li>
+  <li><strong>In production, the <code>local</code> disk forces uploads off and logs it critically</strong>, so they pause and are never lost.</li>
+  <li>The state is exposed in <code>/health</code> and <code>/site</code>. The frontends hide upload pickers; everything else keeps working.</li>
+  </ul></li>
+</ul>
+
+<h2>3. Account deletion, export and Q9</h2>
+<p><strong>Found:</strong> 30 references to riders in the schema (17 cascade, 13 set null), plus notifications and the audit log with no foreign key. Deleting a rider today would:</p>
+<ul>
+<li>hard-delete all their contributions;</li>
+<li>delete events they organise <em>with other riders' registrations</em>;</li>
+<li>delete group trips they own <em>for every member</em>;</li>
+<li>leave notification rows behind;</li>
+<li>leave photo files on disk.</li>
+</ul>
+<p><strong>The design</strong> (ready to build once Q9 is answered):</p>
+<ul>
+<li>re-authentication by password and username, pre-checks, an optional cooling-off period;</li>
+<li>one resumable transaction, with file deletes after commit and retried;</li>
+<li>a deletion record and an audit entry holding counts only;</li>
+<li>documented retention exceptions;</li>
+<li>a ZIP export over a signed 24-hour link.</li>
+</ul>
+<p><strong>Q9 needs your answer:</strong> published reports are A deleted, B kept without the name, C kept without the name and without photos, or D the rider's choice. Plus:</p>
+<ul>
+<li>Q9a: events with registered riders;</li>
+<li>Q9b: group trips with members;</li>
+<li>Q9c: safety-hold days;</li>
+<li>Q9d: cooling-off days.</li>
+</ul>
+<p>Nothing is decided.</p>
+<h3>Data lifecycle</h3>
+<svg viewBox="0 0 760 420" role="img" aria-labelledby="lc-title lc-desc" style="width:100%;height:auto;max-width:760px">
+<title id="lc-title">Rider data lifecycle</title>
+<desc id="lc-desc">Sign-up leads to an active account holding profile, trips, contributions and photos. From there a rider can export data at any time, or request deletion: re-authentication and pre-checks, then a cooling-off period, then the deletion run. The run removes private data, applies the Q9 choice to public contributions, deletes photo files after commit, and keeps only a pseudonymous audit trail, the deletion record and provider backups until they expire.</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5c5850"/></marker></defs>
+<g fill="none" stroke="#5c5850" stroke-width="1.5">
+<rect x="10" y="20" width="130" height="50" rx="3"/><rect x="190" y="20" width="240" height="50" rx="3"/><rect x="470" y="20" width="160" height="50" rx="3" stroke-dasharray="4 3"/>
+<rect x="190" y="120" width="200" height="60" rx="3"/><rect x="190" y="220" width="200" height="50" rx="3"/><rect x="190" y="320" width="200" height="60" rx="3" stroke="#a51d2d" stroke-width="2"/>
+<rect x="440" y="300" width="300" height="100" rx="3"/><rect x="440" y="180" width="300" height="100" rx="3"/>
+<path d="M140,45 H186" marker-end="url(#a)"/><path d="M430,45 H466" marker-end="url(#a)"/><path d="M290,70 V116" marker-end="url(#a)"/><path d="M290,180 V216" marker-end="url(#a)"/><path d="M290,270 V316" marker-end="url(#a)"/>
+<path d="M390,340 H436" marker-end="url(#a)"/><path d="M390,322 Q420,300 436,250" marker-end="url(#a)"/><path d="M190,245 Q150,245 150,150 Q150,90 186,60" marker-end="url(#a)" stroke-dasharray="4 3"/>
+</g>
+<text x="20" y="50">Sign-up</text>
+<text x="200" y="40">Active account</text><text class="muted" x="200" y="58">profile · trips · contributions · photos</text>
+<text x="480" y="40">Export (ZIP, any time)</text><text class="muted" x="480" y="58">signed link, 24 h</text>
+<text x="200" y="142">Deletion request</text><text class="muted" x="200" y="160">re-auth · pre-checks (Q9a/b/c)</text>
+<text x="200" y="242">Cooling-off (Q9d)</text><text class="muted" x="200" y="260">sign in to cancel</text>
+<text x="160" y="110" class="muted">cancel</text>
+<text x="200" y="342">Deletion run</text><text class="muted" x="200" y="360">one transaction ·</text><text class="muted" x="200" y="374">files deleted after commit</text>
+<text x="450" y="200">Removed</text><text class="muted" x="450" y="220">profile, sessions, trips, saved items,</text><text class="muted" x="450" y="238">contacts, verifications, notifications;</text><text class="muted" x="450" y="256">public contributions per Q9 (A/B/C/D)</text>
+<text x="450" y="320">Kept (retention exceptions)</text><text class="muted" x="450" y="340">audit log (pseudonymous id) · deletion record</text><text class="muted" x="450" y="358">(counts, option) · provider backups until expiry</text><text class="muted" x="450" y="376">· content under an open safety hold (Q9c)</text>
+</svg>
+
+<h2>4. Staff MFA</h2>
+<ul>
+<li><strong>How:</strong> TOTP plus 8 hashed recovery codes on the custom staff guard. The libraries are already installed through Fortify, so there is <strong>no new package</strong>.</li>
+<li><strong>Sign-in:</strong> a password step, then a challenge (5-minute expiry, rate-limited, no code reuse).</li>
+<li><strong>Setup:</strong> enrolment with password confirmation.</li>
+<li><strong>Rollout:</strong> optional first, then required; an environment override cannot be weakened by the setting.</li>
+<li><strong>Recovery:</strong> an administrator reset (audited, sessions revoked) and a break-glass artisan command.</li>
+<li><strong>Riders:</strong> sign-in unchanged.</li>
+<li><strong>Size:</strong> about 1.5 sessions.</li>
+</ul>
+
+<h2>5. Contact retention</h2>
+<ul>
+<li><strong>Today:</strong> messages are kept forever; staff delete them one by one (audited). The dev database has 0 messages.</li>
+<li><strong>Plan:</strong>
+  <ul>
+  <li>placeholder periods (spam 30 days, closed 12 months, open never automatic);</li>
+  <li>a <code>closed_at</code> timestamp and legal holds;</li>
+  <li>a daily purge with dry-run and <strong>purge off by default</strong>;</li>
+  <li>a counts-only audit;</li>
+  <li>a rider "delete my messages" path.</li>
+  </ul></li>
+</ul>
+
+<h2>6. CI</h2>
+<ul>
+<li><strong>Added to both workflows (local only):</strong> least-privilege token permissions, cancel superseded runs, and <code>composer validate --strict</code>.</li>
+<li><strong>E2E runs one job per browser:</strong> public chromium, firefox, mobile and webkit; staff chromium, firefox and webkit.</li>
+<li><strong>WebKit</strong> installs its system libraries on the runner (<code>--with-deps</code>) and does not block until its first green run.</li>
+<li><strong>Pint</strong> stays out until a one-off formatting commit (58 files, style only) is approved.</li>
+</ul>
+<div class="scroll"><table>
+<tr><th>Check</th><th>Exit</th><th>Result</th></tr>
+<tr><td><code>composer validate --strict</code></td><td>0</td><td>valid</td></tr>
+<tr><td><code>vendor/bin/pint --test</code></td><td>1</td><td>58 files need formatting (style only)</td></tr>
+<tr><td>YAML parse of both workflows</td><td>0</td><td>valid; jobs listed; <code>permissions: contents: read</code></td></tr>
+<tr><td>GitHub Actions run</td><td>—</td><td><span class="warn">not run</span>: needs a push (owner approval)</td></tr>
+</table></div>
+<p>No application code changed. Session 22's full green run stands: Laravel 162 passed, public E2E 152 passed, staff E2E 51 passed.</p>
+
+<h2>7. Roadmap, in order</h2>
+<ol>
+<li><strong>Owner decisions:</strong> Q9 (a–d), D7 periods, AR3, hosting profile, email, Sentry, the S3 package (D1), the Pint commit, and the dollar-card limit.</li>
+<li><strong>Uploads kill switch and production disk guard</strong> (about 1 session, no decision needed).</li>
+<li><strong>Account deletion and export</strong> (about 2 sessions, after Q9).</li>
+<li><strong>Staff MFA</strong> (about 1.5 sessions, after AR3).</li>
+<li><strong>Contact retention</strong> (about 0.5 session, after D7).</li>
+<li><strong>Owner pushes both repos:</strong> the first CI run, then make WebKit blocking once green.</li>
+<li><strong>Pre-production, with approval:</strong> provision, S3 disk, scheduler, <code>expose_php=Off</code>, a restore drill, email, Sentry, staging smoke test.</li>
+<li><strong>Then:</strong> remaining features (F8, F10, F6) and real content.</li>
+</ol>
+
+<h2>Sources (pricing and payment, accessed 2026-11-22)</h2>
+<ul>
+<li><a href="https://laravel.com/cloud/docs/pricing">Laravel Cloud plans and pricing</a>; <a href="https://ployz.dev/blog/laravel-cloud-pricing">Laravel Cloud pricing in 2026</a></li>
+<li><a href="https://neon.com/faqs/managed-postgres-providers-point-in-time-recovery">Neon: point-in-time recovery FAQ</a>; <a href="https://vela.run/articles/neon-serverless-postgres-pricing-2026/">Neon pricing 2026 breakdown</a></li>
+<li><a href="https://www.bytebase.com/blog/postgres-hosting-options-pricing-comparison/">Postgres hosting pricing comparison 2026</a>; <a href="https://selfhost.dev/blog/managed-postgresql-comparison-2026/">Managed PostgreSQL comparison 2026</a></li>
+<li><a href="https://upstash.com/kb/cloudflare-r2-pricing-in-2026-storage-operations-and-real-monthly-bills">Cloudflare R2 pricing 2026</a>; <a href="https://upstash.com/blog/backblaze-b2-pricing-explained-2026">Backblaze B2 pricing (October 2026)</a></li>
+<li><a href="https://massivegrid.com/blog/vercel-pricing-explained-2026/">Vercel pricing 2026</a>; <a href="https://convika.com/compare/cloudflare-pages-commercial-use/">Cloudflare Pages commercial use</a>; <a href="https://temps.sh/blog/cloudflare-pages-free-tier-limits-2026">Cloudflare Pages free tier limits 2026</a></li>
+<li><a href="https://vpsproof.com/blog/digitalocean-pricing">DigitalOcean droplet pricing 2026</a>; <a href="https://bex.co/blog/2026/07/10/hetzner-singapore-region-apac-self-hosting">Hetzner Singapore 2026 repricing</a>; <a href="https://laracopilot.com/blog/laravel-forge-pricing-2026/">Laravel Forge pricing 2026</a></li>
+<li><a href="https://smtpedia.com/amazon-aws-ses-pricing/">Amazon SES rate card 2026</a>; <a href="https://www.mailblast.io/blog/ses/amazon-ses-regions-explained">Amazon SES regions</a>; <a href="https://www.transactionalemailservices.com/pricing/postmark">Postmark pricing</a></li>
+<li><a href="https://justinmckelvey.com/blog/sentry-pricing">Sentry pricing 2026</a>; <a href="https://usenightowl.com/compare/flare/">Flare pricing comparison</a></li>
+<li><a href="https://nepaldocsguide.blog/blog/get-dollar-card-nepal-international-online-payments">Dollar card Nepal: limits</a>; <a href="https://digitalsolutionnepal.com/dollar-card-fees-limits-nepal-banks/">Dollar card fees and limits (2026)</a></li>
+</ul>
+</main>
+</body>
+</html>

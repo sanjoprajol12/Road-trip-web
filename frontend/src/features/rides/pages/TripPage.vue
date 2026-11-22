@@ -62,7 +62,12 @@ const detailsSaved = ref(false)
 const saveDetails = async () => (detailsSaved.value = await call(() => updateTrip(props.id, { ...details, notes: details.notes || null, motorcycle: details.motorcycle || null, starts_on: details.starts_on || null, ends_on: details.ends_on || null })))
 
 const stop = reactive({ name: '', day: '', destination_id: '', overnight: false })
-const addStop = async () => (await call(() => addPart(props.id, 'stops', { name: stop.name, day: stop.day ? Number(stop.day) : null, destination_id: stop.destination_id || null, overnight: stop.overnight }))) && Object.assign(stop, { name: '', day: '', destination_id: '', overnight: false })
+const adding = ref(false)
+const addStop = async () => {
+  adding.value = true
+  if (await call(() => addPart(props.id, 'stops', { name: stop.name, day: stop.day ? Number(stop.day) : null, destination_id: stop.destination_id || null, overnight: stop.overnight }))) Object.assign(stop, { name: '', day: '', destination_id: '', overnight: false })
+  adding.value = false
+}
 // Edit a stop in place: name, day, overnight and note (links stay as they are).
 const editingStop = ref<string | null>(null)
 const stopEdit = reactive({ name: '', day: '' as string | number, overnight: false, note: '' })
@@ -149,10 +154,10 @@ async function deleteTrip() {
     <StatusPanel v-else-if="!t" class="mt-6" state="empty" title="Trip not available" message="Only members of a trip can open it." />
     <article v-else class="mt-6">
       <div class="flex flex-wrap items-end justify-between gap-4">
-        <h1 class="display text-[clamp(2.5rem,1.8rem+3vw,4.5rem)]">{{ t.title }}</h1>
+        <h1 class="display text-[clamp(2.5rem,1.8rem+3vw,4.5rem)] text-balance wrap-anywhere">{{ t.title }}</h1>
         <p class="text-sm text-muted">You are {{ t.my_role === 'owner' ? 'the owner' : `a ${t.my_role}` }}<template v-if="!canEdit"> (read only)</template></p>
       </div>
-      <p v-if="err" class="mt-4 rounded-md border border-danger/40 bg-crimson-wash px-4 py-3 text-sm text-danger" role="alert">{{ err }}</p>
+      <p v-if="err" :key="err" class="feedback-in mt-4 rounded-md border border-danger/40 bg-crimson-wash px-4 py-3 text-sm text-danger" role="alert">{{ err }}</p>
 
       <div class="mt-10 grid gap-14 lg:grid-cols-[1fr_22rem]">
         <div class="grid content-start gap-14">
@@ -187,25 +192,25 @@ async function deleteTrip() {
                 </div>
                 <div v-if="canEdit && editingStop !== s.id" class="flex shrink-0 flex-wrap items-center justify-end">
                   <button type="button" class="grid size-9 place-items-center text-muted hover:text-ink" :aria-label="`Edit ${s.name}`" @click="startStopEdit(s)"><Pencil class="size-4" aria-hidden="true" /></button>
-                  <button type="button" class="grid size-9 place-items-center text-muted hover:text-ink disabled:opacity-30" :disabled="i === 0" :aria-label="`Move ${s.name} up`" @click="move(i, -1)"><ArrowUp class="size-4" aria-hidden="true" /></button>
-                  <button type="button" class="grid size-9 place-items-center text-muted hover:text-ink disabled:opacity-30" :disabled="i === t.stops.length - 1" :aria-label="`Move ${s.name} down`" @click="move(i, 1)"><ArrowDown class="size-4" aria-hidden="true" /></button>
+                  <button type="button" class="grid size-9 place-items-center text-muted hover:text-ink disabled:opacity-40" :disabled="i === 0" :aria-label="`Move ${s.name} up`" @click="move(i, -1)"><ArrowUp class="size-4" aria-hidden="true" /></button>
+                  <button type="button" class="grid size-9 place-items-center text-muted hover:text-ink disabled:opacity-40" :disabled="i === t.stops.length - 1" :aria-label="`Move ${s.name} down`" @click="move(i, 1)"><ArrowDown class="size-4" aria-hidden="true" /></button>
                   <button type="button" class="grid size-9 place-items-center text-muted hover:text-danger" :aria-label="`Remove ${s.name}`" @click="removeStop(s)"><Trash2 class="size-4" aria-hidden="true" /></button>
                 </div>
               </li>
             </ol>
             <p v-else class="mt-4 text-sm text-muted">No stops yet. Add a <RouterLink to="/routes" class="link">route</RouterLink> or some of its stretches, places from a <RouterLink to="/places" class="link">place page</RouterLink>, a destination or your <RouterLink to="/saved" class="link">saved list</RouterLink>.</p>
-            <template v-if="t.stops?.length">
-              <DestinationMap v-if="mapPoints.length || mapLines.length" :key="[...mapPoints.map((p) => p.name), mapLines.length].join('|')" class="mt-6" :center="null" :name="`${t.title} stops`" :points="mapPoints" :lines="mapLines" />
-              <p v-else class="mt-6 text-sm text-muted">None of these stops has a recorded position or track, so there is no map yet.</p>
-              <TripDays :trip="t" />
-            </template>
             <form v-if="canEdit" class="mt-4 grid gap-3 sm:grid-cols-[1fr_5rem_12rem_auto] sm:items-end" @submit.prevent="addStop">
               <div class="field"><label for="sn">Stop</label><input id="sn" v-model="stop.name" class="input" maxlength="120" /></div>
               <div class="field"><label for="sd">Day</label><input id="sd" v-model="stop.day" type="number" min="1" max="365" class="input" /></div>
               <div class="field"><label for="sdest">Destination</label><select id="sdest" v-model="stop.destination_id" class="input"><option value="">None</option><option v-for="d in destinations.data.value ?? []" :key="d.id" :value="d.id">{{ d.name }}</option></select></div>
-              <button type="submit" class="btn btn-quiet" :disabled="stop.name.trim().length < 2">Add</button>
+              <button type="submit" class="btn btn-quiet" :disabled="stop.name.trim().length < 2 || adding" :aria-busy="adding">{{ adding ? 'Adding…' : 'Add' }}</button>
               <label class="flex items-center gap-2 text-sm sm:col-span-4"><input v-model="stop.overnight" type="checkbox" class="accent-crimson" /> Overnight stop</label>
             </form>
+            <template v-if="t.stops?.length">
+              <DestinationMap v-if="mapPoints.length || mapLines.length" :key="[...mapPoints.map((p) => p.name), mapLines.length].join('|')" class="mt-8" :center="null" :name="`${t.title} stops`" :points="mapPoints" :lines="mapLines" />
+              <p v-else class="mt-6 text-sm text-muted">None of these stops has a recorded position or track, so there is no map yet.</p>
+              <TripDays :trip="t" />
+            </template>
           </section>
 
           <TripBudget :trip="t" :can-edit="canEdit" :run="call" />
@@ -223,7 +228,7 @@ async function deleteTrip() {
             <div class="field"><label for="tm">Motorcycle</label><input id="tm" v-model="details.motorcycle" class="input" :disabled="!canEdit" /></div>
             <div class="field"><label for="tn">Notes</label><textarea id="tn" v-model="details.notes" class="input" rows="4" maxlength="10000" :disabled="!canEdit" aria-describedby="tn-help" /><p id="tn-help" class="text-xs text-muted">Every member of this trip can read these notes{{ canEdit ? '; clear the field and save to remove them' : '' }}.</p></div>
             <button v-if="canEdit" type="submit" class="btn btn-quiet">Save details</button>
-            <p v-if="detailsSaved" class="text-sm" role="status">Details saved.</p>
+            <p v-if="detailsSaved" class="feedback-in text-sm" role="status">Details saved.</p>
           </form>
 
           <section class="grid gap-3" aria-labelledby="mem">
@@ -233,7 +238,7 @@ async function deleteTrip() {
                 <span class="flex-1">{{ m.display_name }}<span v-if="m.id === user?.id" class="text-muted"> (you)</span></span>
                 <select v-if="isOwner && m.role !== 'owner'" :value="m.role" class="input min-h-8 w-24 px-1 text-xs" :aria-label="`Role of ${m.display_name}`" @change="setRole(m.id, ($event.target as HTMLSelectElement).value)"><option value="editor">editor</option><option value="viewer">viewer</option></select>
                 <span v-else class="text-muted">{{ m.role }}</span>
-                <button v-if="m.role !== 'owner' && (isOwner || m.id === user?.id)" type="button" class="p-1 text-muted hover:text-danger" :aria-label="m.id === user?.id ? 'Leave this trip' : `Remove ${m.display_name}`" @click="removeMember(m.id)"><Trash2 class="size-4" aria-hidden="true" /></button>
+                <button v-if="m.role !== 'owner' && (isOwner || m.id === user?.id)" type="button" class="grid size-9 place-items-center text-muted hover:text-danger" :aria-label="m.id === user?.id ? 'Leave this trip' : `Remove ${m.display_name}`" @click="removeMember(m.id)"><Trash2 class="size-4" aria-hidden="true" /></button>
               </li>
             </ul>
             <form v-if="isOwner" class="grid grid-cols-[1fr_6rem] gap-2" @submit.prevent="addMember">
@@ -245,7 +250,7 @@ async function deleteTrip() {
             <ul v-if="isOwner && t.invitations?.length" class="grid gap-1 text-sm" aria-label="Invitations waiting for an answer">
               <li v-for="i in t.invitations" :key="i.id" class="flex items-center gap-2">
                 <span class="flex-1">{{ i.display_name }} <span class="text-muted">({{ i.role }}, {{ i.expired ? 'expired' : 'waiting' }})</span></span>
-                <button type="button" class="p-1 text-muted hover:text-danger" :aria-label="`Cancel the invitation for ${i.display_name}`" @click="cancelInv(i.id)"><Trash2 class="size-4" aria-hidden="true" /></button>
+                <button type="button" class="grid size-9 place-items-center text-muted hover:text-danger" :aria-label="`Cancel the invitation for ${i.display_name}`" @click="cancelInv(i.id)"><Trash2 class="size-4" aria-hidden="true" /></button>
               </li>
             </ul>
           </section>

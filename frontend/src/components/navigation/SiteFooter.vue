@@ -16,7 +16,7 @@ const footer = computed(() => site.value?.footer)
 </script>
 
 <template>
-  <footer class="on-night border-t border-night-line bg-night text-night-text">
+  <footer class="on-night texture-contours border-t border-night-line bg-night text-night-text">
     <div class="wrap grid gap-10 py-14 md:grid-cols-[1.4fr_1fr]">
       <div class="grid content-start gap-4">
         <RouterLink to="/" class="flex items-center gap-2.5 text-night-text">

@@ -57,6 +57,28 @@ return [
                 'items.*.text' => ['required', 'string', 'max:240'],
             ],
         ],
+        // Session 21: the working route planner on the homepage, previewing one real published route.
+        'planner' => [
+            'label' => 'Route planner',
+            'rules' => [
+                'heading' => ['required', 'string', 'max:120'],
+                'intro' => ['nullable', 'string', 'max:400'],
+                // Empty: the newest published route that has stretches.
+                'ids' => ['present', 'array', 'max:1'], 'ids.*' => ['uuid'],
+            ],
+        ],
+        'tools' => [
+            'label' => 'What riders can do',
+            'rules' => [
+                'heading' => ['required', 'string', 'max:120'],
+                'intro' => ['nullable', 'string', 'max:400'],
+                'items' => ['required', 'array', 'min:1', 'max:6'],
+                'items.*' => ['array:name,text,cta'],
+                'items.*.name' => ['required', 'string', 'max:40'],
+                'items.*.text' => ['required', 'string', 'max:240'],
+                'items.*.cta' => $link, 'items.*.cta.label' => ['nullable', 'string', 'max:30'], 'items.*.cta.to' => $linkTo,
+            ],
+        ],
         'featured_destinations' => [
             'label' => 'Featured destinations',
             'rules' => [
@@ -118,6 +140,8 @@ return [
         'hero' => ['eyebrow' => null, 'lines' => ['New heading'], 'lead' => null, 'primary_cta' => null, 'secondary_cta' => null, 'background' => ['kind' => 'bundled', 'ref' => '/images/photos/kathmandu-motorcycle'], 'photo_credit' => 'Kathmandu. Photo: Igor Ovsyannykov, CC0'],
         'slides' => ['heading' => null, 'items' => []],
         'layers' => ['heading' => 'New section', 'intro' => null, 'items' => [['name' => 'Item', 'text' => 'Describe it.']]],
+        'planner' => ['heading' => 'New section', 'intro' => null, 'ids' => []],
+        'tools' => ['heading' => 'New section', 'intro' => null, 'items' => [['name' => 'Item', 'text' => 'Describe it.', 'cta' => null]]],
         'featured_destinations' => ['heading' => 'Destinations', 'link_label' => 'All destinations', 'ids' => []],
         'featured_routes' => ['heading' => 'Routes', 'link_label' => 'All routes', 'ids' => []],
         'featured_experiences' => ['heading' => 'Rider experiences', 'link_label' => 'All experiences', 'ids' => []],

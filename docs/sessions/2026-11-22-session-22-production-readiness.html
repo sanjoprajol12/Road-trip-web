@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 22: Production readiness | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:60rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; }
+  h2 { font-size:1.3rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.4rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  code { font-size:.88em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; word-break:break-word; }
+  .warn { color:var(--warn); font-weight:700; }
+  .ok { color:var(--ok); font-weight:700; }
+  ul, ol { padding-left:1.3rem; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; margin:.6rem 0 1rem; }
+  th, td { text-align:left; vertical-align:top; padding:.4rem .6rem; border-bottom:1px solid var(--line); }
+  th { background:var(--surface); }
+  .crit { color:#a51d2d; font-weight:700; } .high { color:#8a5a00; font-weight:700; }
+</style>
+</head>
+<body>
+<main>
+<p class="meta">My Ride Nepal · Session report</p>
+<h1>Session 22: production readiness audit</h1>
+<p class="meta">2026-11-22 · Claude Code (Opus 5.5) · Nothing committed · No migration · No dependency · No remote service · No data changed</p>
+
+<h2>Verdict</h2>
+<p><strong>Not ready for a public launch.</strong> The application itself is in good shape:</p>
+<ul>
+<li>Authorization and privacy are enforced and tested route by route.</li>
+<li>There are no production dependency vulnerabilities.</li>
+<li>No WCAG AA contrast failures were found.</li>
+<li>Both test suites are green.</li>
+</ul>
+<p>What blocks launch is outside the code:</p>
+<ul>
+<li>There is no decided hosting or production database with backups.</li>
+<li>Uploads would be lost on the planned serverless platform.</li>
+<li>Riders cannot delete their account or export their data.</li>
+<li>There is no email provider and no error monitoring.</li>
+<li>Almost no content is published.</li>
+</ul>
+
+<h2>Project progress</h2>
+<ul>
+<li><strong>Verified completion: 67.8%</strong> (177 / 261), <strong>unchanged</strong>.</li>
+<li><strong>Implementation coverage: 81.9%</strong>, unchanged.</li>
+<li>This was an audit session. The two fixes repair defects in existing features, and no requirement changed status.</li>
+</ul>
+
+<h2>Risk register</h2>
+<div class="scroll"><table>
+<tr><th>Level</th><th>Risk</th><th>Evidence</th><th>Needs</th></tr>
+<tr><td class="crit">Critical</td><td>No production hosting or database, and no backup or restore</td><td><code>DEPLOYMENT_READINESS.md</code>: AR4 and AR5 open; nothing deployed</td><td>Owner decision, then a restore drill</td></tr>
+<tr><td class="crit">Critical</td><td>Uploads (rider photos, media library) go to the container disk, which serverless replaces; there is no switch to turn uploads off in production</td><td><code>config/settings.php</code> allows only <code>storage.driver = local</code>; no kill switch exists in the code</td><td>D1 storage decision; meanwhile build an "uploads off" setting</td></tr>
+<tr><td class="crit">Critical</td><td>No account deletion or data export</td><td>Audit G19 "documented, not built"; H11 partial; Q9 open</td><td>Q9 decision, then build</td></tr>
+<tr><td class="high">High</td><td>No email provider: confirmations and password resets cannot reach riders in production</td><td>Local Mailpit only; SMTP settings exist</td><td>Provider choice and credentials</td></tr>
+<tr><td class="high">High</td><td>No error monitoring or alerting</td><td>Logs go to stderr only</td><td>Owner (a new service)</td></tr>
+<tr><td class="high">High</td><td>CI has never run; the root repository has no commits</td><td><code>.github/workflows/ci.yml</code> exists in both repos and would also run WebKit</td><td>Owner: commit and push</td></tr>
+<tr><td class="high">High</td><td>Safari and WebKit untested (many riders use iPhones)</td><td>Launch fails: missing <code>libevent-2.1-7t64</code> and <code>libmanette-0.2-0</code></td><td>Approve the sudo install, or run in CI</td></tr>
+<tr><td class="high">High</td><td>Almost no content: 0 routes, places, events or published guides; 4 seeded destinations without coordinates</td><td>Read-only database inspection</td><td>Staff data entry</td></tr>
+<tr><td class="high">High</td><td>Staff accounts have no MFA</td><td>AR3 open</td><td>Owner decision</td></tr>
+<tr><td>Medium</td><td>Route page LCP 3.74 s on a throttled phone (lab); 376 ms for a menu tap on the home page under a 4x CPU slowdown</td><td><code>production-audit.spec.ts</code> lab metrics</td><td>Profile Leaflet and the API waterfall</td></tr>
+<tr><td>Medium</td><td>The public site is a client-rendered SPA, not visible to crawlers</td><td>D4 open</td><td>Owner decision</td></tr>
+<tr><td>Medium</td><td>The OpenStreetMap public tile server allows only light use</td><td>Deployment notes</td><td>A tile provider for real traffic</td></tr>
+<tr><td>Medium</td><td>No screen-reader, axe or Lighthouse verification</td><td>Tools not installed (owner approval)</td><td>Approve, then run</td></tr>
+<tr><td>Medium</td><td>Contact message retention period undefined</td><td>D7 open</td><td>Owner decision</td></tr>
+<tr><td>Low</td><td><code>X-Powered-By: PHP/8.3.36</code> on API responses</td><td>Header probe</td><td><code>expose_php=Off</code> in the image</td></tr>
+<tr><td>Low</td><td>2 moderate advisories in development dependencies (glob and minimatch via <code>@vue/test-utils</code>)</td><td><code>pnpm audit</code>; not in the production build</td><td>Update when upstream allows</td></tr>
+<tr><td>Low</td><td>Full route tracks are sent to trip pages</td><td>Code comment</td><td>Simplify if long routes get slow</td></tr>
+</table></div>
+
+<h2>Accessibility</h2>
+<p>Automated, without new dependencies: the new <code>production-audit.spec.ts</code> in both apps, plus the existing <code>quality.spec.ts</code>.</p>
+<ul>
+<li><strong>Contrast (WCAG AA 1.4.3):</strong> 0 failures on 13 public pages, 4 signed-in rider pages (account, rides, a trip, saved) and 13 staff screens. Colours were measured against the real solid background behind the text. Text over photos and over the see-through header is not judged automatically.</li>
+<li><strong>Focus visible and not obscured (2.4.7, 2.4.11):</strong>
+  <ul>
+  <li><span class="warn">Fixed:</span> tabbing could leave a focused link under the fixed header on the homepage (Chromium and Firefox). Now fixed with <code>scroll-padding-top</code>.</li>
+  <li><span class="warn">Fixed:</span> date fields lost their ring when focus reached the built-in calendar button. Now fixed with <code>:focus-within</code>, in both apps.</li>
+  <li>After the fixes: no problems on 5 public and 5 staff screens, in Chromium and Firefox.</li>
+  </ul></li>
+<li><strong>Tap targets on phones (2.5.8):</strong> no failures once the spacing exception is applied (standalone text links are 20 px tall with enough space around them).</li>
+<li><strong>Structure (existing checks):</strong> one h1, a main landmark, alt text, labelled controls, named buttons and links, unique ids on 13 public and 13 staff screens; a skip link; reduced motion; no sideways scrolling on phones.</li>
+<li><strong>Maps:</strong> every map has a text alternative (lists with the same information), checked in the earlier map browser tests.</li>
+<li><strong>Not verified:</strong> a real screen reader (NVDA or VoiceOver), axe rules, WebKit and Safari.</li>
+</ul>
+
+<h2>Performance (lab measurements, not Lighthouse, not field data)</h2>
+<div class="scroll"><table>
+<tr><th>Page</th><th>LCP unthrottled</th><th>LCP phone, 4x CPU, ~1.6 Mbit/s</th><th>CLS</th></tr>
+<tr><td>Home</td><td>292 ms</td><td>2480 ms</td><td>0.048 (throttled)</td></tr>
+<tr><td>Route detail</td><td>—</td><td>3740 ms</td><td>0</td></tr>
+<tr><td>Explore along my route</td><td>—</td><td>800 ms</td><td>0</td></tr>
+<tr><td>Places</td><td>—</td><td>1408 ms</td><td>0</td></tr>
+<tr><td>Explore, routes, blog</td><td>964 / 436 / 176 ms</td><td>—</td><td>0</td></tr>
+</table></div>
+<ul>
+<li><strong>Load size:</strong> about 79 KB JavaScript and 9 KB CSS gzipped on first load. Leaflet (43 KB) loads only on map pages, and each page is its own chunk.</li>
+<li><strong>Assets:</strong> self-hosted variable fonts; WebP photos with srcset, a high-priority hero image and lazy-loaded images elsewhere.</li>
+<li><strong>API:</strong> local responses take 16–140 ms; <code>/home</code> is cached publicly for 60 s.</li>
+<li><strong>INP:</strong> a menu tap on the home page took 376 ms under the 4x CPU slowdown ("needs improvement"). Real INP needs field data.</li>
+</ul>
+
+<h2>Browser compatibility</h2>
+<ul>
+<li>Chromium, Firefox and a Pixel 7 profile all pass.</li>
+<li>WebKit build 2359 is downloaded but cannot launch: Playwright asks for <code>sudo apt-get install libevent-2.1-7t64 libmanette-0.2-0</code>. Its dry-run lists 15 packages for full support on Ubuntu 26.04.</li>
+<li>Not installed, as instructed. CI (<code>--with-deps</code>) would install them on GitHub.</li>
+</ul>
+
+<h2>Security and privacy</h2>
+<ul>
+<li><strong>Authorization:</strong>
+  <ul>
+  <li><code>RouteAuthorizationTest</code> walks every API route: guests get 401 on every protected route, and riders get 401 on every staff route.</li>
+  <li>Trip privacy, viewer, editor and owner roles, IDOR and staff exclusion are covered by the trip test suites (all passing).</li>
+  <li>Live probe: <code>/trips</code> and <code>/admin/overview</code> answer 401 without a session.</li>
+  </ul></li>
+<li><strong>CSRF (live):</strong> 419 without the token; with it, the request is processed (422 for wrong credentials).</li>
+<li><strong>CORS:</strong> a foreign origin gets no <code>Access-Control-Allow-Origin</code>.</li>
+<li><strong>Cookies:</strong> session cookies are <code>httponly</code> and <code>samesite=lax</code>; <code>secure</code> comes from the production template.</li>
+<li><strong>New <code>SecurityPostureTest</code>:</strong>
+  <ul>
+  <li>Security headers on every API response, with HSTS over HTTPS only.</li>
+  <li>Production 500 errors return only "Server Error", without the cause.</li>
+  <li>Uploaded photos lose EXIF metadata, including GPS position.</li>
+  </ul></li>
+<li><strong>Uploads:</strong> size limit, decoded type, dimension limits, re-encoded to WebP. GPX and GeoJSON tracks: 2 MB and an extension check.</li>
+<li><strong>Rate limits:</strong> API, registration, auth email, staff login, contributions, contact, reports and uploads, tested in <code>AuthTest</code>, <code>RiderWorkflowsTest</code> and <code>SettingsTrustAndSuspensionTest</code>.</li>
+<li><strong>Gaps:</strong> account deletion and export (critical), no production uploads switch (critical), staff MFA (high), the PHP version header (low).</li>
+</ul>
+
+<h2>Infrastructure</h2>
+<ul>
+<li><strong>Ready:</strong>
+  <ul>
+  <li>The production env template (<code>.env.production.example</code>).</li>
+  <li>The container image (<code>Dockerfile.vercel</code>).</li>
+  <li>A health endpoint with a database check.</li>
+  <li>Migrations run under a separate owner role, with rollbacks tested each session.</li>
+  <li>Trusted proxies, synchronous queue for serverless, and logs to stderr.</li>
+  </ul></li>
+<li><strong>Missing:</strong> hosting, production Postgres, backups and restore, durable storage, email provider, error tracking and alerting. CI is defined but has never run.</li>
+</ul>
+
+<h2>Development data (inspected read-only)</h2>
+<ul>
+<li><strong>What exists:</strong> 4 published destinations (Pokhara, Bandipur, Mustang, Rara), marked as dev seed and without coordinates; 1 guide and 1 contribution, both unpublished; no routes, stretches, services, places, events or trips.</li>
+<li><strong>Minimum to verify the product by hand:</strong> 2 destinations with coordinates, 1 route with 3 stretches (distances, a time estimate, one recorded track), 2 services including fuel, 2 places, 1 event, 1 published guide, 1 published road report.</li>
+<li><strong>How it should be made:</strong> clearly fictional names prefixed "[DEV]" with <code>is_dev_seed = true</code>, or real data entered by staff. Not created: owner approval needed, and no real roads or services may be invented.</li>
+</ul>
+
+<h2>Commands and exit codes</h2>
+<div class="scroll"><table>
+<tr><th>Command</th><th>Exit</th><th>Result</th></tr>
+<tr><td><code>php artisan test</code></td><td>0</td><td>162 passed (3409 assertions)</td></tr>
+<tr><td><code>composer audit</code></td><td>0</td><td>no advisories</td></tr>
+<tr><td>public <code>type-check</code> / <code>lint</code> / <code>test:unit</code> / <code>build</code></td><td>0 / 0 / 0 / 0</td><td>30 unit tests</td></tr>
+<tr><td>public <code>pnpm audit --prod</code> / <code>pnpm audit</code></td><td>0 / 1</td><td>clean / 2 moderate dev-only</td></tr>
+<tr><td>staff <code>type-check</code> / <code>lint</code> / <code>test:unit</code> / <code>build</code></td><td>0 / 0 / 0 / 0</td><td>13 unit tests</td></tr>
+<tr><td>staff <code>pnpm audit --prod</code> / <code>pnpm audit</code></td><td>0 / 1</td><td>clean / 2 moderate dev-only</td></tr>
+<tr><td>public <code>playwright test</code> (Chromium, Firefox, mobile)</td><td>0</td><td><span class="ok">152 passed</span>, 10 skipped by design, 0 failed</td></tr>
+<tr><td>staff <code>playwright test</code> (Chromium, Firefox)</td><td>0</td><td><span class="ok">51 passed</span>, 1 skipped by design</td></tr>
+<tr><td>public <code>playwright test --project=webkit</code> (one test)</td><td>1</td><td>browser could not launch: missing system libraries</td></tr>
+</table></div>
+
+<h2>Owner decisions</h2>
+<ul>
+<li><strong>Infrastructure:</strong> AR4 hosting, AR5 production Postgres and backups, D1 storage, email provider, error monitoring.</li>
+<li><strong>Security and privacy:</strong> AR3 staff MFA, Q9 (contributions on account deletion), D7 contact retention.</li>
+<li><strong>Product:</strong> D4 SEO prerender, a map tile provider, Q6 difficulty scale.</li>
+<li><strong>Tooling and data:</strong> approval for axe and Lighthouse, the WebKit system libraries, and a labelled dev dataset.</li>
+</ul>
+
+<h2>Recommended next steps</h2>
+<ol>
+<li>Decide hosting, database and storage, then run a backup and restore drill.</li>
+<li>Build account deletion and export once Q9 is decided, plus a production uploads switch.</li>
+<li>Choose an email provider and error monitoring; turn on staff MFA.</li>
+<li>Commit and push both repos so CI runs, including WebKit.</li>
+<li>Approve axe and Lighthouse; do a screen-reader pass.</li>
+<li>Enter real content, or approve the labelled dev dataset.</li>
+<li>Improve route-page loading on phones.</li>
+</ol>
+</main>
+</body>
+</html>

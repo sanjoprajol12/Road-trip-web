@@ -28,6 +28,11 @@ function describe(n: AppNotification): string {
   if (d.kind === 'place_reviewed') return `Your suggested place "${d.title}" was not accepted. See the reason under Suggest a place.`
   if (d.kind === 'trip_invitation') return `${d.by ?? 'A rider'} invited you to plan "${d.title}". Answer under My rides.`
   if (d.kind === 'contribution_correction') return `A moderator asked you to add a correction to "${d.title}".`
+  if (d.kind === 'ownership_offered') return `${d.by ?? 'A rider'} is closing their account and offers you ${d.subject === 'event' ? 'the event' : 'the trip'} "${d.title}". Answer under Offers.`
+  if (d.kind === 'ownership_accepted') return `${d.by ?? 'A rider'} took over "${d.title}".`
+  if (d.kind === 'ownership_declined') return `${d.by ?? 'A rider'} declined to take over "${d.title}".`
+  if (d.kind === 'trip_closed') return `The trip "${d.title}" was deleted: its owner closed their account and nobody took it over.`
+  if (d.kind === 'event_update' && d.body) return `${d.title}: ${d.body}`
   if (d.kind === 'event_invitation') return `You are invited to ${d.title}.`
   if (d.kind === 'event_cancellation') return `${d.title} was cancelled.`
   if (d.kind === 'event_postponement') return `${d.title} was postponed.`

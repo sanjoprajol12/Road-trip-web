@@ -27,11 +27,13 @@ class CmsTest extends TestCase
 
     public function test_the_seeded_homepage_is_the_existing_copy(): void
     {
+        // Session 21 added the planner and tools after the hero and gave the untouched seeded hero a specific headline.
         $home = $this->as(null)->getJson('/api/v1/home')->assertOk()->assertJsonPath('preview', false)->json('data');
-        $this->assertSame(['hero', 'layers', 'featured_destinations', 'freshness'], array_column($home, 'type'));
-        $this->assertSame(['Plan better.', 'Ride prepared.', 'Learn from real journeys.'], $home[0]['lines']);
+        $this->assertSame(['hero', 'planner', 'tools', 'layers', 'featured_destinations', 'freshness'], array_column($home, 'type'));
+        $this->assertSame(['Plan the ride', 'stretch by stretch.'], $home[0]['lines']);
+        $this->assertEquals(['label' => 'Plan a route', 'to' => '/journey'], $home[0]['primary_cta']);
         $this->assertSame('/images/photos/kathmandu-motorcycle', $home[0]['background']['base']);
-        $this->assertSame('Every observation carries its date', $home[3]['heading']);
+        $this->assertSame('Every observation carries its date', $home[5]['heading']);
         $this->as(null)->getJson('/api/v1/menus/header')->assertOk()->assertJsonCount(6, 'data')->assertJsonPath('data.5.signed_in_only', true);
         $this->as(null)->getJson('/api/v1/menus/sidebar')->assertNotFound();
     }
@@ -48,7 +50,7 @@ class CmsTest extends TestCase
         $this->as($editor)->patchJson("/api/v1/admin/cms/home/sections/{$hero}", ['data' => $data])->assertOk()
             ->assertJsonPath('data.changed', true)->assertJsonMissingPath('data.data.made_up_field');
         // Not published yet: the public homepage is unchanged; a preview token shows the draft.
-        $this->as(null)->getJson('/api/v1/home')->assertJsonPath('data.0.lines', ['Plan better.', 'Ride prepared.', 'Learn from real journeys.']);
+        $this->as(null)->getJson('/api/v1/home')->assertJsonPath('data.0.lines', ['Plan the ride', 'stretch by stretch.']);
         $token = PreviewToken::issue($editor->id);
         $this->as(null)->withHeader('X-Preview-Token', $token)->getJson('/api/v1/home')->assertJsonPath('preview', true)->assertJsonPath('data.0.lines', ['Ride the hills.']);
         $this->as(null)->withHeader('X-Preview-Token', $token.'x')->getJson('/api/v1/home')->assertJsonPath('preview', false);
@@ -98,6 +100,7 @@ class CmsTest extends TestCase
     public function test_order_visibility_schedule_and_archive(): void
     {
         $editor = $this->staff('admin');
+        DB::table('home_sections')->whereIn('type', ['planner', 'tools'])->delete(); // ordering mechanics on the original four sections
         $ids = DB::table('home_sections')->orderBy('position')->pluck('id')->all();
         $this->as($editor)->putJson('/api/v1/admin/cms/home/order', ['ids' => array_reverse($ids)])->assertNoContent();
         $this->as($editor)->patchJson("/api/v1/admin/cms/home/sections/{$ids[1]}", ['is_visible' => false])->assertOk();

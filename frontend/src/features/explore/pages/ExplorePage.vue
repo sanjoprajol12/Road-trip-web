@@ -107,7 +107,7 @@ function clear() {
                   class="transition-transform duration-700 ease-out-quint group-hover:scale-[1.04]"
                 />
                 <!-- No photo of this exact place yet: say so instead of showing somewhere else. -->
-                <p v-else class="on-night grid size-full place-items-center p-4 text-center text-sm text-night-muted">No photo of this place yet</p>
+                <p v-else class="on-night texture-contours grid size-full place-items-center p-4 text-center text-sm text-night-muted">No photo of this place yet</p>
               </div>
             </RouterLink>
           </li>

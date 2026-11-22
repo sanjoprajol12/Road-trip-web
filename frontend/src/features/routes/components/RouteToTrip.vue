@@ -102,7 +102,7 @@ const canSubmit = computed(() => !busy.value && !!pick.value && (pick.value !== 
       <p v-if="trips.data.value && !trips.data.value.length" class="-mt-2 text-xs text-muted">You have no trip you can edit yet, so a new one will be created.</p>
 
       <div class="flex flex-wrap items-center gap-3">
-        <button type="button" class="btn btn-primary" :disabled="!canSubmit || onTrip.whole || onTrip.stretches" @click="addWhole"><RouteIcon class="size-4" aria-hidden="true" /> Add the whole route</button>
+        <button type="button" class="btn" :class="picked.length ? 'btn-quiet' : 'btn-primary'" :disabled="!canSubmit || onTrip.whole || onTrip.stretches" :aria-busy="busy" @click="addWhole"><RouteIcon class="size-4" aria-hidden="true" /> {{ busy && !picked.length ? 'Adding…' : 'Add the whole route' }}</button>
         <button type="button" class="btn btn-quiet" :aria-pressed="reversed" @click="reversed = !reversed"><ArrowLeftRight class="size-4" aria-hidden="true" /> {{ reversed ? 'Riding in reverse' : 'Ride it in reverse' }}</button>
         <p v-if="onTrip.whole" class="text-sm text-muted">The whole route is already on this trip.</p>
         <p v-else-if="onTrip.stretches" class="text-sm text-muted">Some stretches are already on this trip; add the others below.</p>
@@ -112,10 +112,10 @@ const canSubmit = computed(() => !busy.value && !!pick.value && (pick.value !== 
         <legend class="text-sm font-semibold">Or choose stretches and checkpoints, in riding order</legend>
         <ul class="grid border-t border-line">
           <li v-for="r in rows" :key="r.key" class="border-b border-line py-2" :class="r.type === 'stretch' ? 'pl-6' : ''">
-            <label class="flex min-h-9 items-start gap-3 text-sm" :class="added(r) ? 'text-muted' : ''">
-              <input v-model="chosen" type="checkbox" class="mt-1 accent-crimson" :value="r.key" :disabled="added(r)" />
+            <label class="flex min-h-9 gap-3 text-sm" :class="[added(r) ? 'text-muted' : '', r.type === 'stretch' ? 'items-start' : 'items-center']">
+              <input v-model="chosen" type="checkbox" class="accent-crimson" :class="r.type === 'stretch' ? 'mt-1' : ''" :value="r.key" :disabled="added(r)" />
               <span class="grid gap-0.5">
-                <span><span class="font-semibold">{{ r.name }}</span> <span class="text-muted">{{ r.type === 'stretch' ? 'stretch' : 'checkpoint' }}</span><template v-if="added(r)"> · already on this trip</template></span>
+                <span><span class="font-semibold">{{ r.name }}</span> <span :class="r.type === 'stretch' ? 'sr-only' : 'text-muted'">{{ r.type === 'stretch' ? 'stretch' : 'checkpoint' }}</span><template v-if="added(r)"> · already on this trip</template></span>
                 <span v-if="r.type === 'stretch'" class="tabular text-muted">
                   <template v-if="r.segment.distance_km !== null">{{ km(r.segment.distance_km) }}</template><template v-if="r.segment.distance_km !== null && r.segment.estimated_hours !== null"> · </template><template v-if="r.segment.estimated_hours !== null">about {{ r.segment.estimated_hours }} h (estimate)</template><template v-if="r.segment.distance_km !== null || r.segment.estimated_hours !== null"> · </template>{{ surfaceLabels[r.segment.surface] }}
                 </span>
@@ -128,8 +128,8 @@ const canSubmit = computed(() => !busy.value && !!pick.value && (pick.value !== 
       <p v-else class="text-sm text-muted">No stretches are recorded for this route yet, so only the whole route can be added.</p>
 
       <div v-if="rows.length" class="grid gap-3 sm:flex sm:flex-wrap sm:items-center">
-        <button type="button" class="btn btn-quiet" :disabled="!canSubmit || !picked.length" @click="addPicked"><Plus class="size-4" aria-hidden="true" /> Add {{ picked.length || '' }} selected</button>
-        <p class="text-sm" aria-live="polite">
+        <button type="button" class="btn" :class="picked.length ? 'btn-primary' : 'btn-quiet'" :disabled="!canSubmit || !picked.length" :aria-busy="busy" @click="addPicked"><Plus class="size-4" aria-hidden="true" /> {{ busy && picked.length ? 'Adding…' : `Add ${picked.length || ''} selected` }}</button>
+        <p class="tabular text-sm" aria-live="polite">
           <template v-if="!picked.length">Nothing selected.</template>
           <template v-else>
             {{ picked.length }} selected<template v-if="totals.parts">: {{ km(totals.km) }} recorded<template v-if="totals.hours">, about {{ totals.hours }} h riding (estimate)</template></template>.
@@ -139,7 +139,7 @@ const canSubmit = computed(() => !busy.value && !!pick.value && (pick.value !== 
           </template>
         </p>
       </div>
-      <p v-if="msg" :role="msg.ok ? 'status' : 'alert'" class="text-sm" :class="msg.ok ? '' : 'text-danger'">{{ msg.text }} <RouterLink v-if="msg.ok && msg.tripId" :to="`/rides/${msg.tripId}`" class="link font-semibold">Open the trip</RouterLink></p>
+      <p v-if="msg" :key="msg.text" :role="msg.ok ? 'status' : 'alert'" class="feedback-in text-sm" :class="msg.ok ? '' : 'text-danger'">{{ msg.text }} <RouterLink v-if="msg.ok && msg.tripId" :to="`/rides/${msg.tripId}`" class="link font-semibold">Open the trip</RouterLink></p>
     </div>
   </section>
 </template>

@@ -17,16 +17,19 @@ export interface Me {
   verified: VerifiedClaim[]
   suspended_until: string | null
   contribution_suspension?: { until: string; reason: string; appealed_at: string | null; appeal_decision: 'upheld' | 'lifted' | null } | null
+  /** Set while a requested account deletion waits out its 30-day cooling-off. */
+  deletion_scheduled_for: string | null
   created_at: string
 }
 
+/** A rider as others see them. id and joined are null for a "Former rider" (an account that was deleted). */
 export interface PublicUser {
-  id: string
+  id: string | null
   display_name: string
   username: string | null
   home_city?: string | null
   bio?: string | null
-  joined: string
+  joined: string | null
   verified: VerifiedClaim[]
 }
 
@@ -234,7 +237,7 @@ export interface OwnVerification {
 
 export interface AppNotification {
   id: string
-  data: { kind: string; title?: string; body?: string; note?: string; status?: string; claim_kind?: string; change?: 'promoted' | 'approved' | 'declined' | 'removed' | 'published' | 'changes_requested' | 'rejected' | 'suspended' | 'lifted' | 'appeal_upheld'; link?: string; by?: string }
+  data: { kind: string; title?: string; body?: string; note?: string; status?: string; claim_kind?: string; change?: 'promoted' | 'approved' | 'declined' | 'removed' | 'published' | 'changes_requested' | 'rejected' | 'suspended' | 'lifted' | 'appeal_upheld'; link?: string; by?: string; subject?: 'event' | 'trip' }
   read_at: string | null
   created_at: string
 }

@@ -12,6 +12,9 @@ export interface FeaturedData<T> { heading: string; link_label: string | null; i
 export interface FreshnessData { heading: string; text: string | null; legend: { term: string; detail: string }[]; caption: string | null }
 export interface BannerData { heading: string; text: string | null; image: LibraryImage | null; cta: Cta | null }
 export interface TextData { heading: string; body: string }
+/** A real published route (or none) and the published destinations a rider can pick. */
+export interface PlannerData { heading: string; intro: string | null; route: RideRoute | null; places: { slug: string; name: string }[] }
+export interface ToolsData { heading: string; intro: string | null; items: { name: string; text: string; cta: Cta | null }[] }
 
 export type HomeSection = { id: string } & (
   | ({ type: 'hero' } & HeroData)
@@ -23,6 +26,8 @@ export type HomeSection = { id: string } & (
   | ({ type: 'freshness' } & FreshnessData)
   | ({ type: 'banner' } & BannerData)
   | ({ type: 'text' } & TextData)
+  | ({ type: 'planner' } & PlannerData)
+  | ({ type: 'tools' } & ToolsData)
 )
 
 export interface MenuItem { label: string; to: string; signed_in_only: boolean }

@@ -54,3 +54,31 @@ Artisan::command('mrn:permissions:sync', function () {
     \App\Support\Permissions::sync();
     $this->info(count(\App\Support\Permissions::keys()).' permissions in the registry are now in the database.');
 })->purpose('Copy config/permissions.php into the permissions table (run after adding or removing a permission)');
+
+/*
+ * Account deletion (owner decisions D-01..D-04, D-10). Daily: run the deletions whose 30-day cooling-off has passed,
+ * end moderation evidence holds that reached their 30 days, delete finished deletion records after one year, and
+ * retry file removals that failed before. Each step is safe
+ * to repeat: a finished request is skipped, and a file stays queued until it is really gone.
+ */
+Artisan::command('mrn:accounts:process-deletions', function () {
+    $runner = app(\App\Actions\Accounts\ProcessAccountDeletion::class);
+    $tally = ['done' => 0, 'skipped' => 0, 'failed' => 0];
+    \App\Models\AccountDeletionRequest::where('status', 'scheduled')->where('run_after', '<=', now())->orderBy('run_after')
+        ->each(function ($req) use ($runner, &$tally) {
+            $tally[$runner->run($req)]++;
+        });
+    $evidence = app(\App\Actions\Accounts\DisposeModerationEvidence::class)->purgeExpired();
+    // D-10: finished deletion records (done or cancelled) are kept one year, then deleted. Scheduled ones never are.
+    $expired = \App\Models\AccountDeletionRequest::whereIn('status', ['done', 'cancelled'])
+        ->whereRaw('coalesce(completed_at, cancelled_at) <= ?', [now()->subYear()])->delete();
+    if ($expired) {
+        \App\Support\Audit::record('account.deletion_records_purged', 'account_deletion_requests', null, ['records' => $expired, 'older_than' => '1 year']);
+    }
+    $files = \App\Support\PendingFiles::flush();
+    $this->info("Deletions done {$tally['done']}, skipped {$tally['skipped']}, failed {$tally['failed']}; evidence expired {$evidence}; records purged {$expired}; files removed {$files['removed']}, still failing {$files['failed']}.");
+
+    return $tally['failed'] > 0 || $files['failed'] > 0 ? 1 : 0;
+})->purpose('Run due account deletions, end expired moderation evidence holds, purge deletion records older than a year, retry failed file removals');
+
+\Illuminate\Support\Facades\Schedule::command('mrn:accounts:process-deletions')->dailyAt('02:30')->withoutOverlapping()->onOneServer();

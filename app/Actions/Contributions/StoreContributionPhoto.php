@@ -6,8 +6,6 @@ use App\Models\Contribution;
 use App\Models\ContributionMedia;
 use App\Support\Images;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 /**
  * Accepts only images that actually decode as JPEG, PNG or WebP (the extension and the browser's MIME type
@@ -18,12 +16,13 @@ class StoreContributionPhoto
 {
     public function __invoke(Contribution $c, UploadedFile $file, string $alt): ContributionMedia
     {
-        $img = Images::reencode($file);
+        $stored = Images::store($file, "contributions/{$c->id}");
+        try {
+            return $c->media()->create(['disk' => $stored['disk'], 'path' => $stored['path'], 'width' => $stored['width'], 'height' => $stored['height'], 'size_bytes' => $stored['bytes_size'], 'alt' => trim($alt)]);
+        } catch (\Throwable $e) {
+            Images::discard($stored); // no file without its row
 
-        $path = "contributions/{$c->id}/".Str::uuid().'.webp';
-        $disk = Images::disk();
-        Storage::disk($disk)->put($path, $img['bytes']);
-
-        return $c->media()->create(['disk' => $disk, 'path' => $path, 'width' => $img['width'], 'height' => $img['height'], 'size_bytes' => strlen($img['bytes']), 'alt' => trim($alt)]);
+            throw $e;
+        }
     }
 }

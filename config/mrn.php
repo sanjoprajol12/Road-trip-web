@@ -24,5 +24,11 @@ return [
     'uploads' => [
         'max_kb' => 8192,
         'max_edge' => 2000,
+        // Session 24 (docs/architecture/UPLOAD_SAFETY_DESIGN.md). UPLOADS_ENABLED=false stops every new upload; the
+        // staff setting storage.uploads_enabled can pause them too but can never turn them on against this.
+        'enabled' => (bool) env('UPLOADS_ENABLED', true),
+        // The "local" disk is accepted only in these environments (owner decision O6: development only). There is
+        // deliberately no override: production, staging and anything else need a durable disk.
+        'local_disk_environments' => ['local', 'testing'],
     ],
 ];

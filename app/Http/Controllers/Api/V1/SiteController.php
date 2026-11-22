@@ -14,7 +14,10 @@ class SiteController extends Controller
     /** Public site settings for both frontends (name, contact, maintenance, registration). No secrets. */
     public function show(): JsonResponse
     {
-        return response()->json(['data' => Settings::public()]);
+        // Whether new uploads are accepted (both apps hide their pickers when not); never the reason or the disk.
+        $uploads = \App\Support\UploadPolicy::status()['allowed'];
+
+        return response()->json(['data' => Settings::public() + ['uploads' => ['enabled' => $uploads, 'message' => $uploads ? null : \App\Support\UploadPolicy::message()]]]);
     }
 
     /** Library images marked public. Private ones are never served here. */

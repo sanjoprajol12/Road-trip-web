@@ -114,6 +114,13 @@ Route::prefix('admin')->name('admin.')->middleware(['auth:staff', 'can:staff'])-
     Route::delete('staff-invitations/{invitation}', [Admin\StaffInvitationController::class, 'destroy'])->middleware('can:users.invite');
 
     Route::get('audit-logs', Admin\AuditLogController::class)->middleware('can:audit.view');
+    Route::get('account-deletions', [Admin\PrivacyController::class, 'deletions'])->middleware('can:users.deletions.view');
+    Route::middleware('can:moderation.evidence.view')->group(function () {
+        Route::get('moderation-evidence', [Admin\PrivacyController::class, 'evidence']);
+        Route::get('moderation-evidence/{evidence}', [Admin\PrivacyController::class, 'showEvidence'])->whereUuid('evidence');
+        Route::get('moderation-evidence/{evidence}/files/{index}', [Admin\PrivacyController::class, 'file'])->whereUuid('evidence')->whereNumber('index')->name('evidence.file');
+        Route::post('moderation-evidence/{evidence}/release', [Admin\PrivacyController::class, 'release'])->whereUuid('evidence');
+    });
 
     // Site settings: one route pair per group, each behind settings.<group>.manage.
     foreach (config('settings.groups') as $group) {
@@ -121,6 +128,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth:staff', 'can:staff'])-
         Route::put("settings/{$group}", [Admin\SettingsController::class, 'update'])->defaults('group', $group)->middleware("can:settings.{$group}.manage");
     }
     Route::post('settings/storage/test', [Admin\SettingsController::class, 'testStorage'])->middleware('can:settings.storage.manage');
+    Route::get('settings/storage/upload-status', [Admin\SettingsController::class, 'uploadStatus'])->middleware('can:settings.storage.manage');
     Route::post('settings/mail/test-connection', [Admin\SettingsController::class, 'testMailConnection'])->middleware(['can:settings.mail.manage', 'throttle:auth-email']);
     Route::post('settings/mail/test-email', [Admin\SettingsController::class, 'sendTestMail'])->middleware(['can:settings.mail.manage', 'throttle:auth-email']);
     Route::post('settings/maps/test', [Admin\SettingsController::class, 'testProvider'])->middleware(['can:settings.maps.manage', 'throttle:auth-email']);

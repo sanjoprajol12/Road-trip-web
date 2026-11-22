@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 25: Account deletion | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:60rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; }
+  h2 { font-size:1.3rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.4rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  code { font-size:.88em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; word-break:break-word; }
+  .warn { color:var(--warn); font-weight:700; }
+  .ok { color:var(--ok); font-weight:700; }
+  ul, ol { padding-left:1.3rem; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; margin:.6rem 0 1rem; }
+  th, td { text-align:left; vertical-align:top; padding:.4rem .6rem; border-bottom:1px solid var(--line); }
+  th { background:var(--surface); }
+  svg text { font: 13px system-ui, sans-serif; fill: var(--ink); }
+  svg .muted { fill: var(--muted); }
+  .crit { color:#a51d2d; font-weight:700; } .high { color:#8a5a00; font-weight:700; }
+</style>
+</head>
+<body>
+<main>
+<p class="meta">My Ride Nepal · Session report</p>
+<h1>Session 25: account deletion, cooling-off, contribution choices and export</h1>
+<p class="meta">2026-11-22 · Claude Code (Opus 5.5) · Step 2 of the owner decision record (also covers the transfer and evidence parts of steps 3 and 4) · Nothing committed, pushed, purchased, deployed or connected</p>
+
+<h2>Before coding</h2>
+<ul>
+<li><strong>Coordination:</strong> two other Claude sessions were open in this project, but they ran no tools and no project file had changed in the 35 minutes before work started, so nothing conflicted. <code>git status</code> showed only the earlier uncommitted work, which was kept.</li>
+<li><strong>Rules file:</strong> <code>web/CLAUDE.md</code> was a symlink to itself, created in commit <code>02402ff</code>. It is restored from commit <code>54a9c4e</code>, the last version with content, and the root link the rules describe (<code>Road-trip/CLAUDE.md → web/CLAUDE.md</code>) is recreated.</li>
+<li><strong>Dependencies traced:</strong> every foreign key to <code>users</code>, <code>contributions</code>, <code>events</code> and <code>trips</code> (read from <code>pg_constraint</code>), plus the references without a foreign key: notifications, the audit log and contact messages.</li>
+</ul>
+
+<h2>Progress</h2>
+<ul>
+<li><strong>Verified completion: 68.2%</strong> (178 / 261), up from 67.8%.</li>
+<li><strong>Implementation coverage: 82.3%</strong>, up from 81.9%.</li>
+<li>Only <strong>G19</strong> changed, from not built to complete and tested. <strong>H11</strong> stays Partial because of O8 and the undecided retention period.</li>
+</ul>
+
+<h2>What was built</h2>
+<ul>
+<li><strong>Request:</strong> the rider re-enters their password, ticks a confirmation, and chooses for every public contribution: <em>Delete</em>, <em>Keep anonymously</em>, or <em>Keep anonymously, remove photos</em>.
+  <ul>
+  <li>Nothing is pre-selected, and each choice is explained.</li>
+  <li>A missing or foreign choice is refused.</li>
+  <li>Limited to 5 attempts an hour.</li>
+  </ul></li>
+<li><strong>Cooling-off (30 days):</strong>
+  <ul>
+  <li>Nothing is destroyed, and other devices are signed out.</li>
+  <li>The rider can still sign in, read, export, cancel and offer handovers, but cannot post, confirm, join, host or be invited. The public profile is hidden.</li>
+  <li><strong>Signing in does not cancel.</strong> Only the Cancel deletion button does, and it needs the password.</li>
+  </ul></li>
+<li><strong>Handovers:</strong>
+  <ul>
+  <li>An event can go to an approved organizer who is not suspended, deactivated or leaving.</li>
+  <li>A group trip can go to any member, viewers included.</li>
+  <li>Nothing moves until the recipient accepts. Eligibility is checked again at acceptance, and another rider's offer answers 404.</li>
+  <li>Without an accepted handover:
+    <ul>
+    <li>the event is cancelled, kept without an organizer, and its riders are notified;</li>
+    <li>the group trip is deleted and its members are notified.</li>
+    </ul></li>
+  </ul></li>
+<li><strong>Final run</strong> (<code>mrn:accounts:process-deletions</code>, daily at 02:30):
+  <ul>
+  <li>One transaction per request. A failure rolls everything back and is retried on the next run, and a finished request is skipped.</li>
+  <li>Choices are applied. A public contribution without a recorded choice is deleted.</li>
+  <li>Confirmations the rider gave are removed and the last-confirmed date is recomputed; the confirmed reports are untouched.</li>
+  <li>Notifications and password reset tokens are removed, and places held on other riders' events go to the waitlist.</li>
+  <li>The minimum record is kept: dates, counts, and choices by contribution id.</li>
+  </ul></li>
+<li><strong>Files:</strong> photo files are queued inside the transaction and removed after the commit. A failed removal stays queued and is retried. A file still used by a photo row or by held evidence is never removed.</li>
+<li><strong>Moderation evidence:</strong>
+  <ul>
+  <li>Kept for open cases on the rider's contributions, and for open reports the rider filed on others' content.</li>
+  <li>Readable only with <code>moderation.evidence.view</code>, and every view is audited.</li>
+  <li>Removed after 30 days, or earlier by staff. A database check means a hold can never be extended.</li>
+  </ul></li>
+<li><strong>Export:</strong> a password-protected ZIP holding the profile, contributions with photos, confirmations, reports filed, trips (other members by display name only), events, places, saved items, emergency contacts, notifications and sessions.
+  <ul>
+  <li>It is streamed in the response and never stored, so there is no URL to guess or expire.</li>
+  <li>It excludes audit logs, staff-only notes and other riders' private data.</li>
+  </ul></li>
+<li><strong>Staff:</strong> a "Deletions and evidence" page. Deletion requests show dates and counts only (<code>users.deletions.view</code>); the evidence list shows no content until a recorded view.</li>
+<li><strong>Database safety nets:</strong> a contribution can have no author only once it is marked as anonymised, and an event can have no organizer only when it is cancelled. A raw delete of a rider who still has content now fails instead of silently cascading.</li>
+</ul>
+
+<h2>Verification</h2>
+<div class="scroll"><table>
+<tr><th>Check</th><th>Exit</th><th>Result</th></tr>
+<tr><td><code>php artisan test</code></td><td>0</td><td class="ok">184 passed (3844 assertions); <code>AccountDeletionTest</code> 15 tests, 237 assertions, run 3 times</td></tr>
+<tr><td><code>composer audit</code></td><td>0</td><td>no advisories</td></tr>
+<tr><td>Public: type-check, lint, unit, build, <code>pnpm audit --prod</code></td><td>0</td><td>30 unit tests passed; no vulnerabilities</td></tr>
+<tr><td>Staff: type-check, lint, unit, build, <code>pnpm audit --prod</code></td><td>0</td><td>13 unit tests passed; no vulnerabilities</td></tr>
+<tr><td>Public E2E (Chromium, Firefox, mobile)</td><td>0</td><td class="ok">161 passed, 10 skipped (existing per-browser skips), including <code>account-deletion.spec.ts</code> 2 tests × 3 browsers</td></tr>
+<tr><td>Staff E2E (Chromium, Firefox)</td><td>0</td><td class="ok">55 passed, 1 skipped (existing skip), including <code>privacy.spec.ts</code></td></tr>
+<tr><td>WebKit</td><td>—</td><td><span class="warn">not run</span>: system libraries are missing locally (sudo not approved)</td></tr>
+</table></div>
+<p>The first full public run had 4 failures, all fixed before the green run:</p>
+<ul>
+<li>A new heading matched the older auth spec's "Your account" lookup; the heading is renamed "Account deletion".</li>
+<li>The new spec signed in again before the sign-out had finished.</li>
+</ul>
+<p>The browser journey runs the real daily command against the isolated E2E database. No test servers were left running.</p>
+
+<h2>Open for the owner</h2>
+<ul>
+<li><strong>O8 (new):</strong> the audit log is append-only for the app, and entries such as <code>contribution.edited</code> hold the old and new contribution text. That text stays after a deletion, under a pseudonymous id. Decide whether to keep it or redact it with a privileged maintenance job.</li>
+<li>How long deletion request rows are kept (proposal: 2 years).</li>
+<li>Whether a community-corroborated report should lose that status when removed confirmations drop it below the threshold (today it keeps it).</li>
+<li>Not built: the reminder email 3 days before the deletion, and a signed cancel link in the email.</li>
+<li>At hosting time: a cron for the scheduler, a production mail provider (O5) and durable storage (O6).</li>
+</ul>
+
+<h2>Boundaries kept</h2>
+<p>No purchase, deployment, external connection or remote Supabase access. No new dependency, and no commit or push. Deletions ran only on test databases and E2E test accounts.</p>
+</main>
+</body>
+</html>

@@ -24,6 +24,11 @@ export function sql(statement: string): string {
 
 /** Removes every account the E2E suites created (their trips, contributions and claims cascade). */
 export function deleteTestUsers() {
+  // Since session 25 the database refuses to orphan a contribution or an open event (only the account deletion flow
+  // may anonymise them), so test content goes first.
+  const test = `select id from users where email like '%@${TEST_EMAIL_DOMAIN}'`
+  sql(`delete from contributions where author_id in (${test})`)
+  sql(`delete from events where organizer_id in (${test})`)
   sql(`delete from users where email like '%@${TEST_EMAIL_DOMAIN}'`)
 }
 

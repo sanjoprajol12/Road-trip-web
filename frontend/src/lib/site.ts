@@ -12,12 +12,16 @@ export interface SiteSettings {
   social: Partial<Record<'facebook' | 'instagram' | 'youtube' | 'tiktok' | 'x', string | null>>
   seo: { default_title: string; default_description: string }
   footer: { tagline: string | null; disclaimer: string; note: string | null; credits: string | null }
+  /** Whether new photos are accepted right now (paused when storage is not durable or staff paused uploads). */
+  uploads?: { enabled: boolean; message: string | null }
 }
 
 export const site = ref<SiteSettings | null>(null)
 /** Header and footer menus and active notices, all managed in the staff portal. Empty when the API is down. */
 export const menus = ref<{ header: MenuItem[]; footer: MenuItem[] }>({ header: [], footer: [] })
 export const notices = ref<Notice[]>([])
+// How many home hero sections are mounted right now: the header is transparent only over a rendered hero.
+export const heroesOnScreen = ref(0)
 
 export async function loadSite(): Promise<void> {
   try {

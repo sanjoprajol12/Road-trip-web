@@ -34,6 +34,12 @@ alter default privileges in schema public grant select, insert, update, delete o
 alter default privileges in schema public grant usage, select on sequences to mrn_app;
 grant select, insert, update, delete on all tables in schema public to mrn_app;
 grant usage, select on all sequences in schema public to mrn_app;
+-- The audit log stays append-only for the app (migration 2026_11_18_100008): the blanket grant above must not undo it.
+do \$\$ begin
+  if to_regclass('public.audit_logs') is not null then
+    revoke update, delete, truncate on audit_logs from mrn_app;
+  end if;
+end \$\$;
 SQL
 done
 echo "Local databases and roles are ready (myridenepal, myridenepal_test, myridenepal_e2e; mrn_owner, mrn_app)."

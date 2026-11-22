@@ -26,7 +26,7 @@ Even with the build fixed, a deployment cannot serve requests until the items be
 | `SESSION_SECURE_COOKIE=true`, `SESSION_DOMAIN=null` | host-only secure cookies per frontend | template |
 | `QUEUE_CONNECTION=sync` | serverless containers run no worker | template |
 | Mail provider | confirmation, reset, invitation emails | owner (credentials can live encrypted in Settings) |
-| Durable storage | uploads on the container disk vanish when an instance is replaced | **D1**; keep uploads disabled in production until then |
+| Durable storage | uploads on the container disk vanish when an instance is replaced | **D1 / O6 open.** Enforced since session 24: outside local/testing the local disk is refused (`UploadPolicy`, 422 + critical log, existing files still served); set `UPLOADS_ENABLED=false` until a provider is verified (`UPLOAD_SAFETY_DESIGN.md`) |
 | Migrations | run once per release with the owner role (`php artisan migrate --database=pgsql_owner --force`) from a trusted machine or CI job | documented |
 | Health check | `GET /api/v1/health` (checks the database) | ready |
 | Error monitoring | logs to stderr (`LOG_CHANNEL=stderr`) are kept by the platform; a hosted error tracker would be a new service | owner |

@@ -7,6 +7,7 @@ import { useAsync } from '@/lib/useAsync'
 import { contributionKindLabels } from '../labels'
 import type { Contribution, ContributionKind } from '@/types/api'
 import { getContribution, saveContribution, uploadPhoto } from '../services/contributions'
+import { site } from '@/lib/site'
 import { getRoute, listRoutes } from '@/features/routes/services/routes'
 import { getPlace } from '@/features/places/services/places'
 import { listDestinations } from '@/features/explore/services/destinations'
@@ -130,7 +131,11 @@ async function upload() {
 
     <div v-else-if="created" class="mt-10 grid gap-6">
       <p class="flex items-center gap-2 text-success" role="status"><CircleCheck class="size-5" aria-hidden="true" /> {{ editing ? 'Changes saved. It is still waiting for review.' : 'Sent for review.' }} You can follow it in <RouterLink to="/account#activity" class="link font-semibold">your account</RouterLink>.</p>
-      <form class="grid gap-4 rounded-md border border-line bg-surface p-5" @submit.prevent="upload">
+      <section v-if="site?.uploads && !site.uploads.enabled" class="grid gap-2 rounded-md border border-line bg-surface p-5" aria-labelledby="photos-paused">
+        <h2 id="photos-paused" class="font-semibold">Photos</h2>
+        <p class="text-sm" role="status">{{ site.uploads.message }}</p>
+      </section>
+      <form v-else class="grid gap-4 rounded-md border border-line bg-surface p-5" @submit.prevent="upload">
         <h2 class="font-semibold">Add photos (optional, up to 6)</h2>
         <p class="text-sm text-muted">JPEG, PNG or WebP. Location data is removed from every photo.</p>
         <p v-if="uploadError" role="alert" class="text-sm text-danger">{{ uploadError }}</p>

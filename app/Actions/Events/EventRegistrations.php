@@ -67,6 +67,9 @@ class EventRegistrations
     {
         $reg = DB::transaction(function () use ($event, $invitee) {
             $event = EventCapacity::lock($event);
+            if ($invitee->isDeletionScheduled() || $invitee->isDeactivated()) {
+                throw ValidationException::withMessages(['username' => ['This rider cannot be invited.']]);
+            }
             if ($invitee->id === $event->organizer_id) {
                 throw ValidationException::withMessages(['username' => ['You cannot invite yourself.']]);
             }

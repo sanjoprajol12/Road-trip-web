@@ -32,7 +32,8 @@ return [
 
         'local' => [
             'driver' => 'local',
-            'root' => storage_path('app/private'),
+            // LOCAL_DISK_ROOT (a path inside storage/) keeps the E2E API's uploads apart from the development files.
+            'root' => storage_path(env('LOCAL_DISK_ROOT', 'app/private')),
             'serve' => true,
             'throw' => false,
             'report' => false,

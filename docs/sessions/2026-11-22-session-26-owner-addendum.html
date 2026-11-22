@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 26: Owner addendum | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:60rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; }
+  h2 { font-size:1.3rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.4rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  code { font-size:.88em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; word-break:break-word; }
+  .warn { color:var(--warn); font-weight:700; }
+  .ok { color:var(--ok); font-weight:700; }
+  ul, ol { padding-left:1.3rem; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; margin:.6rem 0 1rem; }
+  th, td { text-align:left; vertical-align:top; padding:.4rem .6rem; border-bottom:1px solid var(--line); }
+  th { background:var(--surface); }
+  svg text { font: 13px system-ui, sans-serif; fill: var(--ink); }
+  svg .muted { fill: var(--muted); }
+  .crit { color:#a51d2d; font-weight:700; } .high { color:#8a5a00; font-weight:700; }
+</style>
+</head>
+<body>
+<main>
+<p class="meta">My Ride Nepal · Session report</p>
+<h1>Session 26: audit text redaction, deletion record retention and corroboration recalculation</h1>
+<p class="meta">2026-11-22 · Claude Code (Opus 5.5) · Owner addendum O8, D-10, D-11 · Nothing committed, pushed, purchased, deployed or connected</p>
+
+<h2>Progress</h2>
+<ul>
+<li><strong>Verified completion: 68.6%</strong> (179 / 261), up from 68.2%.</li>
+<li><strong>Implementation coverage: 82.5%</strong>, up from 82.3%.</li>
+<li>Only <strong>H11</strong> (data deletion and relationship integrity) changed, from partial to complete and tested.</li>
+</ul>
+
+<h2>O8: audit text redaction</h2>
+<ul>
+<li><strong>Integrity:</strong> the audit log has no hash chain, signature or checksum, so redaction breaks no verification. A future chain must hash the redacted form and link each redaction record.</li>
+<li><strong>Still append-only:</strong> the app role still cannot update or delete audit rows. It may only call <code>mrn_redact_audit_text(entry, reason)</code>, a <code>security definer</code> function owned by the table owner.
+  <ul>
+  <li>It accepts one reason (<code>account_deletion</code>) and three entry types: contribution edits, contribution corrections and place resubmissions.</li>
+  <li>It replaces only text fields with <code>"[redacted]"</code>. Ids, times, actions, actors, subjects and IP addresses are kept, and no key is removed.</li>
+  </ul></li>
+<li><strong>Every redaction is recorded:</strong> a separate <code>audit.redacted</code> entry, by <code>system</code>, names the affected entry, the fields and the reason, with no content and no person. A repeated call changes nothing and records nothing.</li>
+<li><strong>When it runs:</strong> only inside the account deletion run, for the departing rider's contributions and for the place suggestions deleted with the account. There is no HTTP route, and the migration cannot be rolled back once a redaction exists.</li>
+</ul>
+
+<h2>Found during verification: the append-only rule was off in two databases</h2>
+<ul>
+<li>In the development and E2E databases, the app role <strong>could update and delete</strong> audit rows. The test database was correct.</li>
+<li><strong>Cause:</strong> <code>scripts/setup-local-db.sh</code> grants update and delete on every table, which undid the append-only revoke whenever the script ran after the migrations.</li>
+<li><strong>Fixed:</strong> the script now re-applies the revoke, and the revoke is restored in both databases.</li>
+<li><strong>Checked as the app role</strong> in the E2E database: a direct update is refused, and the function redacts and records. The two check rows stay there, because the log cannot be edited.</li>
+<li><strong>Before production:</strong> confirm that <code>has_table_privilege('mrn_app', 'audit_logs', 'update')</code> is false.</li>
+</ul>
+
+<h2>D-10: deletion records kept one year</h2>
+<ul>
+<li>A finished or cancelled request keeps only:
+  <ul>
+  <li>the request and processing dates and the status;</li>
+  <li>choice categories (no contribution ids);</li>
+  <li>counts, including event and trip handovers, redactions and withdrawn corroborations;</li>
+  <li>the attempts and the error class.</li>
+  </ul></li>
+<li>The daily command deletes finished records one year after they finished, and audits the number deleted. Scheduled requests are never purged.</li>
+<li>The pseudonymous account id stays for that year, so a deletion can be applied again after a backup restore.</li>
+</ul>
+
+<h2>D-11: corroboration recalculated</h2>
+<ul>
+<li>A report that the community threshold made "community corroborated" goes back to "published" when the remaining confirmers fall below the threshold. Each change is audited as <code>contribution.corroboration_withdrawn</code>, with the count and the threshold.</li>
+<li>The remaining confirmers are counted without the time window and without re-checking other riders, so only the removal changes the outcome. The author is never counted.</li>
+<li>A moderator's corroboration and an <code>officially_sourced</code> report are kept. The report stays published, and the API shows the new status.</li>
+</ul>
+
+<h2>Verification</h2>
+<div class="scroll"><table>
+<tr><th>Check</th><th>Exit</th><th>Result</th></tr>
+<tr><td><code>php artisan test</code></td><td>0</td><td class="ok">187 passed (3889 assertions); <code>AccountDeletionTest</code> 18 tests (3 new: O8, D-10, D-11)</td></tr>
+<tr><td><code>composer audit</code></td><td>0</td><td>no advisories</td></tr>
+<tr><td>Public E2E <code>account-deletion.spec.ts</code> (Chromium, Firefox, mobile)</td><td>0</td><td class="ok">6 passed (the real daily command, including the new steps)</td></tr>
+<tr><td>Staff E2E <code>privacy.spec.ts</code> (Chromium, Firefox)</td><td>0</td><td class="ok">2 passed</td></tr>
+<tr><td>App-role privilege check (E2E DB, as <code>mrn_app</code>)</td><td>—</td><td>update refused; function redacted 2 fields and wrote <code>audit.redacted</code></td></tr>
+<tr><td>Frontends</td><td>—</td><td>no frontend file changed this session; the session 25 checks stand (all exit 0)</td></tr>
+<tr><td>Full browser suites, WebKit</td><td>—</td><td><span class="warn">not rerun</span>: only the API changed. The session 25 full runs stand (161 + 55 passed). WebKit is still blocked locally.</td></tr>
+</table></div>
+
+<h2>Boundaries kept</h2>
+<p>No production data, deployment, external connection, purchase, remote Supabase, new dependency, commit or push.</p>
+</main>
+</body>
+</html>

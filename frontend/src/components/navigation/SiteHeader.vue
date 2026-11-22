@@ -5,7 +5,7 @@ import { CircleUserRound, Menu, X } from 'lucide-vue-next'
 import BrandMark from './BrandMark.vue'
 import { useAuth } from '@/features/authentication/useAuth'
 import SiteLink from '@/components/ui/SiteLink.vue'
-import { menus } from '@/lib/site'
+import { heroesOnScreen, menus } from '@/lib/site'
 
 
 const route = useRoute()
@@ -30,7 +30,8 @@ async function close() {
   toggle.value?.focus()
 }
 
-const overlay = computed(() => route.meta.overlayHeader && !scrolled.value && !open.value)
+// Light text over the hero photo only while a hero is actually on screen; loading, errors and a removed hero get the normal header.
+const overlay = computed(() => route.meta.overlayHeader && heroesOnScreen.value > 0 && !scrolled.value && !open.value)
 </script>
 
 <template>

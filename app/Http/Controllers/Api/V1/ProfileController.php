@@ -49,7 +49,8 @@ class ProfileController extends Controller
 
     public function publicProfile(string $username): JsonResponse
     {
-        $user = User::where('username', $username)->with('verifications')->firstOrFail();
+        // Hidden during the deletion cooling-off.
+        $user = User::where('username', $username)->whereNull('deletion_scheduled_for')->with('verifications')->firstOrFail();
         $contributions = $user->hasMany(\App\Models\Contribution::class, 'author_id')->visible()
             ->with(['destination', 'route', 'segment', 'media'])->latest()->limit(20)->get();
 

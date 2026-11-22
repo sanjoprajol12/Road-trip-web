@@ -20,7 +20,7 @@ class Contribution extends Model
     protected function casts(): array
     {
         return ['kind' => ContributionKind::class, 'status' => ContributionStatus::class, 'observed_on' => 'date:Y-m-d', 'details' => 'array', 'last_confirmed_on' => 'date:Y-m-d',
-            'correction_requested_at' => 'datetime', 'author_corrected_at' => 'datetime', 'author_correction_reviewed_at' => 'datetime'];
+            'correction_requested_at' => 'datetime', 'author_corrected_at' => 'datetime', 'author_correction_reviewed_at' => 'datetime', 'author_deleted_at' => 'datetime'];
     }
 
     public function scopeVisible(Builder $q): void

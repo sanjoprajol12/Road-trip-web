@@ -39,6 +39,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('users/me/saved', [V1\SavedItemController::class, 'index']);
     Route::post('users/me/saved', [V1\SavedItemController::class, 'store']);
     Route::delete('users/me/saved/{type}/{id}', [V1\SavedItemController::class, 'destroy']);
+    // Account deletion and export: signed in is enough (also while suspended, unconfirmed, or in the cooling-off).
+    Route::get('users/me/deletion', [V1\AccountDeletionController::class, 'show']);
+    Route::post('users/me/deletion', [V1\AccountDeletionController::class, 'store'])->middleware('throttle:account-deletion');
+    Route::delete('users/me/deletion', [V1\AccountDeletionController::class, 'cancel'])->middleware('throttle:account-deletion');
+    Route::post('users/me/export', [V1\AccountDeletionController::class, 'export'])->middleware('throttle:account-export');
+    Route::post('users/me/deletion/offers', [V1\OwnershipTransferController::class, 'offer'])->middleware('throttle:reports');
+    Route::delete('users/me/deletion/offers/{offer}', [V1\OwnershipTransferController::class, 'withdraw']);
+    Route::get('users/me/ownership-offers', [V1\OwnershipTransferController::class, 'incoming']);
     Route::apiResource('users/me/emergency-contacts', V1\EmergencyContactController::class)->except('show')->parameters(['emergency-contacts' => 'contact']);
 
     Route::middleware(['verified', 'not-suspended'])->group(function () {
@@ -81,6 +89,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('trips/{trip}/{part}', [V1\TripPartController::class, 'store'])->whereIn('part', ['stops', 'expenses', 'checklist']);
         Route::patch('trips/{trip}/{part}/{id}', [V1\TripPartController::class, 'update'])->whereIn('part', ['stops', 'expenses', 'checklist']);
         Route::delete('trips/{trip}/{part}/{id}', [V1\TripPartController::class, 'destroy'])->whereIn('part', ['stops', 'expenses', 'checklist']);
+
+        Route::post('ownership-offers/{offer}/accept', [V1\OwnershipTransferController::class, 'respond'])->defaults('answer', 'accept');
+        Route::post('ownership-offers/{offer}/decline', [V1\OwnershipTransferController::class, 'respond'])->defaults('answer', 'decline');
 
         Route::post('guides/{guide}/expert-review', [V1\GuideController::class, 'expertReview']);
     });

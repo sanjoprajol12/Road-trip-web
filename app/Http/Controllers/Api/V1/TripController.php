@@ -68,6 +68,9 @@ class TripController extends Controller
             'role' => ['required', Rule::in(['editor', 'viewer'])],
         ], ['username.exists' => 'No rider has that username.']);
         $user = User::where('username', $data['username'])->firstOrFail();
+        if ($user->isDeletionScheduled() || $user->isDeactivated()) {
+            throw ValidationException::withMessages(['username' => ['This rider cannot be invited.']]);
+        }
         if ($trip->roleOf($user)) {
             throw ValidationException::withMessages(['username' => ['Already a member.']]);
         }
