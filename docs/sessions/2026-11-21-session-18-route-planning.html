@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 18: Route planning | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:60rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; }
+  h2 { font-size:1.3rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.4rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  code { font-size:.88em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; word-break:break-word; }
+  .warn { color:var(--warn); font-weight:700; }
+  .ok { color:var(--ok); font-weight:700; }
+  ul, ol { padding-left:1.3rem; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; margin:.6rem 0 1rem; }
+  th, td { text-align:left; vertical-align:top; padding:.4rem .6rem; border-bottom:1px solid var(--line); }
+  th { background:var(--surface); }
+</style>
+</head>
+<body>
+<main>
+<p class="meta">My Ride Nepal · Session report</p>
+<h1>Session 18: route planning, with verification and audit closure</h1>
+<p class="meta">2026-11-21 · Claude Code (Opus 5.5) · Nothing committed · One additive migration · No dependency · No PostGIS, no routing provider</p>
+
+<h2>Project progress</h2>
+<ul>
+<li><strong>Verified completion: 66.7%</strong> (174 / 261), up from 65.1% (170 / 261): <strong>+1.6 points</strong></li>
+<li><strong>Implementation coverage: 81.5%</strong> (212.65 / 261), up from 80.7%</li>
+<li>Completed: <strong>B4</strong> (from verification incomplete), <strong>B5</strong>, <strong>E4</strong> and <strong>B8</strong> (all three from partial). Implemented but unverified: 0. Regressions: none found.</li>
+<li><strong>B13 stays partial.</strong> Name, province, distance, surface and recorded-track filters work and are tested. Difficulty waits for <strong>owner decision Q6</strong> (no scale is defined, and none was invented). Season filtering needs seasonal data that does not exist.</li>
+<li>Areas: Routes 4 / 13 to 7 / 13 (30.8% to 53.8%). Preparation and safety 3 / 14 to 4 / 14 (21.4% to 28.6%).</li>
+</ul>
+
+<h2>Work completed</h2>
+<ul>
+<li><strong>Plan this ride</strong> (route page):
+  <ul>
+  <li>Stretches in riding order with distance, distance from the start, a staff time estimate, surface and services, plus "ride it in reverse".</li>
+  <li>Totals use only recorded data. There is no time total unless every stretch has a time.</li>
+  <li>Fuel planning shows the longest run with no recorded station, counted conservatively and per direction, with caveats.</li>
+  <li>A warning appears when stretches and the route total disagree.</li>
+  <li>Phones get cards; wider screens get a table.</li>
+  </ul></li>
+<li><strong>Riding time per stretch:</strong> a staff estimate between 0.1 and 48 h, with database checks, an editor field and readable validation messages.</li>
+<li><strong>Route filters:</strong> name, province, maximum recorded distance, surface and recorded track, kept in the address.</li>
+<li><strong>Service markers (B8):</strong> published services only, at recorded positions. Each marker opens that service's details, built as text. Services with no recorded position are labelled in the list.</li>
+</ul>
+
+<h2>Calculation checks</h2>
+<ul>
+<li><strong>B4:</strong> distances are staff-recorded per stretch, summed in riding order, rounded to 0.1 km, and never summed past a missing value. The sum is compared with the route total (warning above 5%). Comparing a stretch distance with the length of its recorded track is not implemented and not required by B4.</li>
+<li><strong>B5:</strong> the times are staff estimates, labelled "estimate" everywhere, and never computed or shown as travel times. The cumulative time stops at the first stretch without one.</li>
+<li><strong>E4:</strong> gaps come only from recorded stretch distances and recorded fuel services, counting the stretches that hold stations in full. Edge cases are unit-tested: fuel on every stretch, fuel only at an end, no fuel, missing distances, empty and single-stretch routes, rounding. No fuel availability is invented.</li>
+</ul>
+
+<h2>Verification (commands and exit codes)</h2>
+<div class="scroll"><table>
+<tr><th>Command</th><th>Exit</th><th>Result</th></tr>
+<tr><td><code>php artisan test</code></td><td>0</td><td>145 passed (3095 assertions)</td></tr>
+<tr><td><code>composer audit</code></td><td>0</td><td>No advisories</td></tr>
+<tr><td>Public: <code>pnpm type-check</code>, <code>lint</code>, <code>test:unit</code>, <code>build</code>, <code>audit --prod</code></td><td>0 each</td><td>Unit tests: 18 passed; no known vulnerabilities</td></tr>
+<tr><td>Staff: same five commands</td><td>0 each</td><td>Unit tests: 13 passed; no known vulnerabilities</td></tr>
+<tr><td>Public E2E (Chromium, Firefox, Pixel 7)</td><td>0</td><td>138 passed, 3 skipped by design (Chromium-only and desktop-only checks), 0 failed; full log read, no failure markers</td></tr>
+<tr><td>Staff E2E (Chromium, Firefox)</td><td>0</td><td>48 passed, 0 failed, 0 skipped</td></tr>
+</table></div>
+<p>B8 browser evidence (<code>route-services.spec.ts</code>, 6 passed on three projects):</p>
+<ul>
+<li>Exactly two markers appear: the published pump and workshop. The draft clinic and the tea house with no position are not drawn.</li>
+<li>Each marker opens its own service's popup, with name, kind, stretch, notes and freshness.</li>
+<li>The phone profile uses a real tap.</li>
+<li>A route without a track shows markers and checkpoints but no line.</li>
+<li>The stretch list carries the same information for keyboard and screen-reader users, including "no map position".</li>
+</ul>
+<p>Screenshots inspected: <code>test-results/route-plan-mobile.png</code>, <code>route-services-mobile.png</code>.</p>
+
+<h2>Database changes</h2>
+<p>Migration <code>2026_11_21_100020_add_segment_riding_time</code>: a nullable <code>route_segments.estimated_hours</code> column with a check constraint. Applied to the dev and E2E databases. Rollback drops only this column.</p>
+
+<h2>Owner decision still open</h2>
+<p><strong>Q6:</strong> what difficulty scale should routes use, if any? It blocks the difficulty observations in B6 and the difficulty filter in B13. Seasonal information (A8, L9, and seasons for B13) also needs owner-supplied content.</p>
+
+<h2>Limitations</h2>
+<ul>
+<li>All planning numbers depend on what staff record. No real routes exist yet in the dev database.</li>
+<li>Not run: WebKit, axe, Lighthouse, a screen reader.</li>
+</ul>
+</main>
+</body>
+</html>

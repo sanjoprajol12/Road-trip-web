@@ -84,9 +84,10 @@ class RouteController extends Controller
             'segments.*.end_lat' => ['nullable', 'numeric', 'between:26,31'],
             'segments.*.end_lng' => ['nullable', 'numeric', 'between:80,89'],
             'segments.*.distance_km' => ['nullable', 'numeric', 'between:0.1,1000'],
+            'segments.*.estimated_hours' => ['nullable', 'numeric', 'between:0.1,48'],
             'segments.*.surface' => ['required', Rule::in(['paved', 'mixed', 'gravel', 'dirt', 'unknown'])],
             'segments.*.notes' => ['nullable', 'string', 'max:2000'],
-        ]);
+        ], [], ['segments.*.estimated_hours' => 'riding time', 'segments.*.distance_km' => 'distance', 'segments.*.start_name' => 'from checkpoint', 'segments.*.end_name' => 'to checkpoint']);
         DB::transaction(function () use ($r, $data) {
             $keep = collect($data['segments'])->pluck('id')->filter();
             $removed = $r->segments()->whereNotIn('id', $keep)->get();
@@ -106,6 +107,31 @@ class RouteController extends Controller
         });
 
         return $this->show($r->id);
+    }
+
+    /** Import a recorded track (GPX or GeoJSON) as this segment's real geometry; replaces any earlier one. */
+    public function importPath(Request $request, \App\Models\RouteSegment $segment): RouteResource
+    {
+        $request->validate(['track' => ['required', 'file', 'max:2048', 'extensions:gpx,geojson,json']]);
+        $file = $request->file('track');
+        $path = \App\Support\TrackImport::parse((string) file_get_contents($file->getRealPath()), $file->getClientOriginalExtension() === 'gpx' ? 'gpx' : 'geojson');
+        DB::transaction(function () use ($segment, $path) {
+            $old = $segment->path ? count($segment->path) : 0;
+            $segment->forceFill(['path' => $path])->save();
+            Audit::record('route.path_imported', $segment->route, ['points' => $old], ['segment_id' => $segment->id, 'points' => count($path)]);
+        });
+
+        return $this->show($segment->route_id);
+    }
+
+    public function removePath(\App\Models\RouteSegment $segment): RouteResource
+    {
+        DB::transaction(function () use ($segment) {
+            $segment->forceFill(['path' => null])->save();
+            Audit::record('route.path_removed', $segment->route, null, ['segment_id' => $segment->id]);
+        });
+
+        return $this->show($segment->route_id);
     }
 
     private function validated(Request $request, ?RideRoute $r = null): array

@@ -28,7 +28,8 @@ class RouteResource extends JsonResource
                 'id' => $s->id, 'position' => $s->position, 'start_name' => $s->start_name, 'end_name' => $s->end_name,
                 'start' => $s->start_lat !== null ? [$s->start_lat, $s->start_lng] : null,
                 'end' => $s->end_lat !== null ? [$s->end_lat, $s->end_lng] : null,
-                'distance_km' => $s->distance_km, 'surface' => $s->surface, 'notes' => $s->notes,
+                'distance_km' => $s->distance_km, 'estimated_hours' => $s->estimated_hours, 'surface' => $s->surface, 'notes' => $s->notes,
+                'path' => $s->path, // imported track [[lat, lng], ...] or null: only this is drawn as a road line
                 'services' => $s->relationLoaded('servicePoints') ? $s->servicePoints->map(fn ($p) => [
                     'id' => $p->id, 'kind' => $p->kind, 'name' => $p->name, 'notes' => $p->notes,
                     'position' => $p->latitude !== null ? [$p->latitude, $p->longitude] : null,

@@ -42,6 +42,21 @@ Route::prefix('admin')->name('admin.')->middleware(['auth:staff', 'can:staff'])-
     // Which claims a reviewer may decide is checked per claim in VerificationPolicy.
     Route::post('verifications/{claim}/decision', [Admin\VerificationController::class, 'decide'])->middleware('can:verification.decide');
 
+    Route::middleware('can:places.manage')->group(function () {
+        Route::get('places', [Admin\PlaceController::class, 'index']);
+        Route::post('places', [Admin\PlaceController::class, 'store']);
+        Route::put('places/{place}', [Admin\PlaceController::class, 'update'])->whereUuid('place');
+        Route::get('places/{place}/history', [Admin\PlaceController::class, 'history'])->whereUuid('place');
+    });
+    Route::post('places/{place}/decision', [Admin\PlaceController::class, 'decide'])->middleware('can:places.publish')->whereUuid('place');
+    // Review of rider suggestions and corrections only (no create, edit, unpublish or archive).
+    Route::middleware('can:places.review')->group(function () {
+        Route::get('place-suggestions', [Admin\PlaceReviewController::class, 'index']);
+        Route::get('place-suggestions/{place}', [Admin\PlaceReviewController::class, 'show'])->whereUuid('place');
+        Route::post('place-suggestions/{place}/decision', [Admin\PlaceReviewController::class, 'decide'])->whereUuid('place');
+        Route::get('place-corrections', [Admin\PlaceController::class, 'corrections']);
+        Route::post('place-corrections/{correction}/decision', [Admin\PlaceController::class, 'decideCorrection'])->whereUuid('correction');
+    });
     Route::middleware('can:contributions.moderate')->group(function () {
         Route::get('contributions', [Admin\ContributionController::class, 'index']);
         Route::post('contributions/{contribution}/decision', [Admin\ContributionController::class, 'decide']);
@@ -60,6 +75,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth:staff', 'can:staff'])-
         Route::apiResource('routes', Admin\RouteController::class)->except('show')->parameters(['routes' => 'route']);
         Route::get('routes/{route}', [Admin\RouteController::class, 'show']);
         Route::put('routes/{route}/segments', [Admin\RouteController::class, 'replaceSegments']);
+        Route::post('route-segments/{segment}/path', [Admin\RouteController::class, 'importPath'])->whereUuid('segment');
+        Route::delete('route-segments/{segment}/path', [Admin\RouteController::class, 'removePath'])->whereUuid('segment');
     });
     Route::apiResource('service-points', Admin\ServicePointController::class)->except('show')->parameters(['service-points' => 'point'])->middleware('can:content.services.manage');
     Route::apiResource('guides', Admin\GuideController::class)->except('show')->middleware('can:guides.manage');

@@ -1,14 +1,22 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
-import { ArrowLeft, Moon, Trash2 } from 'lucide-vue-next'
+import { ArrowDown, ArrowLeft, ArrowUp, Moon, Pencil, Trash2 } from 'lucide-vue-next'
 import StatusPanel from '@/components/ui/StatusPanel.vue'
 import { errorMessage, statusOf } from '@/lib/api/client'
 import { useAsync } from '@/lib/useAsync'
 import { useAuth } from '@/features/authentication/useAuth'
-import type { Trip } from '@/types/api'
-import { addMember as addTripMember, addPart, cancelInvitation, deleteTrip as destroyTrip, getTrip, removeMember as dropMember, removePart, setMemberRole, updatePart, updateTrip } from '../services/trips'
+import type { ServicePoint, Trip } from '@/types/api'
+import { addMember as addTripMember, addPart, cancelInvitation, deleteTrip as destroyTrip, getTrip, removeMember as dropMember, removePart, reorderStops, setMemberRole, updatePart, updateTrip } from '../services/trips'
+import { tripRouteTotals } from '@/lib/tripRoute'
+import { surfaceLabels } from '@/features/experiences/labels'
 import { listDestinations } from '@/features/explore/services/destinations'
+import DestinationMap, { type MapLine, type MapPoint } from '@/features/explore/components/DestinationMap.vue'
+import TripBudget from '../components/TripBudget.vue'
+import TripChecklist from '../components/TripChecklist.vue'
+import TripDays from '../components/TripDays.vue'
+import { isPlaceCategory, placeCategories } from '@/features/places/categories'
+import { serviceKinds } from '@/features/routes/serviceKinds'
 
 const props = defineProps<{ id: string }>()
 const router = useRouter()
@@ -27,12 +35,14 @@ const canEdit = computed(() => t.value?.my_role === 'owner' || t.value?.my_role 
 const isOwner = computed(() => t.value?.my_role === 'owner')
 const err = ref<string | null>(null)
 
-async function call(fn: () => Promise<{ data: { data: Trip } }>) {
+async function call(fn: () => Promise<{ data: { data: Trip } }>): Promise<boolean> {
   err.value = null
   try {
     trip.data.value = (await fn()).data.data
+    return true
   } catch (e) {
     err.value = errorMessage(e)
+    return false
   }
 }
 
@@ -48,16 +58,64 @@ async function cancelInv(id: string) {
 
 const details = reactive({ title: '', starts_on: '', ends_on: '', motorcycle: '', notes: '' })
 watch(t, (v) => v && Object.assign(details, { title: v.title, starts_on: v.starts_on ?? '', ends_on: v.ends_on ?? '', motorcycle: v.motorcycle ?? '', notes: v.notes ?? '' }), { immediate: true })
-const saveDetails = () => call(() => updateTrip(props.id, { ...details, starts_on: details.starts_on || null, ends_on: details.ends_on || null }))
+const detailsSaved = ref(false)
+const saveDetails = async () => (detailsSaved.value = await call(() => updateTrip(props.id, { ...details, notes: details.notes || null, motorcycle: details.motorcycle || null, starts_on: details.starts_on || null, ends_on: details.ends_on || null })))
 
 const stop = reactive({ name: '', day: '', destination_id: '', overnight: false })
-const addStop = () => call(() => addPart(props.id, 'stops', { name: stop.name, day: stop.day ? Number(stop.day) : null, destination_id: stop.destination_id || null, overnight: stop.overnight })).then(() => Object.assign(stop, { name: '', day: '', destination_id: '', overnight: false }))
-const expense = reactive({ label: '', category: 'fuel', amount_npr: '' })
-const addExpense = () => call(() => addPart(props.id, 'expenses', { ...expense, amount_npr: Number(expense.amount_npr), paid_by: user.value?.id })).then(() => Object.assign(expense, { label: '', amount_npr: '' }))
-const item = reactive({ label: '', section: 'motorcycle' })
-const addItem = () => call(() => addPart(props.id, 'checklist', item)).then(() => (item.label = ''))
-const toggle = (id: string, done: boolean) => call(() => updatePart(props.id, 'checklist', id, { done }))
+const addStop = async () => (await call(() => addPart(props.id, 'stops', { name: stop.name, day: stop.day ? Number(stop.day) : null, destination_id: stop.destination_id || null, overnight: stop.overnight }))) && Object.assign(stop, { name: '', day: '', destination_id: '', overnight: false })
+// Edit a stop in place: name, day, overnight and note (links stay as they are).
+const editingStop = ref<string | null>(null)
+const stopEdit = reactive({ name: '', day: '' as string | number, overnight: false, note: '' })
+function startStopEdit(s: { id: string; name: string; day: number | null; overnight: boolean; note: string | null }) {
+  editingStop.value = s.id
+  Object.assign(stopEdit, { name: s.name, day: s.day ?? '', overnight: s.overnight, note: s.note ?? '' })
+}
+const saveStop = async (id: string) => (await call(() => updatePart(props.id, 'stops', id, { name: stopEdit.name, day: stopEdit.day === '' ? null : Number(stopEdit.day), overnight: stopEdit.overnight, note: stopEdit.note || null }))) && (editingStop.value = null)
 const remove = (part: string, id: string) => call(() => removePart(props.id, part, id))
+type Stop = NonNullable<Trip['stops']>[number]
+// Route parts can stand for hours of riding, so removing one asks first.
+const removeStop = (s: Stop) => (!s.route_part || window.confirm(`Remove ${s.name} from this trip?`)) && remove('stops', s.id)
+function move(i: number, by: -1 | 1) {
+  const ids = (t.value?.stops ?? []).map((s) => s.id)
+  ;[ids[i], ids[i + by]] = [ids[i + by]!, ids[i]!]
+  return call(() => reorderStops(props.id, ids))
+}
+const routeTotals = computed(() => tripRouteTotals(t.value?.stops ?? []))
+const n = (x: number) => x.toLocaleString('en-IN')
+const partLabel = { route: 'Whole route', stretch: 'Stretch of', checkpoint_start: 'Checkpoint on', checkpoint_end: 'Checkpoint on' } as const
+/** Recorded numbers for a route or stretch stop, and what is not recorded. */
+function partFacts(s: Stop): { facts: string; missing: string } {
+  const v = s.route_part === 'route' ? s.route : s.stretch
+  if (!v) return { facts: '', missing: '' }
+  const facts = [v.distance_km !== null && `${n(v.distance_km)} km`, v.estimated_hours !== null && `about ${n(v.estimated_hours)} h (estimate)`, s.stretch && surfaceLabels[s.stretch.surface], s.stretch?.has_track && 'recorded track'].filter(Boolean).join(' · ')
+  const missing = s.route
+    ? (s.route_part === 'route'
+        ? [!s.route.stretches && 'no stretches recorded', s.route.without_distance && `${s.route.without_distance} of ${s.route.stretches} stretches without a distance`, s.route.without_time && `${s.route.without_time} without a time estimate`, s.route.without_track && `${s.route.without_track} without a recorded track`]
+        : [s.stretch?.distance_km === null && 'no distance recorded', s.stretch?.estimated_hours === null && 'no time estimate', s.stretch && !s.stretch.has_track && 'no recorded track']
+      ).filter(Boolean).join(', ')
+    : ''
+  return { facts, missing }
+}
+// Stops with a known position on the map; one marker per position and name (no duplicates), places link to their page.
+const mapPoints = computed<MapPoint[]>(() => {
+  const seen = new Set<string>()
+  const out: MapPoint[] = []
+  for (const s of t.value?.stops ?? []) {
+    const p: MapPoint | null = s.checkpoint?.position ? { name: s.checkpoint.name, position: s.checkpoint.position, kind: 'checkpoint', link: s.route ? `/routes/${s.route.slug}` : undefined }
+      : s.place?.position ? { name: s.place.name, position: s.place.position, kind: 'place', link: `/places/${s.place.slug}` }
+      : s.destination?.position ? { name: s.destination.name, position: s.destination.position, kind: 'destination', link: `/explore/${s.destination.slug}` }
+      : s.service?.position ? { name: s.service.name, position: s.service.position, kind: 'service' } : null
+    const key = p && `${p.name}|${p.position.join(',')}`
+    if (p && key && !seen.has(key)) {
+      seen.add(key)
+      out.push(p)
+    }
+  }
+  return out
+})
+// Recorded tracks only (imported by staff); stretches without one get no line.
+const mapLines = computed<MapLine[]>(() => (t.value?.stops ?? []).flatMap((s) => s.tracks.map((path) => ({ name: `${s.name} (recorded track)`, path, link: s.route ? `/routes/${s.route.slug}` : undefined }))))
+const placeLabel = (c: string) => (isPlaceCategory(c) ? placeCategories[c].label : 'Place')
 const member = reactive({ username: '', role: 'editor' })
 const addMember = () => call(() => addTripMember(props.id, member)).then(() => (member.username = ''))
 const setRole = (uid: string, role: string) => call(() => setMemberRole(props.id, uid, role))
@@ -81,13 +139,6 @@ async function deleteTrip() {
     err.value = errorMessage(e)
   }
 }
-const sections = { motorcycle: 'Motorcycle', personal: 'Personal', trip: 'This trip' } as const
-const byCategory = computed(() => {
-  const m: Record<string, number> = {}
-  for (const x of t.value?.expenses ?? []) m[x.category] = (m[x.category] ?? 0) + x.amount_npr
-  return Object.entries(m)
-})
-const npr = (n: number) => `NPR ${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
 </script>
 
 <template>
@@ -107,17 +158,47 @@ const npr = (n: number) => `NPR ${n.toLocaleString('en-IN', { maximumFractionDig
         <div class="grid content-start gap-14">
           <section aria-labelledby="it">
             <h2 id="it" class="display text-3xl">Itinerary</h2>
-            <ol v-if="t.stops?.length" class="mt-4 grid border-l-2 border-line-strong">
-              <li v-for="s in t.stops" :key="s.id" class="relative flex items-start gap-3 pb-5 pl-5">
+            <p v-if="routeTotals.parts" class="mt-2 text-sm" data-testid="trip-route-totals">
+              Routes and stretches in this trip: <span class="tabular font-semibold">{{ n(routeTotals.km) }} km</span> recorded<template v-if="routeTotals.hours">, about <span class="tabular font-semibold">{{ n(routeTotals.hours) }} h</span> riding (estimate)</template>.
+              <span class="text-muted"><template v-if="routeTotals.withoutKm || routeTotals.withoutHours">Recorded values only<template v-if="routeTotals.withoutKm">; {{ routeTotals.withoutKm }} without a distance</template><template v-if="routeTotals.withoutHours">; {{ routeTotals.withoutHours }} without a time estimate</template>, so the real figures are higher. </template>Not live travel times.</span>
+            </p>
+            <ol v-if="t.stops?.length" class="mt-4 grid border-l-2 border-line-strong" aria-label="Stops in order">
+              <li v-for="(s, i) in t.stops" :key="s.id" class="relative flex items-start gap-3 pb-5 pl-5">
                 <span class="absolute top-1.5 -left-[6px] size-2.5 rounded-full bg-crimson" aria-hidden="true" />
-                <div class="flex-1">
-                  <p class="font-semibold"><template v-if="s.day">Day {{ s.day }}: </template>{{ s.name }}<Moon v-if="s.overnight" class="ml-1.5 inline size-4 text-muted" aria-label="overnight stop" /></p>
+                <form v-if="editingStop === s.id" class="grid flex-1 gap-2 sm:grid-cols-[1fr_5rem]" :aria-label="`Edit ${s.name}`" @submit.prevent="saveStop(s.id)">
+                  <div class="field"><label :for="`sn-${s.id}`" class="text-xs">Stop</label><input :id="`sn-${s.id}`" v-model="stopEdit.name" class="input" maxlength="120" /></div>
+                  <div class="field"><label :for="`sd-${s.id}`" class="text-xs">Day</label><input :id="`sd-${s.id}`" v-model="stopEdit.day" type="number" min="1" max="365" class="input" /></div>
+                  <div class="field sm:col-span-2"><label :for="`so-${s.id}`" class="text-xs">Note (for example where you sleep, or what is not booked yet)</label><input :id="`so-${s.id}`" v-model="stopEdit.note" class="input" maxlength="1000" /></div>
+                  <label class="flex items-center gap-2 text-sm sm:col-span-2"><input v-model="stopEdit.overnight" type="checkbox" class="accent-crimson" /> Overnight stop</label>
+                  <div class="flex gap-2 sm:col-span-2"><button type="submit" class="btn btn-primary min-h-9 px-3 text-sm" :disabled="stopEdit.name.trim().length < 2">Save</button><button type="button" class="btn btn-quiet min-h-9 px-3 text-sm" @click="editingStop = null">Cancel</button></div>
+                </form>
+                <div v-else class="flex-1">
+                  <p class="font-semibold"><template v-if="s.day">Day {{ s.day }}: </template><RouterLink v-if="s.place && s.place.name === s.name" :to="`/places/${s.place.slug}`" class="link">{{ s.name }}</RouterLink><template v-else>{{ s.name }}</template><Moon v-if="s.overnight" class="ml-1.5 inline size-4 text-muted" aria-label="overnight stop" /></p>
+                  <p v-if="s.place" class="text-sm"><RouterLink v-if="s.place.name !== s.name" :to="`/places/${s.place.slug}`" class="link">{{ s.place.name }}</RouterLink><template v-if="s.place.name !== s.name"> · </template><span class="text-muted">{{ placeLabel(s.place.category) }}</span></p>
+                  <p v-else-if="s.destination" class="text-sm"><RouterLink :to="`/explore/${s.destination.slug}`" class="link">{{ s.destination.name }}</RouterLink></p>
+                  <p v-else-if="s.service" class="text-sm text-muted">{{ serviceKinds[s.service.kind as ServicePoint['kind']]?.label ?? 'Service' }}: {{ s.service.name }}</p>
+                  <template v-else-if="s.route_part && s.route">
+                    <p class="text-sm"><span class="text-muted">{{ partLabel[s.route_part] }}</span> <RouterLink :to="`/routes/${s.route.slug}`" class="link">{{ s.route.name }}</RouterLink><template v-if="s.checkpoint && !s.checkpoint.position"><span class="text-muted"> · no recorded position</span></template></p>
+                    <p v-if="partFacts(s).facts" class="tabular text-sm text-muted">{{ partFacts(s).facts }}</p>
+                    <p v-if="partFacts(s).missing" class="text-xs text-muted">Missing: {{ partFacts(s).missing }}</p>
+                  </template>
+                  <p v-if="s.linked_unavailable" class="text-sm text-muted">{{ s.route_part ? 'This route, stretch or checkpoint is no longer listed, so no route details are shown.' : 'The linked place or service is no longer listed.' }}</p>
                   <p v-if="s.note" class="text-sm text-muted">{{ s.note }}</p>
                 </div>
-                <button v-if="canEdit" type="button" class="p-1 text-muted hover:text-danger" :aria-label="`Remove ${s.name}`" @click="remove('stops', s.id)"><Trash2 class="size-4" aria-hidden="true" /></button>
+                <div v-if="canEdit && editingStop !== s.id" class="flex shrink-0 flex-wrap items-center justify-end">
+                  <button type="button" class="grid size-9 place-items-center text-muted hover:text-ink" :aria-label="`Edit ${s.name}`" @click="startStopEdit(s)"><Pencil class="size-4" aria-hidden="true" /></button>
+                  <button type="button" class="grid size-9 place-items-center text-muted hover:text-ink disabled:opacity-30" :disabled="i === 0" :aria-label="`Move ${s.name} up`" @click="move(i, -1)"><ArrowUp class="size-4" aria-hidden="true" /></button>
+                  <button type="button" class="grid size-9 place-items-center text-muted hover:text-ink disabled:opacity-30" :disabled="i === t.stops.length - 1" :aria-label="`Move ${s.name} down`" @click="move(i, 1)"><ArrowDown class="size-4" aria-hidden="true" /></button>
+                  <button type="button" class="grid size-9 place-items-center text-muted hover:text-danger" :aria-label="`Remove ${s.name}`" @click="removeStop(s)"><Trash2 class="size-4" aria-hidden="true" /></button>
+                </div>
               </li>
             </ol>
-            <p v-else class="mt-4 text-sm text-muted">No stops yet.</p>
+            <p v-else class="mt-4 text-sm text-muted">No stops yet. Add a <RouterLink to="/routes" class="link">route</RouterLink> or some of its stretches, places from a <RouterLink to="/places" class="link">place page</RouterLink>, a destination or your <RouterLink to="/saved" class="link">saved list</RouterLink>.</p>
+            <template v-if="t.stops?.length">
+              <DestinationMap v-if="mapPoints.length || mapLines.length" :key="[...mapPoints.map((p) => p.name), mapLines.length].join('|')" class="mt-6" :center="null" :name="`${t.title} stops`" :points="mapPoints" :lines="mapLines" />
+              <p v-else class="mt-6 text-sm text-muted">None of these stops has a recorded position or track, so there is no map yet.</p>
+              <TripDays :trip="t" />
+            </template>
             <form v-if="canEdit" class="mt-4 grid gap-3 sm:grid-cols-[1fr_5rem_12rem_auto] sm:items-end" @submit.prevent="addStop">
               <div class="field"><label for="sn">Stop</label><input id="sn" v-model="stop.name" class="input" maxlength="120" /></div>
               <div class="field"><label for="sd">Day</label><input id="sd" v-model="stop.day" type="number" min="1" max="365" class="input" /></div>
@@ -127,41 +208,8 @@ const npr = (n: number) => `NPR ${n.toLocaleString('en-IN', { maximumFractionDig
             </form>
           </section>
 
-          <section aria-labelledby="bud">
-            <h2 id="bud" class="display text-3xl">Budget</h2>
-            <p class="mt-2 text-sm text-muted">Estimates you enter. Total: <span class="tabular font-semibold text-ink">{{ npr(t.expense_total_npr ?? 0) }}</span><template v-if="byCategory.length"> ({{ byCategory.map(([c, v]) => `${c} ${npr(v)}`).join(', ') }})</template></p>
-            <ul v-if="t.expenses?.length" class="mt-4 grid border-t border-line text-sm">
-              <li v-for="x in t.expenses" :key="x.id" class="flex items-center gap-3 border-b border-line py-2">
-                <span class="flex-1">{{ x.label }} <span class="text-muted">· {{ x.category }}</span></span>
-                <span class="tabular">{{ npr(x.amount_npr) }}</span>
-                <button v-if="canEdit" type="button" class="p-1 text-muted hover:text-danger" :aria-label="`Remove ${x.label}`" @click="remove('expenses', x.id)"><Trash2 class="size-4" aria-hidden="true" /></button>
-              </li>
-            </ul>
-            <form v-if="canEdit" class="mt-4 grid gap-3 sm:grid-cols-[1fr_9rem_9rem_auto] sm:items-end" @submit.prevent="addExpense">
-              <div class="field"><label for="el">Item</label><input id="el" v-model="expense.label" class="input" maxlength="120" /></div>
-              <div class="field"><label for="ec">Category</label><select id="ec" v-model="expense.category" class="input"><option v-for="c in ['fuel', 'lodging', 'food', 'permits', 'repairs', 'other']" :key="c" :value="c">{{ c }}</option></select></div>
-              <div class="field"><label for="ea">Amount (NPR)</label><input id="ea" v-model="expense.amount_npr" type="number" min="0" step="1" class="input" /></div>
-              <button type="submit" class="btn btn-quiet" :disabled="!expense.label || expense.amount_npr === ''">Add</button>
-            </form>
-          </section>
-
-          <section aria-labelledby="chk">
-            <h2 id="chk" class="display text-3xl">Checklist</h2>
-            <div v-for="(label, sec) in sections" :key="sec" class="mt-4">
-              <h3 class="label text-muted">{{ label }}</h3>
-              <ul class="mt-2 grid gap-1">
-                <li v-for="c in (t.checklist ?? []).filter((x) => x.section === sec)" :key="c.id" class="flex items-center gap-3 text-sm">
-                  <label class="flex flex-1 items-center gap-2"><input type="checkbox" class="accent-crimson" :checked="c.done" :disabled="!canEdit" @change="toggle(c.id, ($event.target as HTMLInputElement).checked)" /><span :class="c.done ? 'text-muted line-through' : ''">{{ c.label }}</span></label>
-                  <button v-if="canEdit" type="button" class="p-1 text-muted hover:text-danger" :aria-label="`Remove ${c.label}`" @click="remove('checklist', c.id)"><Trash2 class="size-4" aria-hidden="true" /></button>
-                </li>
-              </ul>
-            </div>
-            <form v-if="canEdit" class="mt-4 grid gap-3 sm:grid-cols-[1fr_10rem_auto] sm:items-end" @submit.prevent="addItem">
-              <div class="field"><label for="cl">Item</label><input id="cl" v-model="item.label" class="input" maxlength="200" placeholder="For example: spare clutch cable" /></div>
-              <div class="field"><label for="cs">Section</label><select id="cs" v-model="item.section" class="input"><option v-for="(l, s) in sections" :key="s" :value="s">{{ l }}</option></select></div>
-              <button type="submit" class="btn btn-quiet" :disabled="item.label.trim().length < 2">Add</button>
-            </form>
-          </section>
+          <TripBudget :trip="t" :can-edit="canEdit" :run="call" />
+          <TripChecklist :trip="t" :can-edit="canEdit" :run="call" />
         </div>
 
         <aside class="grid content-start gap-10 text-sm">
@@ -173,8 +221,9 @@ const npr = (n: number) => `NPR ${n.toLocaleString('en-IN', { maximumFractionDig
               <div class="field"><label for="te">To</label><input id="te" v-model="details.ends_on" type="date" class="input" :disabled="!canEdit" /></div>
             </div>
             <div class="field"><label for="tm">Motorcycle</label><input id="tm" v-model="details.motorcycle" class="input" :disabled="!canEdit" /></div>
-            <div class="field"><label for="tn">Notes</label><textarea id="tn" v-model="details.notes" class="input" rows="4" :disabled="!canEdit" /></div>
+            <div class="field"><label for="tn">Notes</label><textarea id="tn" v-model="details.notes" class="input" rows="4" maxlength="10000" :disabled="!canEdit" aria-describedby="tn-help" /><p id="tn-help" class="text-xs text-muted">Every member of this trip can read these notes{{ canEdit ? '; clear the field and save to remove them' : '' }}.</p></div>
             <button v-if="canEdit" type="submit" class="btn btn-quiet">Save details</button>
+            <p v-if="detailsSaved" class="text-sm" role="status">Details saved.</p>
           </form>
 
           <section class="grid gap-3" aria-labelledby="mem">

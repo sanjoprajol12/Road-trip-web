@@ -15,7 +15,7 @@ class Contribution extends Model
 {
     use \App\Models\Concerns\HasSources, HasFactory, HasUuids;
 
-    protected $fillable = ['kind', 'title', 'body', 'observed_on', 'destination_id', 'route_id', 'route_segment_id', 'details'];
+    protected $fillable = ['kind', 'title', 'body', 'observed_on', 'destination_id', 'route_id', 'route_segment_id', 'place_id', 'details'];
 
     protected function casts(): array
     {
@@ -67,6 +67,11 @@ class Contribution extends Model
     public function confirmations(): HasMany
     {
         return $this->hasMany(ContributionConfirmation::class);
+    }
+
+    public function place(): BelongsTo
+    {
+        return $this->belongsTo(Place::class);
     }
 
     public function reports(): HasMany

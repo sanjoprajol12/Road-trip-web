@@ -28,9 +28,15 @@ class TripResource extends JsonResource
                 ->join('users as u', 'u.id', '=', 'i.user_id')->where('i.trip_id', $this->id)->where('i.status', 'pending')
                 ->orderBy('i.created_at')->get(['i.id', 'i.role', 'i.expires_at', 'u.display_name', 'u.username'])
                 ->map(fn ($i) => (array) $i + ['expired' => now()->greaterThan($i->expires_at)])),
-            'stops' => $this->when($full, fn () => $this->stops),
+            'stops' => $this->when($full, fn () => $this->stops->map->toTrip()->values()),
             'expenses' => $this->when($full, fn () => $this->expenses),
             'expense_total_npr' => $this->when($full, fn () => round($this->expenses->sum('amount_npr'), 2)),
+            // Sums of entered amounts only; items without an amount are counted, never estimated. All amounts NPR.
+            'budget' => $this->when($full, fn () => [
+                'planned_npr' => round($this->expenses->where('status', 'planned')->sum('amount_npr'), 2),
+                'spent_npr' => round($this->expenses->where('status', 'spent')->sum('amount_npr'), 2),
+                'planned_without_amount' => $this->expenses->where('status', 'planned')->whereNull('amount_npr')->count(),
+            ]),
             'checklist' => $this->when($full, fn () => $this->checklist),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

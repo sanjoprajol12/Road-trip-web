@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 19: Routes in trips | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:60rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; }
+  h2 { font-size:1.3rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.4rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  code { font-size:.88em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; word-break:break-word; }
+  .warn { color:var(--warn); font-weight:700; }
+  .ok { color:var(--ok); font-weight:700; }
+  ul, ol { padding-left:1.3rem; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; margin:.6rem 0 1rem; }
+  th, td { text-align:left; vertical-align:top; padding:.4rem .6rem; border-bottom:1px solid var(--line); }
+  th { background:var(--surface); }
+</style>
+</head>
+<body>
+<main>
+<p class="meta">My Ride Nepal · Session report</p>
+<h1>Session 19: whole routes, stretches and checkpoints in trips (F3)</h1>
+<p class="meta">2026-11-21 · Claude Code (Opus 5.5) · Nothing committed · One additive migration · No dependency · No routing provider, no remote Supabase</p>
+
+<h2>Project progress</h2>
+<ul>
+<li><strong>Verified completion: 67.0%</strong> (175 / 261), up from 66.7% (174 / 261): <strong>+0.4 points</strong>.</li>
+<li><strong>Implementation coverage: 81.7%</strong> (213.25 / 261), up from 81.5%.</li>
+<li><strong>Completed:</strong> F3, which moved from partial. Regressions: none found.</li>
+<li><strong>My Rides and private trip planning:</strong> 9 / 18 to 10 / 18 (50.0% to 55.6%); coverage 75.6% to 78.9%.</li>
+<li><strong>Routes and route information:</strong> unchanged at 7 / 13 (53.8%). F3 belongs to the trips area, and no route row changed.</li>
+<li><strong>Not moved:</strong> F4 and F15 stay "under-tested". This session did not browser-test their overnight, budget or checklist paths.</li>
+</ul>
+
+<h2>Design (written before the schema change)</h2>
+<p><code>docs/architecture/TRIP_ROUTE_PARTS.md</code> extends the existing <code>trip_stops</code> rather than adding a second planning system. It covers:</p>
+<ul>
+<li>Two nullable columns: <code>route_segment_id</code> (FK, null on delete) and <code>route_part</code> (route, stretch, checkpoint_start or checkpoint_end), with a check constraint.</li>
+<li>Checkpoints stay segment endpoints. Each is stored once: the start of its stretch, or the end of the last stretch.</li>
+<li>Duplicates are blocked by two partial unique indexes, backed by API checks that name the repeats.</li>
+<li>A trip holds either the whole route or some of its stretches, never both, so distances are not counted twice.</li>
+<li>If staff delete a stretch, the stop keeps its name and the trip says the stretch is gone. The staff edit never fails.</li>
+<li>Rollback: <code>down()</code> drops only the new objects. It was tested on the E2E database.</li>
+</ul>
+
+<h2>Work completed</h2>
+<ul>
+<li><strong>Route page, "Add to a trip":</strong>
+  <ul>
+  <li>Choose an existing trip or "A new trip", and ride either direction.</li>
+  <li>Add the whole route, or tick stretches and checkpoints in riding order.</li>
+  <li>Each stretch shows its recorded km, time estimate and surface, and says what is missing (distance, time, track).</li>
+  <li>A live total covers the selection. Items already on the trip are marked and disabled.</li>
+  <li>Guests are asked to sign in.</li>
+  </ul></li>
+<li><strong>Trip page:</strong>
+  <ul>
+  <li>Each route, stretch or checkpoint stop shows its recorded figures and what is missing.</li>
+  <li>Route totals use recorded values only and count the parts without values.</li>
+  <li>Stops move up and down; removing a route stop asks first.</li>
+  <li>Checkpoints with a recorded position appear on the trip map (green). Stretches are never drawn there.</li>
+  </ul></li>
+<li><strong>API:</strong>
+  <ul>
+  <li><code>POST trips/{id}/route-parts</code> adds parts and <code>PUT trips/{id}/stops/order</code> reorders.</li>
+  <li>Only published routes are accepted, and only that route's own stretches. Owners and editors only.</li>
+  <li>A request adds everything or nothing.</li>
+  </ul></li>
+<li><strong>Documented rule changes:</strong> a generic stop with only <code>route_id</code> is now a whole-route stop and is deduplicated. Route stops cannot have their links changed by PATCH; the name, day, overnight and note stay editable.</li>
+</ul>
+
+<h2>Verification (every exit code captured, full logs read)</h2>
+<div class="scroll"><table>
+<tr><th>Command</th><th>Exit</th><th>Result</th></tr>
+<tr><td><code>php artisan test</code></td><td>0</td><td>151 passed (3227 assertions), including 6 new F3 tests</td></tr>
+<tr><td><code>composer audit</code></td><td>0</td><td>no advisories</td></tr>
+<tr><td>public type-check, lint, build</td><td>0, 0, 0</td><td>lint first flagged a redundant spread in the new spec; fixed and re-run</td></tr>
+<tr><td>public unit</td><td>0</td><td>25 passed (7 new in <code>tripRoute.spec.ts</code>)</td></tr>
+<tr><td>public <code>pnpm audit --prod</code></td><td>0</td><td>no known vulnerabilities</td></tr>
+<tr><td>staff type-check, lint, unit, build, audit</td><td>0 (all)</td><td>13 unit tests passed</td></tr>
+<tr><td>public E2E (Chromium, Firefox, mobile)</td><td>0</td><td><span class="ok">141 passed</span>, 3 skipped by design, 0 failed</td></tr>
+<tr><td>staff E2E (Chromium, Firefox)</td><td>0</td><td><span class="ok">48 passed</span>, 0 failed</td></tr>
+</table></div>
+<p><span class="warn">Note:</span> my first staff E2E run had no project filter, so it also tried WebKit. All 24 WebKit tests failed at browser launch because its system libraries are not installed. That is an environment issue, not a code failure; 48 passed on Chromium and Firefox. The re-run with the usual projects exited 0.</p>
+
+<h2>What the tests cover</h2>
+<ul>
+<li><strong>Feature tests:</strong>
+  <ul>
+  <li>Whole route, with recorded totals and the counts of what is missing.</li>
+  <li>Stretches and checkpoints in riding order, either direction, whatever order they were chosen in.</li>
+  <li>The canonical checkpoint ("end of stretch 1" equals "start of stretch 2").</li>
+  <li>Duplicates refused by the API and by the database. Whole route and its own stretches refused together.</li>
+  <li>Draft and archived routes refused, as are stretches of another route.</li>
+  <li>A route unpublished later loses its details; a stretch deleted by staff leaves the stop with a notice.</li>
+  <li>Guest 401, outsider 403, viewer 403 (add, reorder, edit, remove); editor and owner allowed.</li>
+  <li>Reorder refuses stale or foreign lists.</li>
+  <li>PATCH cannot change route links.</li>
+  <li>Destination stops still work alongside route stops. The existing place and service trip tests still pass.</li>
+  </ul></li>
+<li><strong>Browser test</strong> (Chromium, Firefox, mobile), the full rider workflow:
+  <ul>
+  <li>Guest prompt, then stretches and checkpoints added to an existing trip, then items marked as already added.</li>
+  <li>A new trip created from the route page with the whole route in reverse.</li>
+  <li>Totals and missing values on the trip, reorder that survives a reload, and the checkpoint marker on the map.</li>
+  <li>Removal: cancel keeps the stop, confirm removes it.</li>
+  <li>A viewer sees the itinerary without controls and cannot choose the trip.</li>
+  <li>No sideways scrolling on phones.</li>
+  </ul></li>
+<li><strong>Screenshots inspected:</strong> the route picker on mobile, and the trip itinerary on mobile and desktop. Riding order, missing values and disabled end buttons all look right.</li>
+</ul>
+
+<h2>Not done or not checked</h2>
+<ul>
+<li>The trip map does not draw stretches; the route page draws recorded tracks. There are no per-day totals.</li>
+<li>Not run: WebKit (system libraries), axe, Lighthouse, a screen reader.</li>
+<li>The development database has no real routes, so every figure depends on what staff record.</li>
+</ul>
+
+<h2>Next</h2>
+<ul>
+<li><strong>Owner:</strong> Q6 (difficulty scale) and seasonal data, for B6 and B13.</li>
+<li><strong>No decision needed:</strong> saving guides (F8), account deletion and export (G19, H11), private notes (F10), budget target and split (F6), and browser tests that would close F4 and F15.</li>
+</ul>
+</main>
+</body>
+</html>

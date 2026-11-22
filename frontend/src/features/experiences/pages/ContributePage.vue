@@ -8,6 +8,7 @@ import { contributionKindLabels } from '../labels'
 import type { Contribution, ContributionKind } from '@/types/api'
 import { getContribution, saveContribution, uploadPhoto } from '../services/contributions'
 import { getRoute, listRoutes } from '@/features/routes/services/routes'
+import { getPlace } from '@/features/places/services/places'
 import { listDestinations } from '@/features/explore/services/destinations'
 
 // Without an id: a new contribution. With an id: the author edits it while it still waits for review.
@@ -38,6 +39,13 @@ const created = ref<Contribution | null>(null)
 const editing = computed(() => !!props.id)
 const loadError = ref<string | null>(null)
 const locked = ref(false)
+// Filed under a place of interest (R12): opened from a place page as /contribute?place=slug, or kept when editing.
+const place = ref<{ id: string; slug: string; name: string } | null>(null)
+async function loadPlace(slug: string) {
+  const p = await getPlace(slug).catch(() => null)
+  place.value = p && (p.data.status === undefined || p.data.status === 'published') ? { id: p.data.id, slug: p.data.slug, name: p.data.name } : null
+}
+if (route.query.place) void loadPlace(String(route.query.place))
 
 onMounted(async () => {
   if (!props.id) return
@@ -54,6 +62,7 @@ onMounted(async () => {
       destination_id: dests.find((d) => d.slug === c.destination?.slug)?.id ?? '',
       route_segment_id: c.segment?.id ?? '',
     })
+    if (c.place) await loadPlace(c.place.slug)
     for (const [k, v] of Object.entries(c.details ?? {})) (form.details as Record<string, string>)[k] = String(v ?? '')
     if (c.route?.slug) {
       routeSlug.value = c.route.slug
@@ -72,7 +81,7 @@ async function submit() {
   try {
     const body = {
       kind: form.kind, title: form.title, body: form.body, observed_on: form.observed_on,
-      destination_id: form.destination_id || null, route_segment_id: needsSegment.value ? form.route_segment_id || null : null, details: d,
+      destination_id: form.destination_id || null, place_id: place.value?.id ?? null, route_segment_id: needsSegment.value ? form.route_segment_id || null : null, details: d,
     }
     created.value = await saveContribution(props.id, body)
   } catch (e) {
@@ -168,7 +177,8 @@ async function upload() {
             <p v-if="errors.route_segment_id" class="field-error">{{ errors.route_segment_id }}</p>
           </div>
         </fieldset>
-        <div v-else class="field">
+        <p v-if="place" class="flex flex-wrap items-center gap-2 rounded-md border border-line bg-surface p-3 text-sm">About the place <RouterLink :to="`/places/${place.slug}`" class="link font-semibold">{{ place.name }}</RouterLink><button type="button" class="link ml-auto" @click="place = null">Not about this place</button></p>
+        <div v-else-if="!needsSegment" class="field">
           <label for="dest">Destination <span class="font-normal text-muted">(optional)</span></label>
           <select id="dest" v-model="form.destination_id" class="input sm:w-80">
             <option value="">None</option>

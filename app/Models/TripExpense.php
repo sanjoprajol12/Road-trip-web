@@ -9,7 +9,7 @@ class TripExpense extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['label', 'category', 'amount_npr', 'paid_by'];
+    protected $fillable = ['label', 'category', 'amount_npr', 'paid_by', 'status'];
 
     protected function casts(): array
     {

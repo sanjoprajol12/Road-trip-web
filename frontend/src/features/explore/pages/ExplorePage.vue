@@ -36,6 +36,7 @@ function clear() {
         <p class="lead mt-5 max-w-xl text-muted">
           Where riders go, what they found there, and what to sort out before you set off.
         </p>
+        <RouterLink to="/places" class="btn btn-quiet mt-6">Browse places of interest</RouterLink>
       </div>
       <form class="grid gap-3 sm:grid-cols-[1fr_auto]" role="search" @submit.prevent>
         <div class="field">

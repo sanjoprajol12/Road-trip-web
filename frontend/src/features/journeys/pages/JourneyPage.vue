@@ -8,6 +8,7 @@ import { useAsync } from '@/lib/useAsync'
 import { formatDay } from '@/lib/format'
 import RouteMap from '@/features/routes/components/RouteMap.vue'
 import { serviceKinds } from '@/features/routes/serviceKinds'
+import { isPlaceCategory, placeCategories } from '@/features/places/categories'
 import { listDestinations } from '@/features/explore/services/destinations'
 import SaveButton from '@/features/saved/components/SaveButton.vue'
 import AddToTrip from '@/features/rides/components/AddToTrip.vue'
@@ -51,8 +52,8 @@ const current = computed(() => result.value?.data[choice.value] ?? null)
 const segments = computed(() => (current.value ? (current.value.reversed ? [...(current.value.route.segments ?? [])].reverse() : current.value.route.segments ?? []) : []))
 const kinds = computed(() => [...new Set(current.value?.places.map((p) => p.kind) ?? [])])
 const shown = computed(() => (current.value?.places ?? []).filter((p) => filter.value === 'all' || p.kind === filter.value))
-const labelOf = (kind: string) => (kind === 'destination' ? 'Destination' : (serviceKinds[kind as ServicePoint['kind']]?.label ?? kind))
-const iconOf = (kind: string) => serviceKinds[kind as ServicePoint['kind']]?.icon ?? MapPin
+const labelOf = (kind: string) => (kind === 'destination' ? 'Destination' : isPlaceCategory(kind) ? placeCategories[kind].label : (serviceKinds[kind as ServicePoint['kind']]?.label ?? kind))
+const iconOf = (kind: string) => (isPlaceCategory(kind) ? placeCategories[kind].icon : (serviceKinds[kind as ServicePoint['kind']]?.icon ?? MapPin))
 const distanceText = (p: JourneyPlace) => (p.on_route ? 'On this route' : `${p.distance_km.toLocaleString('en-IN')} km from the route line (straight line, not riding distance)`)
 </script>
 

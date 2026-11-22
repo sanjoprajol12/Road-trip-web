@@ -7,9 +7,9 @@ import { useAsync } from '@/lib/useAsync'
 import { useAuth } from '@/features/authentication/useAuth'
 import { addPart, listTrips } from '../services/trips'
 
-// "Add to a trip" for a service or destination: trips this rider owns or edits; the server checks the role again
-// and refuses the same service twice on one trip.
-const props = defineProps<{ kind: 'service' | 'destination'; id: string; name: string; note?: string | null }>()
+// "Add to a trip" for a service, destination or place: trips this rider owns or edits; the server checks the role again
+// and refuses the same service or place twice on one trip.
+const props = defineProps<{ kind: 'service' | 'destination' | 'place'; id: string; name: string; note?: string | null }>()
 const { user } = useAuth()
 // shortcut: each picker loads the rider's trips itself; share one cached list if pages show many pickers.
 const trips = useAsync(async () => (user.value ? (await listTrips()).filter((t) => t.my_role !== 'viewer') : []))
@@ -19,7 +19,7 @@ async function add() {
   const trip = trips.data.value?.find((t) => t.id === pick.value)
   if (!trip) return
   try {
-    await addPart(trip.id, 'stops', { name: props.name.slice(0, 120), note: props.note ?? null, ...(props.kind === 'service' ? { service_point_id: props.id } : { destination_id: props.id }) })
+    await addPart(trip.id, 'stops', { name: props.name.slice(0, 120), note: props.note ?? null, ...({ service: { service_point_id: props.id }, destination: { destination_id: props.id }, place: { place_id: props.id } })[props.kind] })
     msg.value = { ok: true, text: `Added to ${trip.title}.` }
   } catch (e) {
     msg.value = { ok: false, text: errorMessage(e) }

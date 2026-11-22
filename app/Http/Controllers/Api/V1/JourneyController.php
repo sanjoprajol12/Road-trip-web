@@ -44,7 +44,7 @@ class JourneyController extends Controller
             'to' => ['slug' => $to->slug, 'name' => $to->name],
             'within_km' => $within,
             'data' => $routes->map(fn (RideRoute $r) => [
-                'route' => (new RouteResource($r))->toArray($request),
+                'route' => (new RouteResource($r))->resolve($request),
                 // The route is recorded in the other direction: the rider follows the stretches in reverse order.
                 'reversed' => $r->start_destination_id === $to->id,
                 'places' => $this->placesNear($r, $within, [$from->id, $to->id]),
@@ -55,7 +55,7 @@ class JourneyController extends Controller
     /** Services on the route's stretches (on route) and published places within $within km of its line (detour). */
     private function placesNear(RideRoute $r, float $within, array $endpoints): array
     {
-        $lines = $r->segments->filter(fn ($s) => $s->start_lat !== null && $s->end_lat !== null)->values();
+        $lines = $r->segments->filter(fn ($s) => $s->lines() !== [])->values();
         $places = collect();
         foreach ($r->segments as $s) {
             foreach ($s->servicePoints as $p) {
@@ -65,8 +65,8 @@ class JourneyController extends Controller
         if ($lines->isNotEmpty()) {
             // Bounding-box prefilter in SQL, exact straight-line distance in PHP.
             $pad = $within / 111.0;
-            $lats = $lines->flatMap(fn ($s) => [$s->start_lat, $s->end_lat]);
-            $lngs = $lines->flatMap(fn ($s) => [$s->start_lng, $s->end_lng]);
+            $lats = $lines->flatMap(fn ($s) => collect($s->lines())->flatMap(fn ($l) => [$l[0], $l[2]]));
+            $lngs = $lines->flatMap(fn ($s) => collect($s->lines())->flatMap(fn ($l) => [$l[1], $l[3]]));
             $box = fn ($q) => $q->whereBetween('latitude', [$lats->min() - $pad, $lats->max() + $pad])
                 ->whereBetween('longitude', [$lngs->min() - $pad * 1.2, $lngs->max() + $pad * 1.2]);
             $onRoute = $places->pluck('id')->all();
@@ -87,6 +87,15 @@ class JourneyController extends Controller
                             'near' => "{$seg->start_name} to {$seg->end_name}", 'link' => "/explore/{$d->slug}", 'last_confirmed_on' => $d->last_confirmed_on?->toDateString()]);
                     }
                 });
+            \App\Models\Place::published()->tap($box)->limit(300)->get()
+                ->each(function (\App\Models\Place $p) use ($lines, $within, $places) {
+                    [$km, $seg] = $this->nearest($lines, $p->latitude, $p->longitude);
+                    if ($km <= $within) {
+                        $places->push(['type' => 'place', 'id' => $p->id, 'kind' => $p->category, 'name' => $p->name, 'notes' => $p->summary,
+                            'position' => [$p->latitude, $p->longitude], 'on_route' => false, 'distance_km' => round($km, 1),
+                            'near' => "{$seg->start_name} to {$seg->end_name}", 'link' => "/places/{$p->slug}", 'last_confirmed_on' => $p->last_confirmed_on?->toDateString()]);
+                    }
+                });
         }
 
         return $places->sortBy([['on_route', 'desc'], ['distance_km', 'asc']])->values()->all();
@@ -95,7 +104,7 @@ class JourneyController extends Controller
     /** @return array{0: float, 1: \App\Models\RouteSegment} */
     private function nearest(Collection $lines, float $lat, float $lng): array
     {
-        return $lines->map(fn ($s) => [Geo::pointToSegmentKm($lat, $lng, $s->start_lat, $s->start_lng, $s->end_lat, $s->end_lng), $s])
+        return $lines->map(fn ($s) => [min(array_map(fn ($l) => Geo::pointToSegmentKm($lat, $lng, ...$l), $s->lines())), $s])
             ->sortBy(0)->first();
     }
 

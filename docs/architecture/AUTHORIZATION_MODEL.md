@@ -45,3 +45,29 @@ Row-level security is **not** used (owner decision): only Laravel connects, as `
 `cms.pages.manage`, `cms.faqs.manage`, `cms.blog.manage` (posts, categories, tags, authors), `cms.team.manage`, `cms.promotions.manage` (popups, banners): drafts of that module. `cms.content.publish`: needed in addition to make content public, schedule, archive, or edit content that is already public. `contact.view` (read the inbox, including sender emails), `contact.manage` (status, delete). `settings.mail.manage`, `settings.maps.manage`, `settings.security.manage`, `settings.trust.manage`. Contribution pauses use the existing `users.suspend`. The CMS entry routes are registered per type, each behind its type's permission (route-matrix test), and the controller checks again.
 - Trips: a rider becomes a member only by accepting an invitation; before that they see only the trip title, the inviter's display name and the role. Someone else's invitation answers 404.
 - Contribution pauses never block reading, trips, saved items or events; they block submitting, editing, photos, reports, confirmations and corrections (`can-contribute` middleware).
+
+## Session 16 permissions (places)
+`places.manage`: create and edit draft places, images, sources, read history. `places.publish`: publish, unpublish, archive, edit published places, decide rider suggestions (request changes or reject need a reason the rider sees) and corrections. Neither is in the moderator defaults; administrators hold both. No-self-review: a staff account linked to (or sharing an email with) the suggesting rider cannot decide that suggestion or correction. Riders can only create suggestions (always pending) and edit their own while pending or sent back; corrections never change a place automatically.
+
+## Session 17: place permissions audit (no role changed)
+- **Built-in moderator** holds neither `places.manage` nor `places.publish`: moderators cannot see the Places screen, rider place suggestions or corrections today. **Administrators** hold every permission.
+- **`places.manage`** (routes `GET/POST admin/places`, `PUT admin/places/{id}`, `GET admin/places/{id}/history`): list every place including pending rider suggestions and the submitter's display name; create drafts; edit any place that is not published, including a rider's pending suggestion (edits are audited with the old values, so the original text is recoverable, but they change what the rider submitted); read history.
+- **`places.publish`** (decisions and corrections): publish, unpublish and archive any place (staff or rider), edit published places, decide rider suggestions (publish, request changes, reject) and decide corrections. No-self-review applies to suggestions and corrections.
+- **Finding:** neither permission can safely be given to moderators for review only. `places.publish` also grants unrestricted publication and withdrawal of staff content; `places.manage` lets them rewrite riders' suggestions.
+- **Proposed least-privilege change (not applied, owner approval needed):** add `places.review`, which allows reading the suggestion and correction queues and deciding *rider suggestions only* (publish, request changes, reject; not unpublish or archive, not staff-created places, no editing), and deciding corrections; add it to the moderator defaults if approved. Restrict editing of a pending rider suggestion under `places.manage` to "request changes" instead of in-place edits.
+
+## Session 17 follow-up: `places.review` (implemented, owner-approved)
+The owner approved the proposal above: the built-in moderator reviews rider place suggestions and corrections without place management or publication rights.
+
+| Endpoint | Before | After |
+|---|---|---|
+| `GET/POST admin/places`, `PUT admin/places/{id}`, `GET admin/places/{id}/history` | `places.manage` | unchanged |
+| `POST admin/places/{id}/decision` (publish, unpublish, request_changes, reject, archive; any place) | `places.publish` | unchanged |
+| `GET admin/place-suggestions`, `GET admin/place-suggestions/{id}` (rider suggestions only, with history) | none | `places.review` |
+| `POST admin/place-suggestions/{id}/decision` (approve from pending; request_changes from pending; reject from pending or changes_requested; rider suggestions only, staff places answer 404) | none | `places.review` |
+| `GET admin/place-corrections`, `POST admin/place-corrections/{id}/decision` | `places.publish` | `places.review` |
+
+- Roles: moderator gains `places.review` only (migration `2026_11_20_100019`, `insertOrIgnore`, idempotent; no other role or assignment touched; added to `defaults.moderator` so fresh databases match). Administrators hold every key as before. Custom roles get nothing automatically.
+- One decision path: `App\Actions\Places\DecidePlace` serves both the lifecycle and the review endpoints (review mode: three decisions, rider suggestions only). It locks the row and re-reads its status, so a repeated or stale decision fails with 422 instead of overwriting; refuses the reviewer's own suggestion (linked rider or same email); requires a reason for reject and request_changes; never changes rider text; audits with the same action names plus `via: review|lifecycle`. Correction decisions also lock the row.
+- Behaviour change: deciding corrections now needs `places.review` (administrators keep it); `places.publish` alone no longer reaches the correction queue.
+- Staff portal: the Places item shows for `places.manage` or `places.review`; tabs follow permissions (Places = manage, Rider suggestions and Corrections = review); no create, edit, publish, unpublish or archive controls appear without the matching permission. Laravel enforces all of it independently.

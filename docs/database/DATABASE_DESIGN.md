@@ -42,3 +42,28 @@ Authority: `web/database/migrations` (Laravel). Local database `myridenepal` (te
 - `2026_11_19_100016_create_trip_invitations_and_contribution_suspensions`: `trip_invitations` (one pending per trip and rider, 14-day `expires_at`, status pending/accepted/declined/cancelled), `contribution_suspensions` (until, reason, lift note, one appeal and its decision; separate from `users.suspended_until`).
 - `media_usages` is now written (CMS entries, homepage sections, settings `*_media_id`), so the media library refuses to delete images in use. It was never written before session 13.
 - Rollback: each `down()` drops only its own tables.
+
+## Session 16 additions (2026-11-20, additive migration `2026_11_20_100017_create_places`)
+- `places`: slug (unique), name, category (check: viewpoint, lake, waterfall, temple, monastery, heritage, cultural, attraction, rest_stop, hidden_place, other), summary, description, `latitude`/`longitude numeric(9,6) not null` with a Nepal bounding check (26.3–30.5, 80.0–88.3), optional destination, cover `media_asset_id` + `gallery` jsonb (media ids, tracked in `media_usages`), status (draft, pending_review, changes_requested, published, rejected, archived), `moderation_note`, `submitted_by` (rider), `created_by_staff_id`, `reviewed_by_staff_id`, observed_on, last_confirmed_on, published_at, is_dev_seed. Sources through `sourceables` (alias `place`). No PostGIS: the activation plan adds a generated geography column from these coordinates later.
+- `place_corrections`: rider-suggested corrections (text, optional proposed position with the same check), status pending/accepted/rejected, review note, reviewer.
+- `contributions.place_id` (nullable FK, null on delete); `saved_items` type check now includes `place`.
+- Permissions synced: `places.manage`, `places.publish` (not added to the moderator defaults; administrators hold every permission).
+- Rollback: `down()` drops the two tables and the column, removes saved `place` rows and restores the old saved-items check.
+
+## Session 17 additions (2026-11-20, additive migration `2026_11_20_100018_add_trip_places_and_segment_paths`)
+- `trip_stops.place_id` (nullable FK, null on delete) with a partial unique index `trip_stops_one_place (trip_id, place_id) where place_id is not null`: a place can be a stop once per trip.
+- `route_segments.path` (jsonb, nullable): the real recorded track `[[lat, lng], ...]` (2–5000 points, all inside Nepal), imported by staff from GPX or GeoJSON. Null means no real geometry: maps draw no line, only checkpoints; straight-line distance maths falls back to the start-to-end chord and is labelled as such.
+- Rollback: `down()` drops the column, the index and the FK only.
+
+## Session 19 additions (2026-11-21, additive migration `2026_11_21_100021_add_trip_route_parts`)
+- `trip_stops.route_segment_id` (nullable FK to `route_segments`, null on delete) and `trip_stops.route_part` (varchar 20, check `route`, `stretch`, `checkpoint_start`, `checkpoint_end`; null for other stops). Design: `docs/architecture/TRIP_ROUTE_PARTS.md`.
+- Partial unique indexes: `trip_stops_one_route (trip_id, route_id) where route_part = 'route'` (a whole route once per trip) and `trip_stops_one_route_part (trip_id, route_segment_id, route_part) where route_segment_id is not null` (a stretch or checkpoint once per trip). A checkpoint is stored once: the start of its stretch, or the end of the last stretch.
+- Backfill: stops with only `route_id` become `route_part = 'route'` (0 rows in dev and E2E at migration time).
+- Rollback: `down()` drops both indexes, the check and both columns; route stops then stay as named stops with `route_id`. Rollback and re-apply verified on `myridenepal_e2e`.
+
+## Session 20 additions (2026-11-21, additive migration `2026_11_21_100022_add_trip_expense_status`)
+- `trip_expenses.status` (varchar 10, default `planned`, check `planned` / `spent`). Existing rows became `planned`; the UI had always called them estimates.
+- `trip_expenses.amount_npr` is now nullable: a planned cost may be unknown. The check `trip_expenses_spent_amount` (`status = 'planned' or amount_npr is not null`) keeps spent rows complete. The existing `amount_npr >= 0` check is unchanged. All amounts are NPR; there is no currency column.
+- Rollback: `down()` refuses while any row has no amount, so it never invents one. Otherwise it drops both checks and the column and restores NOT NULL. Rollback and re-apply verified on `myridenepal_e2e`.
+- No schema change for days, overnight stops or notes. Per-day totals are computed from `trip_stops.day` and recorded route values.
+

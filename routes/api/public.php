@@ -15,6 +15,8 @@ Route::get('destinations/{slug}', [V1\DestinationController::class, 'show']);
 Route::get('routes', [V1\RouteController::class, 'index']);
 Route::get('routes/{slug}', [V1\RouteController::class, 'show']);
 Route::get('journeys', V1\JourneyController::class);
+Route::get('places', [V1\PlaceController::class, 'index']);
+Route::get('places/{slug}', [V1\PlaceController::class, 'show']);
 Route::get('contributions', [V1\ContributionController::class, 'index']);
 Route::get('contributions/{contribution}', [V1\ContributionController::class, 'show']);
 Route::get('media/{media}', [V1\ContributionController::class, 'media'])->name('media.show');

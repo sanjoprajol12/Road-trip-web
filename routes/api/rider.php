@@ -35,6 +35,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('users/me/notifications', [V1\NotificationController::class, 'index']);
     Route::post('users/me/notifications/read', [V1\NotificationController::class, 'markRead']);
     Route::post('users/me/contribution-appeal', [V1\ProfileController::class, 'appealContributionSuspension'])->middleware('throttle:applications');
+    Route::get('users/me/places', [V1\PlaceController::class, 'mine']);
     Route::get('users/me/saved', [V1\SavedItemController::class, 'index']);
     Route::post('users/me/saved', [V1\SavedItemController::class, 'store']);
     Route::delete('users/me/saved/{type}/{id}', [V1\SavedItemController::class, 'destroy']);
@@ -48,6 +49,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('contributions/{contribution}/media', [V1\ContributionController::class, 'upload'])->middleware(['throttle:uploads', 'can-contribute']);
         Route::post('contributions/{contribution}/reports', [V1\ContributionController::class, 'report'])->middleware(['throttle:reports', 'can-contribute']);
         Route::post('contributions/{contribution}/confirmations', [V1\ContributionController::class, 'confirm'])->middleware(['throttle:reports', 'can-contribute']);
+        Route::post('places', [V1\PlaceController::class, 'store'])->middleware(['throttle:contributions', 'can-contribute']);
+        Route::patch('places/{place}', [V1\PlaceController::class, 'update'])->middleware('can-contribute')->whereUuid('place');
+        Route::post('places/{place}/corrections', [V1\PlaceController::class, 'correct'])->middleware(['throttle:reports', 'can-contribute'])->whereUuid('place');
         Route::post('contributions/{contribution}/correction', [V1\ContributionController::class, 'correct'])->middleware(['throttle:contributions', 'can-contribute']);
 
         Route::post('events', [V1\EventController::class, 'store']);
@@ -72,6 +76,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('trip-invitations/{invitation}/decline', [V1\TripInvitationController::class, 'respond'])->defaults('answer', 'decline');
         Route::patch('trips/{trip}/members/{user}', [V1\TripController::class, 'updateMember']);
         Route::delete('trips/{trip}/members/{user}', [V1\TripController::class, 'removeMember']);
+        Route::post('trips/{trip}/route-parts', [V1\TripItineraryController::class, 'addRoute']);
+        Route::put('trips/{trip}/stops/order', [V1\TripItineraryController::class, 'reorder']);
         Route::post('trips/{trip}/{part}', [V1\TripPartController::class, 'store'])->whereIn('part', ['stops', 'expenses', 'checklist']);
         Route::patch('trips/{trip}/{part}/{id}', [V1\TripPartController::class, 'update'])->whereIn('part', ['stops', 'expenses', 'checklist']);
         Route::delete('trips/{trip}/{part}/{id}', [V1\TripPartController::class, 'destroy'])->whereIn('part', ['stops', 'expenses', 'checklist']);

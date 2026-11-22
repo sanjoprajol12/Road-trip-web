@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 20: Trip planning | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:60rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; }
+  h2 { font-size:1.3rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.4rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  code { font-size:.88em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; word-break:break-word; }
+  .warn { color:var(--warn); font-weight:700; }
+  .ok { color:var(--ok); font-weight:700; }
+  ul, ol { padding-left:1.3rem; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; margin:.6rem 0 1rem; }
+  th, td { text-align:left; vertical-align:top; padding:.4rem .6rem; border-bottom:1px solid var(--line); }
+  th { background:var(--surface); }
+</style>
+</head>
+<body>
+<main>
+<p class="meta">My Ride Nepal · Session report</p>
+<h1>Session 20: trip planning completion (F4 and F15)</h1>
+<p class="meta">2026-11-21 · Claude Code (Opus 5.5) · Nothing committed · One additive migration · No dependency · No routing provider, no remote Supabase, no payments</p>
+
+<h2>Project progress</h2>
+<ul>
+<li><strong>Verified completion: 67.8%</strong> (177 / 261), up from 67.0% (175 / 261): <strong>+0.8 points</strong>.</li>
+<li><strong>Implementation coverage: 81.9%</strong> (213.75 / 261), up from 81.7%.</li>
+<li><strong>Completed:</strong> F4 (stops and accommodation) and F15 (shared stops, budgets, checklists and notes), both from "complete, under-tested".</li>
+<li><strong>Areas:</strong> My Rides 10 / 18 to 12 / 18 (55.6% to 66.7%); Routes unchanged at 53.8%.</li>
+<li><strong>Still partial:</strong> F6 (no budget target or per-person split) and F10 (no private per-member notes). Regressions: none found.</li>
+</ul>
+
+<h2>Gap assessment (before any change)</h2>
+<p><code>docs/audits/TRIP_PLANNING_GAP_ASSESSMENT.md</code> checks every acceptance criterion against code, schema, API, frontend and tests.</p>
+<ul>
+<li><strong>Real gaps found:</strong>
+  <ul>
+  <li>No way to edit a stop in the UI.</li>
+  <li>No per-day view, and no warning for nights without a place to stay.</li>
+  <li>Planned and spent costs not distinguished, and unknown costs impossible to enter.</li>
+  <li>Checklist items not editable.</li>
+  <li>A withdrawn destination silently disappeared from its stop.</li>
+  </ul></li>
+<li><strong>Working but untested:</strong> notes, and changes made by an editor being seen by other members.</li>
+<li><strong>Not built (documented):</strong> arrival and departure times are not modelled.</li>
+</ul>
+
+<h2>Work completed</h2>
+<ul>
+<li><strong>Stops and accommodation:</strong>
+  <ul>
+  <li>Each stop can be edited in place: name, day, overnight and note.</li>
+  <li>A day-by-day view gives dates from the trip start, recorded distance and riding time per day (missing values counted, never filled in) and the overnight stop for each night.</li>
+  <li>It warns about nights without a stay, days after the end date, a list that runs backwards, and stops without a day.</li>
+  </ul></li>
+<li><strong>Budget:</strong>
+  <ul>
+  <li>Planned and spent costs, all in NPR. A planned cost may have no amount yet; the total then says it is incomplete.</li>
+  <li>A spent cost needs an amount, enforced by the API and by a database check.</li>
+  <li>Costs can be edited and show "paid by". Removing one asks first.</li>
+  </ul></li>
+<li><strong>Checklist:</strong> items can be edited, ticked and unticked, with "n of m done" progress and empty-section text.</li>
+<li><strong>Notes:</strong> the field says that every member can read them; "Details saved." confirms a save; clearing the field removes them.</li>
+<li><strong>Map:</strong> recorded tracks of route and stretch stops are drawn as grey lines next to the markers, and the caption tells the two apart. Stops without a track get no line. The itinerary and day lists carry the same information for keyboard and screen-reader users.</li>
+<li><strong>Integrity:</strong> a withdrawn or deleted destination now flags its stop. A demoted editor loses edit rights at once.</li>
+</ul>
+
+<h2>Database</h2>
+<ul>
+<li>Migration <code>2026_11_21_100022_add_trip_expense_status</code>: <code>trip_expenses.status</code> (planned or spent; existing rows became planned) and a nullable <code>amount_npr</code>, with the check <code>trip_expenses_spent_amount</code>.</li>
+<li>Applied to the dev and E2E databases. Rollback and re-apply were verified on E2E.</li>
+<li>Rollback refuses while any amount is missing, so it never invents one.</li>
+</ul>
+
+<h2>Verification (every exit code captured, full logs read)</h2>
+<div class="scroll"><table>
+<tr><th>Command</th><th>Exit</th><th>Result</th></tr>
+<tr><td><code>php artisan test</code></td><td>0</td><td>157 passed (3351 assertions), including 6 new in <code>TripPlanningTest</code></td></tr>
+<tr><td><code>composer audit</code></td><td>0</td><td>no advisories</td></tr>
+<tr><td>public type-check, lint, build</td><td>0, 0, 0</td><td>—</td></tr>
+<tr><td>public unit</td><td>0</td><td>30 passed (5 new in <code>tripDays.spec.ts</code>)</td></tr>
+<tr><td>public <code>pnpm audit --prod</code></td><td>0</td><td>no known vulnerabilities</td></tr>
+<tr><td>staff type-check, lint, unit, build, audit</td><td>0 (all)</td><td>13 unit tests passed</td></tr>
+<tr><td>public E2E (Chromium, Firefox, mobile)</td><td>0</td><td><span class="ok">144 passed</span>, 3 skipped by design, 0 failed</td></tr>
+<tr><td>staff E2E (Chromium, Firefox)</td><td>0</td><td><span class="ok">48 passed</span>, 0 failed</td></tr>
+</table></div>
+<p><span class="warn">Note:</span> a first full public E2E run was cut off at test 61 of 147 when the session ended, with no failures up to then. The complete re-run is the result above.</p>
+
+<h2>What the tests cover</h2>
+<ul>
+<li><strong>Feature tests:</strong>
+  <ul>
+  <li>Accommodation stops added, moved to another day, edited and removed by editors.</li>
+  <li>Viewers, outsiders and guests refused; bad values refused.</li>
+  <li>An editor's change read back by the viewer.</li>
+  <li>A demoted editor locked out.</li>
+  <li>Planned and spent costs, with the missing-amount rules enforced by the API and the database.</li>
+  <li>Checklist edit, tick and untick.</li>
+  <li>Notes written, changed, cleared and capped at 10,000 characters.</li>
+  <li>Withdrawn and soft-deleted destinations.</li>
+  <li>Recorded tracks only, never a straight line.</li>
+  </ul></li>
+<li><strong>Browser test</strong> (Chromium, Firefox, mobile), with owner, editor and viewer:
+  <ul>
+  <li>Overnight stop at a destination, edit, reorder, and the day-by-day warnings appearing and clearing.</li>
+  <li>Track and marker on the map.</li>
+  <li>Planned cost without an amount, then marked as spent with one.</li>
+  <li>Checklist lifecycle, and notes saved and then cleared.</li>
+  <li>The editor changes notes and removes a cost; the viewer sees the result with no controls.</li>
+  <li>No sideways scrolling on phones.</li>
+  </ul></li>
+<li><strong>Screenshots inspected:</strong> day by day and budget, on Firefox desktop and on mobile.</li>
+</ul>
+
+<h2>Not done or not checked</h2>
+<ul>
+<li>No arrival or departure times, bookings, availability, payments, budget targets or splits.</li>
+<li>Edits are last write wins, with no conflict detection.</li>
+<li>Full recorded tracks are sent to the trip page with no simplification. That is fine for a few routes but would need work for very long ones.</li>
+<li>Not run: WebKit (system libraries), axe, Lighthouse, a screen reader.</li>
+</ul>
+
+<h2>Next</h2>
+<ul>
+<li><strong>Owner:</strong> Q6 (difficulty) and seasonal data.</li>
+<li><strong>No decision needed:</strong>
+  <ul>
+  <li>Verify E5 (accommodation planning) against its criteria.</li>
+  <li>Saving guides (F8).</li>
+  <li>Account deletion and export (G19, H11).</li>
+  <li>Private notes (F10).</li>
+  <li>Budget target and split (F6).</li>
+  </ul></li>
+</ul>
+</main>
+</body>
+</html>

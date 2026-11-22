@@ -7,11 +7,13 @@ import { errorMessage } from '@/lib/api/client'
 import { useAsync } from '@/lib/useAsync'
 import { formatDay } from '@/lib/format'
 import { serviceKinds } from '@/features/routes/serviceKinds'
+import { isPlaceCategory, placeCategories } from '@/features/places/categories'
+import type { PlaceCategory } from '@/features/places/services/places'
 import AddToTrip from '@/features/rides/components/AddToTrip.vue'
 import type { ServicePoint } from '@/types/api'
 import { listSaved, unsaveItem, type SavedItem, type SavedType } from '../services/saved'
 
-const tabs: [SavedType | 'all', string][] = [['all', 'Everything'], ['service', 'Services'], ['destination', 'Destinations'], ['route', 'Routes'], ['contribution', 'Experiences']]
+const tabs: [SavedType | 'all', string][] = [['all', 'Everything'], ['service', 'Services'], ['destination', 'Destinations'], ['place', 'Places'], ['route', 'Routes'], ['contribution', 'Experiences']]
 const type = ref<SavedType | 'all'>('all')
 const kind = ref('')
 const saved = useAsync(() => listSaved({ type: type.value === 'all' ? undefined : type.value, kind: type.value === 'service' && kind.value ? kind.value : undefined }))
@@ -19,8 +21,8 @@ watch([type, kind], () => void saved.run())
 watch(type, () => (kind.value = ''))
 const items = computed(() => saved.data.value ?? [])
 
-const canAddToTrip = (i: SavedItem) => i.type === 'service' || i.type === 'destination'
-const tripKind = (i: SavedItem) => (i.type === 'service' ? 'service' : 'destination')
+const canAddToTrip = (i: SavedItem) => i.type === 'service' || i.type === 'destination' || i.type === 'place'
+const tripKind = (i: SavedItem) => (i.type === 'service' ? 'service' : i.type === 'place' ? 'place' : 'destination')
 const msg = ref<string | null>(null)
 async function remove(i: SavedItem) {
   try {
@@ -31,7 +33,7 @@ async function remove(i: SavedItem) {
     msg.value = errorMessage(e)
   }
 }
-const iconFor = (i: SavedItem) => (i.type === 'service' ? (serviceKinds[i.kind as ServicePoint['kind']]?.icon ?? MapPin) : i.type === 'route' ? RouteIcon : i.type === 'contribution' ? ScrollText : MapPin)
+const iconFor = (i: SavedItem) => (i.type === 'place' && isPlaceCategory(i.kind ?? '') ? placeCategories[i.kind as PlaceCategory].icon : i.type === 'service' ? (serviceKinds[i.kind as ServicePoint['kind']]?.icon ?? MapPin) : i.type === 'route' ? RouteIcon : i.type === 'contribution' ? ScrollText : MapPin)
 </script>
 
 <template>
@@ -59,7 +61,7 @@ const iconFor = (i: SavedItem) => (i.type === 'service' ? (serviceKinds[i.kind a
         <div class="flex gap-3">
           <component :is="iconFor(i)" class="mt-1 size-5 shrink-0 text-muted" aria-hidden="true" />
           <div>
-            <p class="label text-muted">{{ i.type === 'service' ? (serviceKinds[i.kind as ServicePoint['kind']]?.label ?? 'Service') : tabs.find(([v]) => v === i.type)?.[1].replace(/s$/, '') }}</p>
+            <p class="label text-muted">{{ i.type === 'place' && isPlaceCategory(i.kind ?? '') ? placeCategories[i.kind as PlaceCategory].label : i.type === 'service' ? (serviceKinds[i.kind as ServicePoint['kind']]?.label ?? 'Service') : tabs.find(([v]) => v === i.type)?.[1].replace(/s$/, '') }}</p>
             <RouterLink v-if="i.link" :to="i.link" class="link text-lg font-semibold">{{ i.name }}</RouterLink>
             <p v-else class="text-lg font-semibold">{{ i.name }}</p>
             <p v-if="i.place" class="text-sm text-muted">{{ i.place }}</p>

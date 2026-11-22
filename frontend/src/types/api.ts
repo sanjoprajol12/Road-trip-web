@@ -73,6 +73,10 @@ export interface Segment {
   surface: 'paved' | 'mixed' | 'gravel' | 'dirt' | 'unknown'
   notes: string | null
   services: ServicePoint[]
+  /** Imported track [[lat, lng], ...], or null: only this is drawn as a road line. */
+  path: [number, number][] | null
+  /** Staff estimate from the written-up route, per stretch; null when not recorded. */
+  estimated_hours: number | null
 }
 
 export interface RideRoute {
@@ -116,6 +120,7 @@ export interface Contribution {
   source_url: string | null
   moderation_note?: string | null
   author?: PublicUser
+  place?: { slug: string; name: string } | null
   destination?: { slug: string; name: string } | null
   route?: { slug: string; name: string } | null
   segment?: { id: string; start_name: string; end_name: string } | null
@@ -175,9 +180,26 @@ export interface Trip {
   members?: { id: string; display_name: string; username: string | null; role: 'owner' | 'editor' | 'viewer' }[]
   /** Owner only: invitations waiting for an answer. */
   invitations?: { id: string; role: 'editor' | 'viewer'; expires_at: string; display_name: string; username: string | null; expired: boolean }[]
-  stops?: { id: string; position: number; day: number | null; name: string; destination_id: string | null; route_id: string | null; service_point_id: string | null; overnight: boolean; note: string | null }[]
-  expenses?: { id: string; label: string; category: string; amount_npr: number; paid_by: string | null }[]
+  stops?: {
+    id: string; position: number; day: number | null; name: string; destination_id: string | null; route_id: string | null; service_point_id: string | null; place_id: string | null; overnight: boolean; note: string | null
+    /** Linked records, only while they are published. */
+    place: { slug: string; name: string; category: string; position: [number, number] | null } | null
+    destination: { slug: string; name: string; position: [number, number] | null } | null
+    service: { name: string; kind: string; position: [number, number] | null } | null
+    /** Session 19: a whole route, one stretch, or one checkpoint (null for other stops). */
+    route_segment_id: string | null
+    route_part: 'route' | 'stretch' | 'checkpoint_start' | 'checkpoint_end' | null
+    route: { slug: string; name: string; distance_km: number | null; estimated_hours: number | null; stretches: number; without_distance: number; without_time: number; without_track: number } | null
+    stretch: { from: string; to: string; distance_km: number | null; estimated_hours: number | null; surface: Segment['surface']; has_track: boolean } | null
+    checkpoint: { name: string; position: [number, number] | null } | null
+    /** Recorded tracks of this route or stretch ([[lat, lng], ...] each); empty when none is recorded. */
+    tracks: [number, number][][]
+    linked_unavailable: boolean
+  }[]
+  /** All amounts NPR. A planned cost may have no amount yet; a spent one always has one. */
+  expenses?: { id: string; label: string; category: string; amount_npr: number | null; paid_by: string | null; status: 'planned' | 'spent' }[]
   expense_total_npr?: number
+  budget?: { planned_npr: number; spent_npr: number; planned_without_amount: number }
   checklist?: { id: string; label: string; section: 'motorcycle' | 'personal' | 'trip'; done: boolean; position: number }[]
   updated_at: string
 }
@@ -212,7 +234,7 @@ export interface OwnVerification {
 
 export interface AppNotification {
   id: string
-  data: { kind: string; title?: string; body?: string; note?: string; status?: string; claim_kind?: string; change?: 'promoted' | 'approved' | 'declined' | 'removed' | 'suspended' | 'lifted' | 'appeal_upheld'; link?: string; by?: string }
+  data: { kind: string; title?: string; body?: string; note?: string; status?: string; claim_kind?: string; change?: 'promoted' | 'approved' | 'declined' | 'removed' | 'published' | 'changes_requested' | 'rejected' | 'suspended' | 'lifted' | 'appeal_upheld'; link?: string; by?: string }
   read_at: string | null
   created_at: string
 }

@@ -31,6 +31,7 @@ class ContributionResource extends JsonResource
             'correction_request' => $this->when($insider, $this->correction_request),
             'sources' => $this->whenLoaded('sources', fn () => $this->sources->map->toPublic()->values()),
             'author' => $this->whenLoaded('author', fn () => (new PublicUserResource($this->author))->toArray($request)),
+            'place' => $this->whenLoaded('place', fn () => $this->place ? ['slug' => $this->place->slug, 'name' => $this->place->name] : null),
             'destination' => $this->whenLoaded('destination', fn () => $this->destination ? ['slug' => $this->destination->slug, 'name' => $this->destination->name] : null),
             'route' => $this->whenLoaded('route', fn () => $this->route ? ['slug' => $this->route->slug, 'name' => $this->route->name] : null),
             'segment' => $this->whenLoaded('segment', fn () => $this->segment ? ['id' => $this->segment->id, 'start_name' => $this->segment->start_name, 'end_name' => $this->segment->end_name] : null),

@@ -18,7 +18,7 @@ use Illuminate\Validation\Rule;
  */
 class SavedItemController extends Controller
 {
-    private const TYPES = ['destination', 'route', 'service', 'contribution'];
+    private const TYPES = ['destination', 'route', 'service', 'contribution', 'place'];
 
     public function index(Request $request): JsonResponse
     {
@@ -40,6 +40,10 @@ class SavedItemController extends Controller
             ]))
             ->merge(ServicePoint::where('status', 'published')->with(['destination', 'segment.route'])->whereIn('id', $ids('service'))
                 ->when($type['kind'] ?? null, fn ($q, $k) => $q->where('kind', $k))->get()->map(fn (ServicePoint $p) => $this->service($p)))
+            ->merge(\App\Models\Place::published()->with('destination')->whereIn('id', $ids('place'))->get()->map(fn (\App\Models\Place $p) => [
+                'type' => 'place', 'id' => $p->id, 'name' => $p->name, 'kind' => $p->category, 'link' => "/places/{$p->slug}", 'place' => $p->destination?->name,
+                'latitude' => $p->latitude, 'longitude' => $p->longitude, 'last_confirmed_on' => $p->last_confirmed_on?->toDateString(),
+            ]))
             ->merge(Contribution::visible()->whereIn('id', $ids('contribution'))->get()->map(fn (Contribution $c) => [
                 'type' => 'contribution', 'id' => $c->id, 'name' => $c->title, 'kind' => $c->kind->value, 'link' => "/experiences/{$c->id}",
                 'place' => null, 'latitude' => null, 'longitude' => null, 'last_confirmed_on' => $c->last_confirmed_on?->toDateString(),
@@ -75,6 +79,7 @@ class SavedItemController extends Controller
             'route' => RideRoute::published()->whereKey($id)->exists(),
             'service' => ServicePoint::where('status', 'published')->whereKey($id)->exists(),
             'contribution' => Contribution::visible()->whereKey($id)->exists(),
+            'place' => \App\Models\Place::published()->whereKey($id)->exists(),
         };
     }
 

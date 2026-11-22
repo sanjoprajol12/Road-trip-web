@@ -8,10 +8,11 @@ export async function listDestinations(): Promise<Destination[]> {
 /** Null when nothing is published at this address. */
 /** Straight-line neighbours of a destination (null when it has no coordinates). */
 export interface Nearby {
-  radius_km: { destinations: number; services: number; routes: number }
+  radius_km: { destinations: number; services: number; routes: number; places: number }
   destinations: { slug: string; name: string; position: [number, number]; distance_km: number }[]
   services: { id: string; kind: ServicePoint['kind']; name: string; position: [number, number]; distance_km: number; place: string | null; last_confirmed_on: string | null }[]
-  routes: { slug: string; name: string; distance_km: number }[]
+  routes: { slug: string; name: string; distance_km: number; paths: [number, number][][] }[]
+  places: { slug: string; name: string; category: import('@/features/places/services/places').PlaceCategory; position: [number, number]; distance_km: number }[]
 }
 
 export async function getDestination(slug: string): Promise<{ destination: Destination; routes: RideRoute[]; services: ServicePoint[]; nearby: Nearby | null } | null> {

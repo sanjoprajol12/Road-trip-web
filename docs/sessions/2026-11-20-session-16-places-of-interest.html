@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 16: Places of interest | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:60rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; }
+  h2 { font-size:1.3rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.4rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  code { font-size:.88em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; word-break:break-word; }
+  .warn { color:var(--warn); font-weight:700; }
+  .ok { color:var(--ok); font-weight:700; }
+  ul, ol { padding-left:1.3rem; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; margin:.6rem 0 1rem; }
+  th, td { text-align:left; vertical-align:top; padding:.4rem .6rem; border-bottom:1px solid var(--line); }
+  th { background:var(--surface); }
+</style>
+</head>
+<body>
+<main>
+<p class="meta">My Ride Nepal · Session report</p>
+<h1>Session 16: places of interest</h1>
+<p class="meta">2026-11-20 · Claude Code (Opus 5.5) · Nothing committed · One additive migration · No dependency added · PostGIS not enabled</p>
+
+<h2>Project progress</h2>
+<ul>
+<li><strong>Overall verified requirement completion: 64.4%</strong> (168 / 261)</li>
+<li><strong>Implementation coverage: 80.2%</strong> (209.40 / 261; same weights as session 15)</li>
+<li>Before this session: 61.3% (160 / 261, measured at the start with <code>scripts/requirements-progress.mjs</code>). After: 64.4%. <strong>Change: +3.1 percentage points.</strong></li>
+<li>Completed and verified this session: 8. Seven went from not implemented to complete (R2, R3, R9, R12, R13, A4, L4) and one from partial to complete (R10). L13 remains partial, with places added to the map. Implemented but awaiting verification: 0. Blocked: 4 (unchanged).</li>
+<li><strong>Places of interest feature: 7 / 7 = 100% verified.</strong> The denominator is the same as in session 15.</li>
+</ul>
+<div class="scroll"><table><tr><th>Affected area</th><th>Before</th><th>After</th><th>Applicable</th><th>Before %</th><th>After %</th></tr><tr><td>Places and points of interest</td><td>0</td><td>7</td><td>7</td><td>0.0%</td><td>100.0%</td></tr><tr><td>Saved items and services</td><td>3</td><td>4</td><td>5</td><td>60.0%</td><td>80.0%</td></tr><tr><td>Destinations and exploration</td><td>7</td><td>7</td><td>25</td><td>28.0%</td><td>28.0%</td></tr><tr><td>Explore Along My Route</td><td>6</td><td>6</td><td>10</td><td>60.0%</td><td>60.0%</td></tr><tr><td>Rider experiences and moderation</td><td>20</td><td>20</td><td>30</td><td>66.7%</td><td>66.7%</td></tr></table></div>
+
+<h2>Work completed</h2>
+<ul>
+<li><strong>Backend.</strong> A <code>places</code> model with categories, a coordinate check against Nepal in both the API and the database, a status lifecycle, submitter, creator and reviewer, observed and last-confirmed dates, images through the media library (usage-tracked) and structured sources. A <code>place_corrections</code> table and <code>contributions.place_id</code>. Policies use permissions (<code>places.manage</code>, <code>places.publish</code>). Staff decisions write audit rows. No one can review their own suggestion. Duplicates are detected (same category within 150 m, or the same name within 2 km). Rider routes are rate-limited and need contribution rights.</li>
+<li><strong>Staff portal.</strong> The Places screen lists places with search, category and status filters and pages. The editor includes the Nepal map picker, cover and gallery images, sources and a preview on the website. Decisions are publish, unpublish, ask for changes or reject (both with a reason the rider sees) and archive. Each place has a history, and corrections have their own queue.</li>
+<li><strong>Public site.</strong>
+  <ul>
+  <li>Discovery page with search, category filter and pages.</li>
+  <li>Detail page: images and credits, description, map, coordinates, nearby places and destinations (straight-line distances), sources and freshness, experiences, save, suggest a correction, share an experience.</li>
+  <li>Suggest page: map picker, plus the rider's suggestions with status and the moderator's note, editable after "changes requested".</li>
+  </ul></li>
+<li><strong>Maps and journeys.</strong> Place markers appear on destination maps, and selecting a marker opens the place. Explore Along My Route lists published places near the route with a straight-line distance. No road distances or times are shown.</li>
+<li><strong>Bugs fixed.</strong>
+  <ul>
+  <li>Every Leaflet map drew over the sticky header when scrolled.</li>
+  <li>Hidden resource fields were sent as empty <code>[]</code>.</li>
+  <li>The map picker text said "destination" on the Places screen.</li>
+  </ul></li>
+</ul>
+
+<h2>Verification (your 15 points)</h2>
+<div class="scroll"><table>
+<tr><th>#</th><th>Check</th><th>Evidence</th></tr>
+<tr><td>1–2</td><td>Staff create and edit; coordinates saved and displayed</td><td>Staff E2E (Chromium, Firefox): empty form refused, latitude 35 refused, map click sets coordinates inside Nepal, saved draft, published, and the public API returns the same latitude</td></tr>
+<tr><td>3</td><td>Permissions enforced by Laravel</td><td>PlacesTest: editor without <code>places.publish</code> gets 403 on publish and on editing live content; riders get 401 on staff routes; the route-permission matrix covers every new route</td></tr>
+<tr><td>4–6</td><td>Unpublished hidden; published shown; search and category</td><td>PlacesTest plus public E2E: the draft returns not found and is absent from lists and journeys; search and category filters (including combined) work</td></tr>
+<tr><td>7</td><td>Map markers open the right place</td><td>Public E2E: clicking a place marker on the destination map navigates to <code>/places/...</code></td></tr>
+<tr><td>8–9</td><td>Riders suggest; cannot publish their own</td><td>PlacesTest: a request asking for "published" is stored as pending; the rider's linked staff account cannot decide it (422). Public E2E: suggestion through the map, shown as "Waiting for review"</td></tr>
+<tr><td>10–11</td><td>Approve, reject, request changes; history kept</td><td>PlacesTest: full history sequence (suggested, request changes, resubmitted, publish); rejection keeps the record. Staff E2E: reason required, then the history panel</td></tr>
+<tr><td>12</td><td>Invalid coordinates and incomplete forms</td><td>API and database bounds; E2E error states on both sides; duplicate refusal with a link</td></tr>
+<tr><td>13–14</td><td>Mobile and desktop; loading, empty, success, error</td><td>Screenshots (place page on mobile, suggest form and staff editor on desktop) inspected; empty search state and success messages asserted</td></tr>
+<tr><td>15</td><td>No regression</td><td>Full suites: Laravel 135 passed; public E2E 120 passed, 3 skipped by design (Chromium-only and desktop-only checks); staff E2E 38 passed; both apps pass type-check, lint, unit tests, build and audit</td></tr>
+</table></div>
+
+<h2>Commands executed (main)</h2>
+<p><code>node scripts/requirements-progress.mjs</code> (start and end), <code>php artisan migrate --database=pgsql_owner</code> for dev and E2E (after <code>--pretend</code>), <code>php artisan test</code>, <code>composer audit</code>, <code>pnpm type-check / lint / test:unit / build / audit --prod</code> in both apps, Playwright suites (public: Chromium, Firefox, Pixel 7; staff: Chromium, Firefox), and a deliberate test with the fix removed to check the overlap test (it did not catch the bug, so the check was replaced).</p>
+
+<h2>Security implications</h2>
+<ul>
+<li>Every place route sits behind <code>places.manage</code> or <code>places.publish</code> (staff) or confirmed-rider middleware with contribution rights and rate limits (riders). Public reads return published places only.</li>
+<li>Status and moderator notes go only to staff and the submitter. Reviewer identities are never shown to riders.</li>
+<li>Coordinates are checked in three places: request validation, the database check, and the map bounds in the UI.</li>
+<li>Rider text is stored and shown as plain text. Corrections never change a place automatically; every decision is audited.</li>
+</ul>
+
+<h2>Remaining defects and limitations</h2>
+<ul>
+<li>No real places exist yet; none were invented. Staff must enter them, with sources and licensed images.</li>
+<li>Riders cannot attach photos directly to a suggestion; images come from the staff media library, and rider photos go on experiences.</li>
+<li>Places cannot yet be added to trips (trip stops have no <code>place_id</code>). Routes are listed but not drawn on the destination map (L13 partial).</li>
+<li>Distances are straight-line, computed in PHP. PostGIS (D3) would index them; the plan is ready.</li>
+<li>Not run: WebKit, axe, Lighthouse, a screen reader.</li>
+</ul>
+
+<h2>Decisions for you</h2>
+<ul>
+<li>Should the built-in moderator role get <code>places.manage</code> and <code>places.publish</code>? Not granted automatically.</li>
+<li>D3 PostGIS, D2 routing provider, D1 storage, AR3 to AR5, D4, D7, and approval for axe and Lighthouse (all unchanged).</li>
+</ul>
+
+<h2>Recommended next session</h2>
+<ol>
+<li>Add places to trip itineraries, and draw routes on the destination map (closes L13).</li>
+<li>Route depth (B rows, 30.8%) and preparation and safety (E rows, 21.4%).</li>
+<li>Account deletion and data export (G19, H11).</li>
+</ol>
+</main>
+</body>
+</html>

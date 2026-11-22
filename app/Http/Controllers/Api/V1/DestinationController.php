@@ -32,7 +32,7 @@ class DestinationController extends Controller
     public function show(string $slug): JsonResponse
     {
         $d = Destination::published()->with('sources')->where('slug', $slug)->firstOrFail();
-        $routes = RideRoute::published()->with(['startDestination', 'endDestination'])
+        $routes = RideRoute::published()->with(['startDestination', 'endDestination', 'segments'])
             ->where(fn ($w) => $w->where('start_destination_id', $d->id)->orWhere('end_destination_id', $d->id))->orderBy('name')->get();
 
         // Practical stops staff attached to this destination; drafts and archived points stay hidden.
@@ -48,7 +48,7 @@ class DestinationController extends Controller
     }
 
     /** Radii for "nearby", in km, straight line (owner decision D3/PostGIS would replace the PHP distance, not the meaning). */
-    private const NEAR_KM = ['destinations' => 50, 'services' => 20, 'routes' => 15];
+    private const NEAR_KM = ['destinations' => 50, 'services' => 20, 'routes' => 15, 'places' => 20];
 
     /**
      * Published places near a destination: other destinations, services not attached to it, and routes whose recorded
@@ -78,12 +78,18 @@ class DestinationController extends Controller
         // shortcut: scans up to 200 published routes in PHP; becomes ST_DWithin on segment geography once PostGIS (D3) is enabled.
         // Routes passing nearby: nearest recorded stretch (start to end line) within the radius; routes that start or end here are listed already.
         $routes = RideRoute::published()->whereNotIn('id', $routeIdsHere)
-            ->whereHas('segments', fn ($s) => $s->whereNotNull('start_lat')->whereNotNull('end_lat'))
-            ->with(['segments' => fn ($s) => $s->whereNotNull('start_lat')->whereNotNull('end_lat')])->limit(200)->get()
+            ->whereHas('segments', fn ($s) => $s->where(fn ($w) => $w->whereNotNull('path')->orWhere(fn ($e) => $e->whereNotNull('start_lat')->whereNotNull('end_lat'))))
+            ->with('segments')->limit(200)->get()
             ->map(fn (RideRoute $r) => ['slug' => $r->slug, 'name' => $r->name,
-                'distance_km' => round($r->segments->min(fn ($s) => Geo::pointToSegmentKm($lat, $lng, $s->start_lat, $s->start_lng, $s->end_lat, $s->end_lng)), 1)])
+                'distance_km' => round(collect($r->segments)->flatMap(fn ($s) => $s->lines())->min(fn ($l) => Geo::pointToSegmentKm($lat, $lng, ...$l)) ?? INF, 1),
+                // Real recorded geometry only (imported tracks); routes without one are listed, not drawn.
+                'paths' => $r->segments->filter(fn ($s) => $s->path)->map(fn ($s) => $s->path)->values()])
             ->filter(fn ($r) => $r['distance_km'] <= self::NEAR_KM['routes'])->sortBy('distance_km')->take(10)->values();
 
-        return ['radius_km' => self::NEAR_KM, 'destinations' => $destinations, 'services' => $services, 'routes' => $routes];
+        $places = \App\Models\Place::published()->where(fn ($w) => $w->where('destination_id', $d->id)->orWhere(fn ($b) => $box($b, self::NEAR_KM['places'])))->limit(300)->get()
+            ->map(fn (\App\Models\Place $p) => ['slug' => $p->slug, 'name' => $p->name, 'category' => $p->category, 'position' => [$p->latitude, $p->longitude], 'distance_km' => $km($p->latitude, $p->longitude)])
+            ->sortBy('distance_km')->take(30)->values();
+
+        return ['radius_km' => self::NEAR_KM, 'destinations' => $destinations, 'services' => $services, 'routes' => $routes, 'places' => $places];
     }
 }

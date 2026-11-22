@@ -6,6 +6,8 @@ import { RouterLink } from 'vue-router'
 import { ArrowLeft, CalendarClock, MessageSquarePlus } from 'lucide-vue-next'
 import StatusPanel from '@/components/ui/StatusPanel.vue'
 import RouteMap from '../components/RouteMap.vue'
+import RoutePlan from '../components/RoutePlan.vue'
+import RouteToTrip from '../components/RouteToTrip.vue'
 import { serviceKinds } from '../serviceKinds'
 import { statusOf } from '@/lib/api/client'
 import { useAsync } from '@/lib/useAsync'
@@ -59,6 +61,8 @@ watch(r, (v) => v && (document.title = `${v.name} | My Ride Nepal`))
       </header>
 
       <section class="mt-10" aria-label="Map"><RouteMap :segments="r.segments ?? []" /></section>
+      <RoutePlan v-if="r.segments?.length" :segments="r.segments" :route-km="r.distance_km" :start-name="r.start?.name ?? null" :end-name="r.end?.name ?? null" />
+      <RouteToTrip :key="r.id" :route="r" />
 
       <section class="mt-12" aria-labelledby="seg-title">
         <h2 id="seg-title" class="display text-3xl">Stretch by stretch</h2>
@@ -69,13 +73,13 @@ watch(r, (v) => v && (document.title = `${v.name} | My Ride Nepal`))
             <span class="absolute top-1 -left-[7px] size-3 rounded-full border-2 border-crimson bg-paper" aria-hidden="true" />
             <h3 class="font-semibold">{{ s.position }}. {{ s.start_name }} to {{ s.end_name }}</h3>
             <p class="text-sm text-muted">
-              Surface recorded: {{ surfaceLabels[s.surface] }}<template v-if="s.distance_km"> · <span class="tabular">{{ s.distance_km }} km</span></template>
+              Surface recorded: {{ surfaceLabels[s.surface] }}<template v-if="s.distance_km"> · <span class="tabular">{{ s.distance_km }} km</span></template><template v-if="s.estimated_hours"> · about {{ s.estimated_hours }} h riding (estimate)</template>
             </p>
             <p v-if="s.notes" class="prose-serif mt-2 max-w-prose">{{ s.notes }}</p>
             <ul v-if="s.services.length" class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm" aria-label="Services along this stretch">
               <li v-for="svc in s.services" :key="svc.id" class="flex items-center gap-1.5">
                 <component :is="serviceKinds[svc.kind].icon" class="size-4 text-info" aria-hidden="true" /><span class="sr-only">{{ serviceKinds[svc.kind].label }}:</span>{{ svc.name }}<SaveButton type="service" :id="svc.id" :name="svc.name" compact />
-                <span class="text-xs text-muted">({{ svc.last_confirmed_on ? `seen ${formatDay(svc.last_confirmed_on)}` : 'never confirmed' }})</span>
+                <span class="text-xs text-muted">({{ svc.last_confirmed_on ? `seen ${formatDay(svc.last_confirmed_on)}` : 'never confirmed' }}{{ svc.position ? '' : '; no map position' }})</span>
               </li>
             </ul>
             <div class="mt-4">

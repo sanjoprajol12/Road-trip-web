@@ -25,7 +25,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ContributionController extends Controller
 {
-    private const WITH = ['author.verifications', 'destination', 'route', 'segment', 'media', 'sources'];
+    private const WITH = ['author.verifications', 'destination', 'route', 'segment', 'media', 'sources', 'place'];
 
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -33,6 +33,7 @@ class ContributionController extends Controller
         $q = Contribution::visible()->with(self::WITH)->orderByDesc('observed_on')->orderByDesc('created_at');
         $q->when($request->query('kind'), fn ($q, $k) => $q->where('kind', $k));
         $q->when($request->query('destination'), fn ($q, $s) => $q->whereHas('destination', fn ($d) => $d->where('slug', $s)));
+        $q->when($request->query('place'), fn ($q, $s) => $q->whereHas('place', fn ($p) => $p->where('slug', $s)));
         $q->when($request->query('route'), fn ($q, $s) => $q->whereHas('route', fn ($r) => $r->where('slug', $s)));
         $q->when($request->query('segment'), fn ($q, $id) => $q->where('route_segment_id', $id));
         if ($search = trim((string) $request->query('q'))) {
@@ -73,7 +74,7 @@ class ContributionController extends Controller
     public function update(Request $request, Contribution $contribution): ContributionResource
     {
         $this->authorize('update', $contribution);
-        $fields = ['kind', 'title', 'body', 'observed_on', 'destination_id', 'route_id', 'route_segment_id', 'details'];
+        $fields = ['kind', 'title', 'body', 'observed_on', 'destination_id', 'route_id', 'route_segment_id', 'place_id', 'details'];
         DB::transaction(function () use ($request, $contribution, $fields) {
             $old = $contribution->only($fields);
             $contribution->update($this->validated($request));
@@ -189,6 +190,7 @@ class ContributionController extends Controller
             'body' => ['required', 'string', 'min:20', 'max:10000'],
             'observed_on' => ['required', 'date', 'before_or_equal:today', 'after:2000-01-01'],
             'destination_id' => ['nullable', 'uuid', Rule::exists('destinations', 'id')->where('status', 'published')],
+            'place_id' => ['nullable', 'uuid', Rule::exists('places', 'id')->where('status', 'published')],
             'route_id' => ['nullable', 'uuid', Rule::exists('routes', 'id')->where('status', 'published')],
             'route_segment_id' => ['nullable', 'required_if:kind,road_report', 'uuid', 'exists:route_segments,id'],
             'details' => ['nullable', 'array:motorcycle,engine_cc,duration_days,expenses_npr,surface,problems,lessons,wish_known,places'],

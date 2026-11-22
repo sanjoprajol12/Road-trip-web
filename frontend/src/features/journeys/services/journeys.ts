@@ -3,9 +3,9 @@ import type { RideRoute } from '@/types/api'
 
 // Explore Along My Route, curated mode (/api/v1/journeys). Distances are straight-line from the recorded route line.
 export interface JourneyPlace {
-  type: 'service' | 'destination'
+  type: 'service' | 'destination' | 'place'
   id: string
-  /** Service kind, or "destination". */
+  /** Service kind, place category, or "destination". */
   kind: string
   name: string
   notes: string | null

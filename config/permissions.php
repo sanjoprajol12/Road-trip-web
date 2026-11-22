@@ -56,7 +56,8 @@ return [
         'cms.menus.manage' => 'Edit the header and footer menus',
         'cms.notices.manage' => 'Create, schedule and remove site-wide notices',
         'places.manage' => 'Create and edit places of interest (drafts), their images and sources',
-        'places.publish' => 'Publish and unpublish places; approve, reject or request changes on rider suggestions; review corrections',
+        'places.publish' => 'Publish, unpublish and archive places, edit published places, and decide any place including rider suggestions',
+        'places.review' => 'Review rider-suggested places (approve, request changes, reject with a reason) and rider corrections; no creating, editing, unpublishing or archiving',
         'cms.pages.manage' => 'Create and edit custom pages',
         'cms.faqs.manage' => 'Create and edit frequently asked questions',
         'cms.blog.manage' => 'Create and edit blog posts, categories, tags and authors',
@@ -80,7 +81,7 @@ return [
         'moderator' => [
             'overview.view', 'verification.view', 'verification.decide', 'contributions.moderate', 'events.view', 'events.cancel',
             'content.destinations.manage', 'content.routes.manage', 'content.services.manage', 'guides.manage', 'guides.publish',
-            'users.view', 'users.suspend', 'media.manage',
+            'users.view', 'users.suspend', 'media.manage', 'places.review',
         ],
     ],
 ];

@@ -23,6 +23,9 @@ function describe(n: AppNotification): string {
   if (d.kind === 'contribution_rights' && d.change === 'suspended') return 'A moderator paused your contribution rights. See the reason on this page.'
   if (d.kind === 'contribution_rights' && d.change === 'lifted') return 'Your contribution rights are back.'
   if (d.kind === 'contribution_rights') return 'Your appeal was reviewed: the pause stays.'
+  if (d.kind === 'place_reviewed' && d.change === 'published') return `Your suggested place "${d.title}" is now published.`
+  if (d.kind === 'place_reviewed' && d.change === 'changes_requested') return `A moderator asked for changes to your suggested place "${d.title}".`
+  if (d.kind === 'place_reviewed') return `Your suggested place "${d.title}" was not accepted. See the reason under Suggest a place.`
   if (d.kind === 'trip_invitation') return `${d.by ?? 'A rider'} invited you to plan "${d.title}". Answer under My rides.`
   if (d.kind === 'contribution_correction') return `A moderator asked you to add a correction to "${d.title}".`
   if (d.kind === 'event_invitation') return `You are invited to ${d.title}.`

@@ -1,7 +1,7 @@
 import { api } from '@/lib/api/client'
 
 // A rider's saved destinations, routes, services and experiences (/api/v1/users/me/saved).
-export type SavedType = 'destination' | 'route' | 'service' | 'contribution'
+export type SavedType = 'destination' | 'route' | 'service' | 'contribution' | 'place'
 export interface SavedItem {
   type: SavedType
   id: string

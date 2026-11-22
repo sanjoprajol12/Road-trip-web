@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 17: Trip places and route tracks | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:60rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; }
+  h2 { font-size:1.3rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.4rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  code { font-size:.88em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; word-break:break-word; }
+  .warn { color:var(--warn); font-weight:700; }
+  .ok { color:var(--ok); font-weight:700; }
+  ul, ol { padding-left:1.3rem; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; margin:.6rem 0 1rem; }
+  th, td { text-align:left; vertical-align:top; padding:.4rem .6rem; border-bottom:1px solid var(--line); }
+  th { background:var(--surface); }
+</style>
+</head>
+<body>
+<main>
+<p class="meta">My Ride Nepal · Session report</p>
+<h1>Session 17: places in trips, real route tracks on maps</h1>
+<p class="meta">2026-11-20 · Claude Code (Opus 5.5) · Nothing committed · One additive migration · No dependency · No role or permission assignment changed</p>
+
+<p class="warn">Correction (session 17 follow-up): the full public E2E run below actually had 3 failures (destination-map spec, all three projects) caused by a wording change in this session. They were missed when reading the output and are fixed in the follow-up; see 2026-11-20-session-17b-places-review.html.</p>
+
+<h2>Project progress</h2>
+<ul>
+<li><strong>Verified completion: 65.1%</strong> (170 / 261), up from 64.4% (168 / 261): <strong>+0.7 points</strong></li>
+<li><strong>Implementation coverage: 80.7%</strong> (210.60 / 261), up from 80.2%</li>
+<li>Completed this session: L13 and R4, both from partial to complete. R11 was already complete and is now re-verified with places. Newly implemented but unverified: 0. Blocked: 4 (unchanged).</li>
+<li><strong>L13: complete.</strong> The destination map shows places, services, destinations and real route tracks, with working links and all states.</li>
+<li><strong>Saved items: 4 / 5 (80%)</strong>, unchanged. The remaining requirement is saving guides (F8).</li>
+<li>Places: 7 / 7. Explore Along My Route: 7 / 10 (was 6). Destinations: 8 / 25 (was 7). No regressions found.</li>
+</ul>
+
+<h2>Moderator permission audit</h2>
+<p>Moderators hold neither place permission. <code>places.manage</code> lets staff create drafts and edit riders' pending suggestions; the edits are audited, but they change what the rider wrote. <code>places.publish</code> grants unrestricted publish, unpublish and archive of every place, plus decisions on suggestions and corrections. Neither is safe to give moderators for review only. <strong>Proposed (not applied):</strong> a <code>places.review</code> permission that decides rider suggestions and corrections only. Details are in <code>AUTHORIZATION_MODEL.md</code>.</p>
+
+<h2>Work completed</h2>
+<ul>
+<li><strong>Places in trips.</strong>
+  <ul>
+  <li>"Add to a trip" works from the place, journey and saved pages, and lists only trips the rider owns or edits.</li>
+  <li>The same place twice in one trip is refused by both the API and a unique index. Unpublished places are refused.</li>
+  <li>The trip page links each stop to its place, destination or service, and says when one was withdrawn.</li>
+  <li>The trip map shows one marker per stop position, by kind, and each marker opens its page. Removing a stop works.</li>
+  <li>Viewers see no edit controls, and the API refuses them.</li>
+  </ul></li>
+<li><strong>Real route geometry.</strong>
+  <ul>
+  <li>Staff import GPX or GeoJSON tracks per segment in the route editor. Files are checked: 2 to 5000 points, all inside Nepal, no external XML entities, at most 2 MB. Imports are audited and can be removed.</li>
+  <li>Destination maps draw recorded tracks under the markers, and a line opens its route.</li>
+  <li>The route page draws only recorded tracks. Previously it drew straight lines between checkpoints, which your rules say must not be presented as roads.</li>
+  <li>Routes without a track are listed with "no recorded track: not drawn".</li>
+  </ul></li>
+</ul>
+
+<h2>Verification (your 13 points)</h2>
+<div class="scroll"><table>
+<tr><th>#</th><th>Check</th><th>Evidence</th></tr>
+<tr><td>1–6</td><td>Private trip, editor adds, viewer refused, unauthorized access, duplicate, remove</td><td>TripPlacesAndPathsTest (feature): owner adds, duplicate gets 422, draft place gets 422, editor adds and removes, viewer gets 403 on add and remove, outsider gets 403, guest gets 401, the database refuses a direct second insert, a withdrawn place shows as unavailable. E2E: add from the place page, duplicate refused, remove from the trip page, viewer sees no remove button and cannot pick the trip</td></tr>
+<tr><td>7–8</td><td>Places on the trip page and trip map</td><td>E2E trip-places.spec (Chromium, Firefox, Pixel 7): place link on the stop, map marker opens the place; mobile screenshot inspected</td></tr>
+<tr><td>9–10</td><td>Real geometry drawn; missing geometry handled</td><td>E2E: destination map draws exactly one line (the tracked route), and the line opens the route; the route without a track shows no line and the "not drawn" label; the route page draws the track only when it exists. Staff E2E route-tracks.spec: GPX imported (3 points), swapped coordinates refused, track removed. TrackImportTest covers GPX, GeoJSON, a single point, swapped coordinates, XXE and invalid XML</td></tr>
+<tr><td>11</td><td>Missing coordinates</td><td>A trip whose stops have no position shows "no map yet"; a destination without a position shows "no map position" (session 15 E2E still passes)</td></tr>
+<tr><td>12</td><td>Mobile and desktop</td><td>Screenshots: trip map (Pixel 7), destination tracks (Chromium)</td></tr>
+<tr><td>13</td><td>No regression</td><td>Laravel 139 passed (2982 assertions); public E2E 123 passed, 3 skipped by design; staff E2E 40 passed; both apps pass type-check, lint, unit tests (7 and 13), build and <code>pnpm audit --prod</code>; <code>composer audit</code> is clean</td></tr>
+</table></div>
+
+<h2>Commands</h2>
+<p><code>node scripts/requirements-progress.mjs</code> (start and end), <code>php artisan migrate --database=pgsql_owner</code> (dev and E2E), <code>php artisan test</code>, <code>composer audit</code>, the <code>pnpm</code> checks in both apps, the Playwright suites (public: Chromium, Firefox, Pixel 7; staff: Chromium, Firefox).</p>
+
+<h2>Database changes</h2>
+<p>Migration <code>2026_11_20_100018_add_trip_places_and_segment_paths</code>, additive: <code>trip_stops.place_id</code> with a partial unique index, and <code>route_segments.path</code> (JSON). Applied to <code>myridenepal</code> and <code>myridenepal_e2e</code>. Rollback: <code>down()</code> drops only these.</p>
+
+<h2>Security implications</h2>
+<ul>
+<li>Trip contents stay member-only: there is no public endpoint, and roles are enforced in Laravel. Viewers are read-only.</li>
+<li>Place stops accept only published places. Withdrawn places stop exposing their details to trip members.</li>
+<li>Track import is limited to <code>content.routes.manage</code>, rejects external XML entities, bounds the file size and point count, checks coordinates, and is audited.</li>
+</ul>
+
+<h2>Limitations</h2>
+<ul>
+<li>No real tracks or places exist yet. Staff must import tracks and enter places; nothing was invented.</li>
+<li>Track lines can be clicked with a pointer only. The same links are in the route lists for keyboard and screen-reader users.</li>
+<li>Not run: WebKit, axe, Lighthouse, a screen reader.</li>
+</ul>
+
+<h2>Decisions for you</h2>
+<ul>
+<li>Approve, adjust or reject <code>places.review</code> for moderators.</li>
+<li>Still open: D3 PostGIS (plan ready), D2, D1, AR3 to AR5, D4, D7, and approval for axe and Lighthouse.</li>
+</ul>
+</main>
+</body>
+</html>

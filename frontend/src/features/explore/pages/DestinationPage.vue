@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import SaveButton from '@/features/saved/components/SaveButton.vue'
-import DestinationMap, { type MapPoint } from '../components/DestinationMap.vue'
+import DestinationMap, { type MapLine, type MapPoint } from '../components/DestinationMap.vue'
+import type { RideRoute } from '@/types/api'
 import SourceList from '@/components/ui/SourceList.vue'
 import { computed, watch } from 'vue'
 import { RouterLink } from 'vue-router'
@@ -9,6 +10,7 @@ import PlacePhoto from '@/components/ui/PlacePhoto.vue'
 import StatusPanel from '@/components/ui/StatusPanel.vue'
 import { getDestination } from '../services/destinations'
 import { serviceKinds } from '@/features/routes/serviceKinds'
+import { placeCategories } from '@/features/places/categories'
 import { contributionKindLabels } from '@/features/experiences/labels'
 
 import { useAsync } from '@/lib/useAsync'
@@ -25,9 +27,16 @@ const center = computed<[number, number] | null>(() => (d.value?.latitude != nul
 const mapPoints = computed<MapPoint[]>(() => [
   ...services.value.filter((s) => s.position).map((s) => ({ name: s.name, position: s.position!, kind: 'service' as const })),
   ...(nearby.value?.services ?? []).map((s) => ({ name: s.name, position: s.position, kind: 'service' as const })),
-  ...(nearby.value?.destinations ?? []).map((n) => ({ name: n.name, position: n.position, kind: 'destination' as const })),
+  ...(nearby.value?.destinations ?? []).map((n) => ({ name: n.name, position: n.position, kind: 'destination' as const, link: `/explore/${n.slug}` })),
+  ...(nearby.value?.places ?? []).map((n) => ({ name: n.name, position: n.position, kind: 'place' as const, link: `/places/${n.slug}` })),
 ])
 const km = (n: number) => `${n.toLocaleString('en-IN')} km`
+// Recorded tracks only (imported by staff). Routes without one are listed and say so; nothing is drawn for them.
+const tracksOf = (r: RideRoute) => (r.segments ?? []).map((s) => s.path).filter((p): p is [number, number][] => !!p && p.length > 1)
+const mapLines = computed<MapLine[]>(() => [
+  ...routes.value.flatMap((r) => tracksOf(r).map((path) => ({ name: r.name, path, link: `/routes/${r.slug}` }))),
+  ...(nearby.value?.routes ?? []).flatMap((r) => r.paths.map((path) => ({ name: r.name, path, link: `/routes/${r.slug}` }))),
+])
 // The newest published rider reports filed under this destination (dated observations, never live conditions).
 const reports = useAsync(() => listContributions({ destination: props.slug, per_page: 5 }))
 
@@ -79,7 +88,7 @@ watch(d, (dest) => {
 
           <template v-if="center">
             <h2 id="map-title" class="display mt-12 text-3xl">On the map</h2>
-            <DestinationMap class="mt-4" :center="center" :name="d.name" :points="mapPoints" />
+            <DestinationMap class="mt-4" :center="center" :name="d.name" :points="mapPoints" :lines="mapLines" />
           </template>
           <p v-else class="mt-12 rounded-md border border-line bg-surface p-4 text-sm text-muted">No map position has been recorded for {{ d.name }} yet.</p>
 
@@ -88,7 +97,7 @@ watch(d, (dest) => {
             <li v-for="r in routes" :key="r.id" class="border-b border-line">
               <RouterLink :to="`/routes/${r.slug}`" class="flex flex-wrap items-baseline justify-between gap-2 py-4">
                 <span class="font-semibold">{{ r.name }}</span>
-                <span class="tabular text-sm text-muted"><template v-if="r.distance_km">{{ r.distance_km }} km</template></span>
+                <span class="tabular text-sm text-muted"><template v-if="r.distance_km">{{ r.distance_km }} km · </template>{{ tracksOf(r).length ? 'drawn on the map' : 'no recorded track: not drawn' }}</span>
               </RouterLink>
             </li>
           </ul>
@@ -112,6 +121,16 @@ watch(d, (dest) => {
           <section v-if="nearby" class="mt-12" aria-labelledby="nearby-title">
             <h2 id="nearby-title" class="display text-3xl">Nearby</h2>
             <p class="mt-2 text-sm text-muted">Straight-line distance from {{ d.name }}, not riding distance.</p>
+            <h3 class="mt-6 font-semibold">Places of interest</h3>
+            <ul v-if="nearby.places.length" class="mt-2 grid border-t border-line text-sm" aria-label="Places of interest">
+              <li v-for="n in nearby.places" :key="n.slug" class="flex flex-wrap items-center gap-2 border-b border-line py-2">
+                <component :is="placeCategories[n.category].icon" class="size-4 text-muted" aria-hidden="true" />
+                <RouterLink :to="`/places/${n.slug}`" class="link font-semibold">{{ n.name }}</RouterLink>
+                <span class="text-muted">{{ placeCategories[n.category].label }}</span>
+                <span class="tabular ml-auto text-muted">{{ km(n.distance_km) }}</span>
+              </li>
+            </ul>
+            <p v-else class="mt-2 text-sm text-muted">None recorded. <RouterLink to="/places/suggest" class="link">Suggest one</RouterLink>.</p>
             <h3 class="mt-6 font-semibold">Other destinations within {{ nearby.radius_km.destinations }} km</h3>
             <ul v-if="nearby.destinations.length" class="mt-2 grid border-t border-line text-sm" aria-label="Nearby destinations">
               <li v-for="n in nearby.destinations" :key="n.slug" class="flex justify-between gap-3 border-b border-line py-2"><RouterLink :to="`/explore/${n.slug}`" class="link font-semibold">{{ n.name }}</RouterLink><span class="tabular text-muted">{{ km(n.distance_km) }}</span></li>
@@ -130,7 +149,7 @@ watch(d, (dest) => {
             <p v-else class="mt-2 text-sm text-muted">None recorded.</p>
             <h3 class="mt-6 font-semibold">Routes passing within {{ nearby.radius_km.routes }} km</h3>
             <ul v-if="nearby.routes.length" class="mt-2 grid border-t border-line text-sm" aria-label="Routes passing nearby">
-              <li v-for="r in nearby.routes" :key="r.slug" class="flex justify-between gap-3 border-b border-line py-2"><RouterLink :to="`/routes/${r.slug}`" class="link font-semibold">{{ r.name }}</RouterLink><span class="tabular text-muted">{{ km(r.distance_km) }} from the route line</span></li>
+              <li v-for="r in nearby.routes" :key="r.slug" class="flex justify-between gap-3 border-b border-line py-2"><RouterLink :to="`/routes/${r.slug}`" class="link font-semibold">{{ r.name }}</RouterLink><span class="tabular text-muted">{{ km(r.distance_km) }} from the route line · {{ r.paths.length ? 'drawn on the map' : 'no recorded track: not drawn' }}</span></li>
             </ul>
             <p v-else class="mt-2 text-sm text-muted">None recorded.</p>
           </section>

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 17b: places.review | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:60rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; }
+  h2 { font-size:1.3rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.4rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  code { font-size:.88em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; word-break:break-word; }
+  .warn { color:var(--warn); font-weight:700; }
+  .ok { color:var(--ok); font-weight:700; }
+  ul, ol { padding-left:1.3rem; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; margin:.6rem 0 1rem; }
+  th, td { text-align:left; vertical-align:top; padding:.4rem .6rem; border-bottom:1px solid var(--line); }
+  th { background:var(--surface); }
+</style>
+</head>
+<body>
+<main>
+<p class="meta">My Ride Nepal · Session report</p>
+<h1>Session 17 follow-up: <code>places.review</code> for moderators</h1>
+<p class="meta">2026-11-20 · Claude Code (Opus 5.5) · Nothing committed · One additive migration · Owner approval given in the session brief</p>
+
+<h2>Owner approval and scope</h2>
+<p>The built-in moderator role may review rider-submitted places and corrections. It must not receive place management or publication rights. Nothing else was changed: no other role, no <code>places.manage</code> or <code>places.publish</code> for moderators, no MFA, no PostGIS, no dependencies.</p>
+
+<h2>Permission matrix</h2>
+<div class="scroll"><table>
+<tr><th>Endpoint</th><th>Before</th><th>After</th></tr>
+<tr><td>Create, list and edit places; history</td><td>places.manage</td><td>unchanged</td></tr>
+<tr><td>Lifecycle decision (publish, unpublish, request changes, reject, archive on any place)</td><td>places.publish</td><td>unchanged</td></tr>
+<tr><td>Rider suggestions: list, view with history, decide (approve, request changes, reject)</td><td>none</td><td>places.review</td></tr>
+<tr><td>Corrections: list, decide</td><td>places.publish</td><td>places.review (administrators keep it)</td></tr>
+</table></div>
+<p>Roles: moderator 14 to 15 permissions (adds <code>places.review</code> only). Administrator: all keys, unchanged. Custom roles: unchanged; the dev role <code>tester</code> was verified untouched.</p>
+
+<h2>Backend behaviour</h2>
+<ul>
+<li>One shared action, <code>DecidePlace</code>, serves both endpoints. It locks the row and re-reads its status, so stale or repeated decisions get 422. It refuses the reviewer's own suggestion and corrections, requires a reason to reject or request changes, never edits rider text, and writes audit rows marked <code>via review|lifecycle</code>.</li>
+<li>The review routes reach rider suggestions only: staff-created places answer 404, and lifecycle decisions are refused with 422. Corrections are locked the same way.</li>
+</ul>
+
+<h2>Frontend behaviour</h2>
+<p>The Places item is visible with manage or review. A moderator sees only the "Rider suggestions" and "Corrections" tabs: read-only details, a preview on the website, history, and approve, ask for changes or reject with a required reason. There are no create, edit, publish, unpublish or archive controls. Administrators keep everything.</p>
+
+<h2>Tests (actually executed)</h2>
+<ul>
+<li><strong>PlacesReviewPermissionTest:</strong> 4 tests, 68 assertions, covering all 27 owner scenarios (positive 1–8, negative 9–21, other roles 22–27). A deliberate hole (review route using lifecycle rules) made 3 of the 4 fail; the code was then restored and passed.</li>
+<li><strong>Laravel overall:</strong> 143 passed (3074 assertions). PlacesTest was updated to the new correction rule and keeps the refusal checks.</li>
+<li><strong>Staff E2E:</strong> 46 passed (Chromium, Firefox). New: moderator review flow with the real API refusing management (403); staff without review rights get no Places item and a 403; phone width with no sideways scrolling (screenshot inspected).</li>
+<li><strong>Public E2E:</strong> 126 passed, 3 skipped by design, 0 failed (full output read).</li>
+<li>Type-check, lint, unit tests (7 and 13), builds, <code>pnpm audit --prod</code> and <code>composer audit</code>: all clean.</li>
+</ul>
+
+<h2>Discovered issue: session 17 was misreported</h2>
+<p class="warn">Session 17's full public E2E run had 3 failures, not "123 passed, 3 skipped". Session 17 changed the wording "from the route line" on the destination page, and the destination-map spec failed on all three projects. The failures were missed because only the last lines of the output were read, and the pipe's exit code was 0. The wording is restored, the full suite passes now, and the session 17 report carries a correction notice. From now on the full filtered output is read before results are reported.</p>
+
+<h2>Progress</h2>
+<p>Verified completion is unchanged at 170 / 261 = 65.1%, with coverage at 80.7%. This is a permission change, and no audited requirement changed status.</p>
+
+<h2>Remaining limitations</h2>
+<ul>
+<li>Moderators review from the details shown; they cannot edit, by design. Fixes go back to the rider through "ask for changes".</li>
+<li>Not run: WebKit, axe, Lighthouse, a screen reader.</li>
+</ul>
+</main>
+</body>
+</html>
