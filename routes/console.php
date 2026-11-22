@@ -56,29 +56,86 @@ Artisan::command('mrn:permissions:sync', function () {
 })->purpose('Copy config/permissions.php into the permissions table (run after adding or removing a permission)');
 
 /*
- * Account deletion (owner decisions D-01..D-04, D-10). Daily: run the deletions whose 30-day cooling-off has passed,
- * end moderation evidence holds that reached their 30 days, delete finished deletion records after one year, and
- * retry file removals that failed before. Each step is safe
- * to repeat: a finished request is skipped, and a file stays queued until it is really gone.
+ * Account deletion (owner decisions D-01..D-04, D-10; session 28 switches). Three daily commands, each safe to repeat:
+ * - process-deletions: due deletions. Off unless ACCOUNT_DELETION_PROCESSING_ENABLED=true.
+ * - purge-deletion-records: finished deletion records older than one year. Off unless ACCOUNT_DELETION_RECORDS_PURGE_ENABLED=true.
+ *   The two switches are independent: enabling one never enables the other.
+ * - expire-evidence: ends moderation evidence holds at 30 days and retries failed file removals. No switch: it only
+ *   removes data whose retention already ended (D-04 allows no longer hold), and does nothing before any deletion ran.
+ * R5: a failure is logged with its exception class and step only (never the message, which can hold SQL values).
  */
-Artisan::command('mrn:accounts:process-deletions', function () {
-    $runner = app(\App\Actions\Accounts\ProcessAccountDeletion::class);
-    $tally = ['done' => 0, 'skipped' => 0, 'failed' => 0];
-    \App\Models\AccountDeletionRequest::where('status', 'scheduled')->where('run_after', '<=', now())->orderBy('run_after')
-        ->each(function ($req) use ($runner, &$tally) {
-            $tally[$runner->run($req)]++;
-        });
-    $evidence = app(\App\Actions\Accounts\DisposeModerationEvidence::class)->purgeExpired();
-    // D-10: finished deletion records (done or cancelled) are kept one year, then deleted. Scheduled ones never are.
-    $expired = \App\Models\AccountDeletionRequest::whereIn('status', ['done', 'cancelled'])
-        ->whereRaw('coalesce(completed_at, cancelled_at) <= ?', [now()->subYear()])->delete();
-    if ($expired) {
-        \App\Support\Audit::record('account.deletion_records_purged', 'account_deletion_requests', null, ['records' => $expired, 'older_than' => '1 year']);
+$safely = function (string $step, callable $work, $command): int {
+    try {
+        return $work();
+    } catch (\Throwable $e) {
+        \Illuminate\Support\Facades\Log::error('Account deletion maintenance step failed.', ['step' => $step, 'exception' => $e::class]);
+        $command->error($step." failed (".$e::class."); nothing was lost and the next run retries.");
+
+        return 1;
     }
-    $files = \App\Support\PendingFiles::flush();
-    $this->info("Deletions done {$tally['done']}, skipped {$tally['skipped']}, failed {$tally['failed']}; evidence expired {$evidence}; records purged {$expired}; files removed {$files['removed']}, still failing {$files['failed']}.");
+};
 
-    return $tally['failed'] > 0 || $files['failed'] > 0 ? 1 : 0;
-})->purpose('Run due account deletions, end expired moderation evidence holds, purge deletion records older than a year, retry failed file removals');
+Artisan::command('mrn:accounts:process-deletions', function () use ($safely) {
+    if (! config('mrn.account_deletion.processing_enabled')) {
+        $this->info('Account deletion processing is switched off (ACCOUNT_DELETION_PROCESSING_ENABLED). Nothing was changed.');
 
-\Illuminate\Support\Facades\Schedule::command('mrn:accounts:process-deletions')->dailyAt('02:30')->withoutOverlapping()->onOneServer();
+        return 0;
+    }
+
+    return $safely('process-deletions', function () {
+        $runner = app(\App\Actions\Accounts\ProcessAccountDeletion::class);
+        $tally = ['done' => 0, 'skipped' => 0, 'failed' => 0];
+        \App\Models\AccountDeletionRequest::where('status', 'scheduled')->where('run_after', '<=', now())->orderBy('run_after')
+            ->each(function ($req) use ($runner, &$tally) {
+                $tally[$runner->run($req)]++;
+            });
+        $files = \App\Support\PendingFiles::flush();
+        $this->info("Deletions done {$tally['done']}, skipped {$tally['skipped']}, failed {$tally['failed']}; files removed {$files['removed']}, still failing {$files['failed']}.");
+
+        return $tally['failed'] > 0 || $files['failed'] > 0 ? 1 : 0;
+    }, $this);
+})->purpose('Run due account deletions (only when ACCOUNT_DELETION_PROCESSING_ENABLED=true)');
+
+Artisan::command('mrn:accounts:purge-deletion-records', function () use ($safely) {
+    if (! config('mrn.account_deletion.records_purge_enabled')) {
+        $this->info('Deletion record purging is switched off (ACCOUNT_DELETION_RECORDS_PURGE_ENABLED). Nothing was changed.');
+
+        return 0;
+    }
+
+    return $safely('purge-deletion-records', function () {
+        // D-10: finished records (done or cancelled) are kept one year, then deleted. Scheduled ones never are. The
+        // application role has no DELETE on these records (session 31): the database function keeps the boundary by the
+        // database clock and writes its own audit entry.
+        $expired = (int) \Illuminate\Support\Facades\DB::selectOne('select mrn_purge_deletion_records(?) as n', [now()->toDateTimeString()])->n;
+        $this->info("Deletion records purged {$expired}.");
+
+        return 0;
+    }, $this);
+})->purpose('Delete finished account deletion records older than one year (only when ACCOUNT_DELETION_RECORDS_PURGE_ENABLED=true)');
+
+Artisan::command('mrn:accounts:expire-evidence', function () use ($safely) {
+    return $safely('expire-evidence', function () {
+        $evidence = app(\App\Actions\Accounts\DisposeModerationEvidence::class)->purgeExpired();
+        $files = \App\Support\PendingFiles::flush();
+        $this->info("Evidence expired {$evidence}; files removed {$files['removed']}, still failing {$files['failed']}.");
+
+        return $files['failed'] > 0 ? 1 : 0;
+    }, $this);
+})->purpose('End moderation evidence holds that reached 30 days and retry failed file removals');
+
+foreach (['mrn:accounts:process-deletions' => '02:30', 'mrn:accounts:expire-evidence' => '02:50', 'mrn:accounts:purge-deletion-records' => '03:10'] as $cmd => $at) {
+    \Illuminate\Support\Facades\Schedule::command($cmd)->dailyAt($at)->withoutOverlapping()->onOneServer();
+}
+
+// F1 and Option B: the production checklist's database part, checked as the application role. Prints no secret.
+Artisan::command('mrn:security:check-database', function () {
+    $failed = 0;
+    foreach (\App\Support\DatabaseSecurity::checks() as [$check, $ok, $detail]) {
+        $this->line(($ok ? 'PASS ' : 'FAIL ').$check.($detail !== '' ? " ({$detail})" : ''));
+        $failed += $ok ? 0 : 1;
+    }
+    $failed ? $this->error("{$failed} check(s) failed.") : $this->info('All database security checks passed.');
+
+    return $failed ? 1 : 0;
+})->purpose('Check the application database role\'s rights, the guard triggers and the definer functions (no secrets printed)');

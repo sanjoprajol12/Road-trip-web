@@ -14,7 +14,7 @@
 | `app/Http/Resources` | response shapes; `PublicUserResource` never exposes email; `VerificationResource` never exposes the reviewer |
 | `app/Http/Middleware` | `SecurityHeaders`, `EnsureNotSuspended`, `SessionMaxAge` |
 | `app/Notifications` | `VerifyEmailAddress` (mail), `VerificationDecided`, `EventInvitation`, `EventChanged` (database) |
-| `app/Support/Audit.php` | append-only audit writer |
+| `app/Support/Audit.php` | audit writer (insert only for the app role; text is redacted only by the `mrn_redact_audit_text` database function during an account deletion) |
 | `config/mrn.php` | project settings (sign-up limit, absolute session lifetime, upload limits) |
 
 ## Conventions

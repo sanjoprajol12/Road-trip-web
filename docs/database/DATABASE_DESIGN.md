@@ -9,7 +9,7 @@ Authority: `web/database/migrations` (Laravel). Local database `myridenepal` (te
 | `sessions`, `password_reset_tokens`, `cache*`, `jobs*` | Laravel infrastructure | sessions.user_id FK cascade |
 | `user_roles` | staff roles (moderator, admin) | PK (user_id, role); enum check |
 | `user_verifications` | claim-specific verification incl. organizer applications | kind/status enums; scope only for experts (check); statement 20–2000 chars; **one open claim per user/kind/scope** (partial unique index) |
-| `audit_logs` | append-only trail (action, subject, before/after JSON, actor, IP) | no FK on actor (survives account deletion) |
+| `audit_logs` | audit trail (action, subject, before/after JSON, actor, IP), protected against direct application changes: the app role may only insert. The narrowly scoped `mrn_redact_audit_text` function (O8) replaces a deleted rider's contribution text with `[redacted]` and records each redaction as `audit.redacted` | no FK on actor (survives account deletion) |
 | `destinations` | editorial destinations, freshness (`last_confirmed_on`), dev-seed flag | unique slug + format; photo needs alt and credit; elevation range; soft delete |
 | `routes`, `route_segments` | routes as ordered segments between checkpoints (lat/lng optional) | unique slug; unique (route, position); positive distances |
 | `service_points` | fuel, mechanics, medical, lodging, food, ATM, connectivity, attached to a destination or segment | must reference one of them |

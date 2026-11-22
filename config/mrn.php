@@ -21,6 +21,13 @@ return [
         'idle_minutes' => (int) env('STAFF_SESSION_IDLE_MINUTES', 60),
         'max_minutes' => (int) env('STAFF_SESSION_MAX_MINUTES', 60 * 12),
     ],
+    // Account deletion jobs (session 28). Both default to off, so a production scheduler does nothing until the owner
+    // decides; each is independent. Tests switch them on per test; E2E enables processing only for its own command call.
+    'account_deletion' => [
+        'processing_enabled' => (bool) env('ACCOUNT_DELETION_PROCESSING_ENABLED', false),
+        'records_purge_enabled' => (bool) env('ACCOUNT_DELETION_RECORDS_PURGE_ENABLED', false),
+    ],
+
     'uploads' => [
         'max_kb' => 8192,
         'max_edge' => 2000,

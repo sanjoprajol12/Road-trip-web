@@ -18,6 +18,7 @@ class AppServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
+        \App\Support\DatabaseSecurity::guardRuntime(); // F1: no owner credentials in production web requests
         // Staff mail settings (when enabled) replace MAIL_* the first time mail is used in a request or job.
         $this->app->afterResolving('mail.manager', fn () => \App\Support\MailSettings::apply());
         // Short, stable type names in `sourceables` (not class names, which would break on a rename).

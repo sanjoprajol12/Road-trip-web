@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 30: DB deletion security review | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:60rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; }
+  h2 { font-size:1.3rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.4rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  code { font-size:.88em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; word-break:break-word; }
+  .warn { color:var(--warn); font-weight:700; }
+  .ok { color:var(--ok); font-weight:700; }
+  ul, ol { padding-left:1.3rem; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; margin:.6rem 0 1rem; }
+  th, td { text-align:left; vertical-align:top; padding:.4rem .6rem; border-bottom:1px solid var(--line); }
+  th { background:var(--surface); }
+  svg text { font: 13px system-ui, sans-serif; fill: var(--ink); }
+  svg .muted { fill: var(--muted); }
+  .crit { color:#a51d2d; font-weight:700; } .high { color:#8a5a00; font-weight:700; }
+</style>
+</head>
+<body>
+<main>
+<p class="meta">My Ride Nepal · Session report</p>
+<h1>Session 30: database-level account deletion security, design review</h1>
+<p class="meta">2026-11-22 · Claude Code (Opus 5.5) · Design review only · No code, schema, privilege or data change · Nothing committed or pushed</p>
+
+<h2>Question</h2>
+<p>Session 29 showed that a rider can only request their own deletion through the app, but that the database cannot tell a genuine request from one written by a compromised application role. What can the database itself guarantee, and at what cost?</p>
+
+<h2>Findings</h2>
+<div class="scroll"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th></tr>
+<tr><td>F1</td><td class="crit">high</td><td>The production template puts the owner credentials (<code>DB_MIGRATION_*</code>) in the web runtime. Anyone who reads that environment bypasses <em>every</em> database protection: the append-only audit log, both guard triggers, and the redaction checks.</td></tr>
+<tr><td>F2</td><td class="high">medium</td><td><code>mrn_app</code> can delete from 57 tables, including <code>users</code>. Only the deletion run needs to delete a rider row.</td></tr>
+<tr><td>F3</td><td class="high">medium</td><td><code>mrn_app</code> can delete deletion records (only the purge needs that) and moderation evidence (never needed).</td></tr>
+<tr><td>F4</td><td class="high">medium</td><td><code>mrn_app</code> can write the <code>migrations</code> table, which it never needs, so a future security migration could be skipped.</td></tr>
+<tr><td>F5</td><td>low</td><td>A fabricated request waits 30 days, but F2 means a misused app role doesn't need a request at all.</td></tr>
+</table></div>
+<p><strong>Already enforced in the database:</strong></p>
+<ul>
+<li>the audit log is insert-only for the app role;</li>
+<li><code>system</code> and redaction entries come only from the owner role;</li>
+<li>request dates come from the database clock and cannot be moved;</li>
+<li>an evidence hold can't exceed 30 days;</li>
+<li>a rider row can't be deleted while it still authors non-anonymised content or organises a non-cancelled event.</li>
+</ul>
+
+<h2>Options</h2>
+<div class="scroll"><table>
+<tr><th>Option</th><th>Summary</th><th>Verdict</th></tr>
+<tr><td>A</td><td>Keep the current state</td><td>F1 to F5 remain</td></tr>
+<tr><td><strong>B</strong></td><td>Owner credentials out of the runtime; revoke DELETE on <code>users</code>, deletion records and evidence, and writes on <code>migrations</code>; definer functions <code>mrn_delete_account(request)</code> (checks a due request by the database clock) and <code>mrn_purge_deletion_records()</code></td><td class="ok">recommended; about half a session</td></tr>
+<tr><td>C</td><td>A separate database role for the daily jobs</td><td>weaker against SQL injection and a compromised host; could be added on top of B later</td></tr>
+<tr><td>D</td><td>The whole deletion run as one stored procedure</td><td>not proportionate: duplicated rules, hard to test</td></tr>
+</table></div>
+<p>The implementation plan, test plan, clock and test design (timing checks skipped for owner-role sessions, proven on the real app-role connection and in E2E), rollback and risks are in <code>docs/security/ACCOUNT_DELETION_DB_SECURITY_DESIGN.md</code>.</p>
+
+<h2>Evidence gathered (read-only)</h2>
+<ul>
+<li><strong>Grants:</strong> the app role's rights on the development database. It has full DML on 57 tables; the audit log is insert and select only.</li>
+<li><strong>Code search:</strong> the only rider-row delete is in <code>ProcessAccountDeletion</code>. Evidence is only created or updated, deletion records are deleted only by the purge, and <code>migrations</code> is never touched at runtime.</li>
+<li><strong>Existing checks:</strong> <code>contributions_author_or_deleted</code> and <code>events_organizer_or_cancelled</code> are present.</li>
+<li><strong>Credentials:</strong> <code>.env.production.example</code> lines 34–35, and <code>config/database.php</code> lines 103–110 (the <code>pgsql_owner</code> connection).</li>
+</ul>
+
+<h2>Changes</h2>
+<ul>
+<li>New: <code>docs/security/ACCOUNT_DELETION_DB_SECURITY_DESIGN.md</code>.</li>
+<li><code>docs/architecture/PRODUCTION_PRIVACY_CHECKLIST.md</code>: new §0 (no owner credentials in the runtime, with a check that prints only whether a password is set) and blocker 12.</li>
+<li>Handoff updated.</li>
+<li>No tests were run, because no code changed. Session 29's results stand.</li>
+</ul>
+
+<h2>Owner decisions needed</h2>
+<ol>
+<li>Approve F1 as a deployment rule: owner credentials never in the production web runtime.</li>
+<li>Approve Option B for an implementation session, or choose A, C or D.</li>
+<li>Whether to start a separate account-takeover review: a misused app role can still change a rider's email or password.</li>
+</ol>
+
+<h2>Progress</h2>
+<p>Unchanged at 179 / 261 = 68.6%. A design review does not change requirement status.</p>
+</main>
+</body>
+</html>

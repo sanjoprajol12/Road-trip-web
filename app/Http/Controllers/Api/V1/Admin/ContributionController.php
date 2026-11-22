@@ -117,7 +117,8 @@ class ContributionController extends Controller
         abort_unless($contribution->isVisible(), 422, 'Only published contributions can be confirmed.');
         DB::transaction(function () use ($contribution) {
             $old = $contribution->only(['last_confirmed_on']);
-            $contribution->forceFill(['last_confirmed_on' => today()])->save();
+            // staff_confirmed_on keeps the moderator's own date apart from rider confirmations (R8).
+            $contribution->forceFill(['last_confirmed_on' => today(), 'staff_confirmed_on' => today()])->save();
             Audit::record('contribution.confirmed', $contribution, ['last_confirmed_on' => $old['last_confirmed_on']?->toDateString()], ['last_confirmed_on' => today()->toDateString()]);
         });
 

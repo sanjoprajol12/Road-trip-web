@@ -68,3 +68,16 @@ At the run, for each report the departing rider had confirmed:
   - "Because of the threshold" means the latest audit entry that set the status has `reason: threshold`.
 - The count includes every remaining confirmation, without the corroboration time window or other riders' current standing. Only the removal can change the outcome.
 - A corroboration a moderator set is kept, and so is `officially_sourced` (staff verification). The report stays published, and the API returns the new status.
+
+## Owner follow-up to the independent review (session 27), implemented in session 28
+
+| Item | Owner decision | Implemented |
+|---|---|---|
+| R8 moderator accuracy date | must fix | yes: `contributions.staff_confirmed_on` (backfilled from `contribution.confirmed` audit entries); the deletion run never lowers `last_confirmed_on` below it, and leaves a date it did not set untouched |
+| R1 fake redaction records | fix before production | yes: trigger `audit_logs_system_guard`; only the table owner (the definer function) or a superuser may write `audit.redacted` or actor type `system` |
+| R2 redact only deleted-account contributions | fix before production | yes: `mrn_redact_audit_text(entry, request)` checks the request (scheduled, due by the database clock, a full 30 days after it was made, account marked for deletion) and the entry's subject (contribution `author_id`, or an unreviewed place `submitted_by`, equal to the request's account). Trigger `account_deletion_requests_guard` stops the app role fabricating a due request |
+| R5 sensitive error logging | fix before production | yes: the run and all three daily commands log only the step, the request id and the exception class |
+| Raw account id vs keyed hash | **deferred** | not changed; needs a restore and replay design with a key lifecycle |
+| Daily command on/off switch | **approved** | yes: `ACCOUNT_DELETION_PROCESSING_ENABLED` and `ACCOUNT_DELETION_RECORDS_PURGE_ENABLED`, independent, both default `false` |
+| R9 recount interpretation | **confirmed** | kept: the remaining confirmations are recounted without the corroboration window and without re-checking other riders' standing; moderator and official-source statuses are kept (test `test_r9_…`) |
+

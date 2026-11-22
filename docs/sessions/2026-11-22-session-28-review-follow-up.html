@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 28: Review follow-up | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:60rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; }
+  h2 { font-size:1.3rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.4rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  code { font-size:.88em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; word-break:break-word; }
+  .warn { color:var(--warn); font-weight:700; }
+  .ok { color:var(--ok); font-weight:700; }
+  ul, ol { padding-left:1.3rem; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; margin:.6rem 0 1rem; }
+  th, td { text-align:left; vertical-align:top; padding:.4rem .6rem; border-bottom:1px solid var(--line); }
+  th { background:var(--surface); }
+  svg text { font: 13px system-ui, sans-serif; fill: var(--ink); }
+  svg .muted { fill: var(--muted); }
+  .crit { color:#a51d2d; font-weight:700; } .high { color:#8a5a00; font-weight:700; }
+</style>
+</head>
+<body>
+<main>
+<p class="meta">My Ride Nepal · Session report</p>
+<h1>Session 28: D-11 integrity and production hardening</h1>
+<p class="meta">2026-11-22 23:45 +0545 · Claude Code (Opus 5.5) · Follow-up to the session 27 independent review · Nothing committed, pushed, deployed, activated or connected</p>
+
+<h2>Status by issue</h2>
+<div class="scroll"><table>
+<tr><th>Issue</th><th>Status</th><th>What was done</th></tr>
+<tr><td>R8: moderator accuracy date</td><td class="ok">complete</td><td>New <code>contributions.staff_confirmed_on</code> (set by the staff confirm action; backfilled from <code>contribution.confirmed</code> audit entries). The deletion run lowers <code>last_confirmed_on</code> only when the leaving rider's confirmation could have set it, and never below the moderator's date.</td></tr>
+<tr><td>R1: fabricated redaction records</td><td class="ok">complete</td><td>Trigger <code>audit_logs_system_guard</code>: an <code>audit.redacted</code> entry, or any entry with actor type <code>system</code>, is accepted only from the owner role or its members, which means from the definer function. The other insert paths were traced: none writes <code>system</code>; <code>Audit::record</code> writes <code>user</code> or <code>staff</code>.</td></tr>
+<tr><td>R2: deleted-account entries only</td><td class="ok">complete</td><td><code>mrn_redact_audit_text(entry, request)</code> checks four things:
+  <ul>
+  <li>the request is scheduled and due by the database clock;</li>
+  <li>it is at least 30 days after it was made;</li>
+  <li>its account is marked for deletion;</li>
+  <li>the entry's contribution author, or its unreviewed place's submitter, is that account.</li>
+  </ul>
+  Trigger <code>account_deletion_requests_guard</code> sets <code>requested_at</code> from the database clock and keeps <code>run_after</code> at least 30 days later. It refuses changes to the account or the dates, and any status move other than scheduled → cancelled or done.</td></tr>
+<tr><td>R5: sensitive error logging</td><td class="ok">complete</td><td>The run and the three commands log only the step, the request id and the exception class. A failed request stays scheduled, and it is retried.</td></tr>
+<tr><td>Job switches</td><td class="ok">complete</td><td><code>ACCOUNT_DELETION_PROCESSING_ENABLED</code> and <code>ACCOUNT_DELETION_RECORDS_PURGE_ENABLED</code>: independent, both default <code>false</code>. A switched-off command changes nothing.
+  <ul>
+  <li><code>expire-evidence</code> has no switch: it only ends 30-day holds and retries file removals.</li>
+  <li>Local development: off. Tests: on per test. E2E: processing on only for its own command call.</li>
+  </ul></td></tr>
+<tr><td>R9: recount interpretation</td><td class="ok">confirmed</td><td>Kept unchanged. A new test shows that confirmations outside the window, and a suspended confirmer, still count.</td></tr>
+<tr><td>Low: <code>place.suggested</code>, wording, focus test</td><td class="ok">complete</td><td>The first place-suggestion version is redactable. The staff audit page and two docs now say "protected against direct application changes, with a narrowly scoped database redaction function". The Firefox focus test serves a blank local map tile; its assertions are unchanged.</td></tr>
+<tr><td>Raw account id vs keyed hash</td><td><span class="warn">not implemented</span></td><td>Deferred by the owner.</td></tr>
+<tr><td>R6, R7 (low)</td><td><span class="warn">not implemented</span></td><td>Out of this task's scope.</td></tr>
+</table></div>
+
+<h2>Migrations and rollback</h2>
+<ul>
+<li><strong><code>2026_11_22_100026_harden_account_deletion</code>:</strong>
+  <ul>
+  <li>adds <code>staff_confirmed_on</code>, with the backfill;</li>
+  <li>adds the two guard triggers;</li>
+  <li>replaces <code>mrn_redact_audit_text(bigint, text)</code> with <code>(bigint, uuid)</code>: security definer, public revoked, execute granted to <code>mrn_app</code>.</li>
+  </ul>
+  <strong>Rollback</strong> is refused once any redaction exists. Without redactions it drops the triggers and the column and restores the session 26 function (checked that it extracts that function from its migration).</li>
+<li><strong><code>2026_11_22_100027_guard_privilege_by_owner_membership</code>:</strong> the exemption becomes "the owner role or a member of it". Local <code>postgres</code> is a member, not a superuser; <code>mrn_app</code> is not a member. Rollback restores the earlier owner-or-superuser exemption.</li>
+<li>Dev and E2E were migrated with <code>--database=pgsql_owner</code>.</li>
+</ul>
+
+<h2>Application-role evidence (<code>mrn_app</code>)</h2>
+<div class="scroll"><table>
+<tr><th>Database</th><th>audit_logs grants</th><th>update / delete / truncate</th><th>function access</th><th>guard triggers</th></tr>
+<tr><td><code>myridenepal</code></td><td>INSERT, SELECT</td><td>no / no / no</td><td><code>mrn_owner</code>, <code>mrn_app</code></td><td>both present</td></tr>
+<tr><td><code>myridenepal_test</code></td><td>INSERT, SELECT</td><td>no / no / no</td><td><code>mrn_owner</code>, <code>mrn_app</code></td><td>both present</td></tr>
+<tr><td><code>myridenepal_e2e</code></td><td>INSERT, SELECT</td><td>no / no / no</td><td><code>mrn_owner</code>, <code>mrn_app</code></td><td>both present</td></tr>
+</table></div>
+<p>Test <code>test_r1_and_r2_…</code> ran on the real app-role connection, inside its own transaction that was rolled back.</p>
+<ul>
+<li><strong>Refused (42501):</strong>
+  <ul>
+  <li>a fabricated <code>audit.redacted</code> entry, and a fabricated <code>system</code> entry;</li>
+  <li>a direct update or delete of an audit row;</li>
+  <li>moving a request's dates or account;</li>
+  <li>inserting a finished request, and reviving a cancelled one.</li>
+  </ul></li>
+<li><strong>Corrected:</strong> a request inserted with past dates got the database clock and a full 30 days.</li>
+<li><strong>Still allowed:</strong> an ordinary audit entry.</li>
+<li><strong>Function refusal:</strong> under that fabricated request, the function answers "not due for final deletion".</li>
+<li><strong>Legitimate path:</strong> the E2E journey runs the real daily command as <code>mrn_app</code>. A rider's edit entry became <code>[redacted]</code> with one <code>system</code> redaction record, in all three browsers.</li>
+<li><strong>Existing records:</strong> the session 26 check record (5407) is untouched. The E2E database now holds 4 redaction records: that one, plus three from these journeys.</li>
+</ul>
+
+<h2>Regression tests (<code>AccountDeletionTest</code>, 25 tests)</h2>
+<ul>
+<li><strong>R8, the exact scenario:</strong> a moderator marks a report still accurate; two days later a rider confirms it; the rider deletes their account; the rider's confirmation is removed. The moderator's date is kept, the status stays published, and the API shows both. A repeated run changes nothing.</li>
+<li><strong>R8, other cases:</strong> a later moderator date is untouched, and a report with rider confirmations only is still recalculated.</li>
+<li><strong>R2, at the function:</strong>
+  <ul>
+  <li>a request still in its cooling-off is refused;</li>
+  <li>for a due request, the rider's own entries are accepted, including <code>place.suggested</code>;</li>
+  <li>repeated calls do nothing and write no second record;</li>
+  <li>refused: another (active) rider's entry; an unknown request or entry; an unsupported type; a mismatched subject type; an account in its cooling-off; a request shortened below 30 days; an account not marked for deletion.</li>
+  </ul></li>
+<li><strong>R5:</strong> exceptions carrying an email, SQL and private text, raised in the run and in the evidence step, never appear in the captured logs. The request id and the exception class do. The request is retried and completes.</li>
+<li><strong>Switches:</strong> both default off. Both off: nothing changes. Purge only: deletions are not processed. Processing only: records are not purged.</li>
+<li><strong>R9:</strong> see the table above.</li>
+<li><strong>O8, D-10, D-11:</strong> the earlier tests still pass. The D-10 boundary probe was rerun through the new purge command: records exactly a year old and older are purged, a record one minute short is kept, scheduled requests are kept, and a second run purges nothing.</li>
+</ul>
+
+<h2>Tests and results</h2>
+<div class="scroll"><table>
+<tr><th>Command</th><th>Exit</th><th>Result</th></tr>
+<tr><td><code>php artisan test</code> (after the last change)</td><td>0</td><td class="ok">194 passed (3966 assertions); <code>AccountDeletionTest</code> also run 4 more times, 25/25 each</td></tr>
+<tr><td><code>composer audit</code></td><td>0</td><td>no advisories</td></tr>
+<tr><td>public: <code>pnpm type-check</code>, <code>lint</code>, <code>test:unit</code>, <code>build</code>, <code>audit --prod</code></td><td>0 each</td><td>36 unit tests passed (other sessions added tests); no vulnerabilities</td></tr>
+<tr><td>staff: the same five</td><td>0 each</td><td>21 unit tests passed; no vulnerabilities</td></tr>
+<tr><td>public <code>npx playwright test --project=chromium --project=firefox --project=mobile</code> (before <code>100027</code>)</td><td><span class="crit">1</span></td><td>166 passed, 7 failed, 10 skipped. Six were the deletion journey's date shift (fixed by <code>100027</code>); one was a Firefox <code>route-services</code> flake.</td></tr>
+<tr><td>rerun: <code>account-deletion.spec.ts</code> (chromium, firefox, mobile)</td><td>0</td><td class="ok">6 passed</td></tr>
+<tr><td>rerun: <code>route-services.spec.ts</code> (firefox)</td><td>0</td><td class="ok">2 passed</td></tr>
+<tr><td>staff <code>npx playwright test --project=chromium --project=firefox</code></td><td>0</td><td class="ok">57 passed, 1 skipped</td></tr>
+<tr><td>rerun after <code>100027</code>: staff <code>privacy.spec.ts</code></td><td>0</td><td class="ok">2 passed</td></tr>
+<tr><td>WebKit</td><td>—</td><td><span class="warn">not run</span>: system libraries are missing locally</td></tr>
+</table></div>
+<p>The full public suite was not repeated after <code>100027</code>, which affects only deletion requests and system audit entries. The specs that touch them were rerun and pass.</p>
+
+<h2>Security implications and remaining production requirements</h2>
+<ul>
+<li><strong>Residual risk:</strong> a compromised app role can still create a deletion request for another rider. It can be used only 30 real days later, and the rider sees the deletion banner meanwhile. Anything the app role can do, a compromised app can do; this is the remaining limit.</li>
+<li><strong>Before production:</strong>
+  <ul>
+  <li>verify that <code>mrn_app</code> has no UPDATE or DELETE on <code>audit_logs</code> and is not a member of the owner role, and that both triggers exist;</li>
+  <li>set the cron;</li>
+  <li>connect a mail provider (O5);</li>
+  <li>get the owner's approval, then enable the switches, one at a time.</li>
+  </ul></li>
+<li><strong>Deferred:</strong> the account-id HMAC, with a restore-replay design and key lifecycle.</li>
+</ul>
+
+<h2>Progress</h2>
+<p>Verified completion is <strong>179 / 261 = 68.6%</strong> (was 68.2% after the review) and coverage <strong>82.5%</strong> (was 82.3%). H11 is complete, tested again. The denominator is unchanged, and no other row changed.</p>
+
+<h2>Coordination</h2>
+<p>Two other sessions were active (road-trip-e5: homepage header and staff save buttons; road-trip-07: UI fixes). File ownership was agreed by message, and nothing overlapped. Browser runs took turns on the shared ports: road-trip-e5 went first, then this session, and both were told when the ports were released.</p>
+</main>
+</body>
+</html>

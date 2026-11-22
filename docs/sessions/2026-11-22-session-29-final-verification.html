@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 29: Final verification | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --surface:#faf9f7; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; --ok:#2e6a3c; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:60rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; }
+  h2 { font-size:1.3rem; border-top:2px solid var(--ink); padding-top:.8rem; margin-top:2.4rem; }
+  .meta { color:var(--muted); font-size:.9rem; }
+  code { font-size:.88em; background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:0 .25em; word-break:break-word; }
+  .warn { color:var(--warn); font-weight:700; }
+  .ok { color:var(--ok); font-weight:700; }
+  ul, ol { padding-left:1.3rem; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; margin:.6rem 0 1rem; }
+  th, td { text-align:left; vertical-align:top; padding:.4rem .6rem; border-bottom:1px solid var(--line); }
+  th { background:var(--surface); }
+  svg text { font: 13px system-ui, sans-serif; fill: var(--ink); }
+  svg .muted { fill: var(--muted); }
+  .crit { color:#a51d2d; font-weight:700; } .high { color:#8a5a00; font-weight:700; }
+</style>
+</head>
+<body>
+<main>
+<p class="meta">My Ride Nepal · Session report</p>
+<h1>Session 29: final session 28 verification and security closure</h1>
+<p class="meta">2026-11-22 23:55 +0545 · Claude Code (Opus 5.5) · Tests and documentation only · No application code changed · Nothing committed, pushed, deployed, activated or connected</p>
+
+<h2>Summary</h2>
+<ul>
+<li><strong>Full public browser suite</strong> after the final trigger fix: <strong>173 passed, 0 failed, 10 skipped</strong> (exit 0).</li>
+<li><strong>Deletion requests:</strong> a rider can only request deletion of their own account; proven by tests.</li>
+<li><strong>Database limit:</strong> the application database role cannot be tied to a signed-in rider. That limit and its consequence are documented.</li>
+<li><strong>Evidence job:</strong> verified on every point asked.</li>
+<li><strong>Production checklist:</strong> written, with its queries validated locally.</li>
+<li><strong>Progress:</strong> unchanged.</li>
+</ul>
+
+<h2>1. Full public browser regression</h2>
+<div class="scroll"><table>
+<tr><th>Command</th><th>Exit</th><th>Result</th></tr>
+<tr><td><code>npx playwright test --project=chromium --project=firefox --project=mobile</code> (web/frontend)</td><td>0</td><td class="ok">173 passed, 0 failed, 10 skipped (11.2 min). The skips are by design: browser-specific audits.</td></tr>
+<tr><td><code>npx playwright test --project=chromium --project=firefox</code> (admin)</td><td>0</td><td class="ok">57 passed, 1 skipped (3.7 min)</td></tr>
+</table></div>
+<p>Nothing failed, so nothing was rerun or changed in the tests. WebKit was not run: its system libraries are missing locally.</p>
+
+<h2>2. Unauthorized deletion requests</h2>
+<p><strong>Every path that creates or changes a request was traced:</strong></p>
+<ul>
+<li>The only one is <code>ScheduleAccountDeletion::request($request->user(), …)</code>, behind <code>POST users/me/deletion</code>.</li>
+<li>The route has no user parameter, and validation accepts only <code>password</code>, <code>confirm</code> and <code>choices</code>.</li>
+<li>No staff route creates or alters requests. Choices for contributions that aren't the rider's own are refused (tested in session 25).</li>
+</ul>
+<div class="scroll"><table>
+<tr><th>Scenario (test)</th><th>Result</th></tr>
+<tr><td>Guest, with a body naming another rider</td><td class="ok">401; nothing written</td></tr>
+<tr><td>Staff session (administrator)</td><td class="ok">401: the staff guard never reaches rider routes</td></tr>
+<tr><td>Rider A with a wrong password and B's id in the body</td><td class="ok">422; nothing written</td></tr>
+<tr><td>Rider A with A's password, and B's id and email in the body</td><td class="ok">only A is scheduled. B: no request, <code>deletion_scheduled_for</code> null, devices still signed in, no email. The audit actor is A.</td></tr>
+<tr><td>Rider A cancels while B is scheduled</td><td class="ok">cancels A's own request only; B stays scheduled. A second attempt gives 422.</td></tr>
+<tr><td>Application role inserts a request naming another rider (real <code>mrn_app</code>, rolled back)</td><td><span class="warn">insert accepted</span>, but that rider's account row is unchanged and the request can't be used for 30 days (trigger)</td></tr>
+<tr><td>Owner role (migrations, tests, local fixtures)</td><td>unrestricted by design: it owns the schema</td></tr>
+</table></div>
+<p><strong>Conclusion:</strong></p>
+<ul>
+<li>An ordinary application session cannot request another rider's deletion.</li>
+<li>A compromised application database role can insert a request, but nothing in the database can tell it apart from a real one. The trigger delays its effect by 30 days.</li>
+<li>The same role can already delete rows it has rights to, including <code>users</code>. Closing this needs an architectural change, which is an owner decision and was <strong>not made in this session</strong>: revoke DELETE on <code>users</code> from <code>mrn_app</code>, and remove accounts only through a definer function that checks a due request.</li>
+</ul>
+
+<h2>3. The evidence job (<code>mrn:accounts:expire-evidence</code>)</h2>
+<div class="scroll"><table>
+<tr><th>Requirement</th><th>Evidence (feature tests)</th></tr>
+<tr><td>Kept until its actual expiry</td><td class="ok"><code>held_until</code> is exactly 30 days after the deletion. On day 29 the snapshot and photo are still there. At exactly <code>held_until</code> it is expired.</td></tr>
+<tr><td>Earlier removal only through the authorised process</td><td class="ok">The job ignores evidence that isn't yet expired. The release endpoint answers 403 for a moderator without <code>moderation.evidence.view</code>; release with the permission was already tested.</td></tr>
+<tr><td>Expired evidence removed correctly</td><td class="ok">disposition <code>expired</code>, snapshot and files null, photo removed</td></tr>
+<tr><td>Failed file removal stays retryable</td><td class="ok">The job exits 1 and the file stays queued (<code>attempts</code> = 1). The next run removes it, and the queue is empty.</td></tr>
+<tr><td>Repeated runs are safe</td><td class="ok">three runs: one <code>moderation.evidence_expired</code> entry, nothing else changes</td></tr>
+<tr><td>Referenced files are not deleted</td><td class="ok">The photo of an anonymised contribution under evidence stays, together with its media row, after the evidence expires.</td></tr>
+<tr><td>No sensitive content in logs</td><td class="ok">The captured logs of a run with a failing removal contain no contribution title, body or photo text. Failure messages were covered in session 28 (R5).</td></tr>
+</table></div>
+
+<h2>4. Production configuration</h2>
+<p>The checklist is <code>docs/architecture/PRODUCTION_PRIVACY_CHECKLIST.md</code>, with read-only verification queries and the expected results. It covers:</p>
+<ul>
+<li>the app role's membership and attributes;</li>
+<li>audit privileges (insert and select only);</li>
+<li>both guard triggers, enabled;</li>
+<li>the redaction function: definer, owner, <code>search_path</code>, ACL, a single version;</li>
+<li>the switches and the order to enable them;</li>
+<li>the cron and the expected schedule;</li>
+<li>mail;</li>
+<li>backup and restore, including re-applying deletions after a restore;</li>
+<li>11 production blockers.</li>
+</ul>
+<p>All of its queries were run on <code>myridenepal</code>, <code>myridenepal_test</code> and <code>myridenepal_e2e</code>, and every result matched. Nothing was run against production; there is none.</p>
+
+<h2>Tests and results</h2>
+<div class="scroll"><table>
+<tr><th>Command</th><th>Exit</th><th>Result</th></tr>
+<tr><td><code>php artisan test</code></td><td>0</td><td class="ok">199 passed (4018 assertions); <code>AccountDeletionTest</code> 30 tests (5 new)</td></tr>
+<tr><td><code>composer audit</code></td><td>0</td><td>no advisories</td></tr>
+<tr><td>public browser suite (above)</td><td>0</td><td class="ok">173 passed, 0 failed, 10 skipped</td></tr>
+<tr><td>staff browser suite (above)</td><td>0</td><td class="ok">57 passed, 1 skipped</td></tr>
+<tr><td>Frontend type-check, lint, unit, build, audits</td><td>—</td><td>not rerun: no frontend file changed in this session. Session 28's runs (all exit 0) stand.</td></tr>
+</table></div>
+
+<h2>Remaining production blockers</h2>
+<ol>
+<li>No production database or host (D-08 candidate only; no budget, D-09).</li>
+<li>Production database privileges, triggers and function not verified (the checklist, sections 1 to 4).</li>
+<li>No production cron.</li>
+<li>No mail provider (O5).</li>
+<li>No durable file storage (O6).</li>
+<li>No tool to re-apply completed deletions after a backup restore.</li>
+<li>Staff MFA (D-07) not built.</li>
+<li>Contact retention (D-05, D-06) not built.</li>
+<li>WebKit / CI browser runs never done.</li>
+<li>The account-id hash is deferred by the owner.</li>
+<li>Log retention period not set.</li>
+</ol>
+<p>Optional hardening for the owner to decide: revoke DELETE on <code>users</code> from the app role, as in section 2.</p>
+
+<h2>Progress</h2>
+<p>Unchanged at <strong>179 / 261 = 68.6%</strong>, coverage 82.5%. Every requirement row this session tests (G19, H11) was already "complete, tested". The blockers above are about production readiness and do not change requirement rows.</p>
+
+<h2>Coordination</h2>
+<p>The two peer sessions (road-trip-e5, road-trip-07) were idle. They were told before the browser runs took the shared ports and again when the ports were released. No UI or texture files were touched.</p>
+</main>
+</body>
+</html>

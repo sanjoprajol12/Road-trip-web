@@ -8,9 +8,15 @@ import { createConfirmedRider, sql } from './support/local'
 // daily command against the isolated E2E database, after moving this rider's date into the past.
 const password = 'deletion-journey-2026'
 const web = fileURLToPath(new URL('../../', import.meta.url))
+// Session 28: the run is switched on only for this call (off by default), and the request is made due by the database
+// clock: both dates move together, as a full 30-day cooling-off (local `postgres` psql, a member of the owner role; the app role cannot move them).
 const runDeletions = (userId: string) => {
-  sql(`update account_deletion_requests set run_after = now() - interval '1 minute' where user_id = '${userId}' and status = 'scheduled'`)
-  execFileSync('php', ['artisan', 'mrn:accounts:process-deletions'], { cwd: web, env: { ...process.env, DB_DATABASE: 'myridenepal_e2e', LOCAL_DISK_ROOT: 'app/e2e' }, encoding: 'utf8' })
+  sql(`update account_deletion_requests set requested_at = now() - interval '31 days', run_after = now() - interval '1 minute' where user_id = '${userId}' and status = 'scheduled'`)
+  execFileSync('php', ['artisan', 'mrn:accounts:process-deletions'], {
+    cwd: web,
+    env: { ...process.env, DB_DATABASE: 'myridenepal_e2e', LOCAL_DISK_ROOT: 'app/e2e', ACCOUNT_DELETION_PROCESSING_ENABLED: 'true' },
+    encoding: 'utf8',
+  })
 }
 
 async function signIn(page: Page, email: string) {
@@ -80,8 +86,13 @@ test('a rider exports their data, schedules the deletion with a choice, signs in
   await page.locator('#delete_password').fill(password)
   await page.getByRole('button', { name: 'Schedule the deletion' }).click()
   await expect(page.locator('#delete').getByText(/Your account will be deleted on/)).toBeVisible()
+  // An edit of that contribution in the audit history: redacted by the run (O8), which runs as the application role.
+  const edit = sql(`insert into audit_logs (actor_id, actor_type, action, subject_type, subject_id, old_data, new_data, created_at)
+     values ('${rider.id}', 'user', 'contribution.edited', 'contributions', '${c}', '{"body": "E2E private draft ${s}"}', '{"body": "E2E private edit ${s}"}', now()) returning id`)
   runDeletions(rider.id)
   expect(sql(`select count(*) from users where id = '${rider.id}'`)).toBe('0')
+  expect(sql(`select old_data->>'body' || ' ' || (new_data->>'body') from audit_logs where id = ${edit}`)).toBe('[redacted] [redacted]')
+  expect(sql(`select count(*) from audit_logs where action = 'audit.redacted' and actor_type = 'system' and subject_id = '${edit}'`)).toBe('1')
   expect(sql(`select author_id is null and author_deleted_at is not null from contributions where id = '${c}'`)).toBe('t')
   await page.goto(`/experiences/${c}`)
   await expect(page.getByRole('heading', { name: title })).toBeVisible()

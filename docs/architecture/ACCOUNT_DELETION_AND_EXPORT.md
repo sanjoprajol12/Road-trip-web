@@ -87,6 +87,33 @@
 - The export is always streamed and needs the password (D1 is not decided, so no stored file or link).
 - `contribution_suspensions` rows cascade with the account.
 
+**Hardened in session 28** (owner follow-up to the session 27 review; see the addendum):
+
+- **Daily jobs:** three commands, scheduled daily.
+  - `mrn:accounts:process-deletions` (02:30) runs only with `ACCOUNT_DELETION_PROCESSING_ENABLED=true`.
+  - `mrn:accounts:purge-deletion-records` (03:10) runs only with `ACCOUNT_DELETION_RECORDS_PURGE_ENABLED=true`.
+  - The two switches are independent, and both default to off. A switched-off command says so and changes nothing.
+  - `mrn:accounts:expire-evidence` (02:50) has no switch: it only ends 30-day evidence holds and retries failed file removals (D-04 allows no longer hold), and does nothing before any deletion ran.
+  - Local development: both off, unless you set them in `.env`. Tests switch them on per test. The E2E journey switches processing on for its own command call.
+- **Production activation requirements:**
+  - owner approval;
+  - a cron for `php artisan schedule:run`;
+  - a production mail provider (O5);
+  - `has_table_privilege('mrn_app', 'audit_logs', 'update')` and `delete` both false;
+  - both triggers present;
+  - then set the switches.
+- **R8:**
+  - A moderator's "still accurate" date is kept in `contributions.staff_confirmed_on` (migration `2026_11_22_100026`, backfilled from the audit log).
+  - The run lowers `last_confirmed_on` only if the departing rider's latest confirmation could have set it, and never below the moderator's date.
+- **R1, R2:**
+  - Only the definer function (table owner) may write `audit.redacted` or actor type `system` (trigger).
+  - The function now takes the deletion request and checks it is due by the database clock after a full 30 days, and that the account is marked for deletion.
+  - It also checks that the entry's subject belongs to that account: contribution `author_id`, or an unreviewed place `submitted_by`. The first `place.suggested` version is covered.
+  - The app role cannot backdate or revive a request: a trigger sets `requested_at` from the database clock, keeps `run_after` at least 30 days later, and refuses changes to the account or dates and any status move other than scheduled → cancelled or done.
+  - **Residual risk:** a compromised app role could create a request for another rider. It can only be used 30 real days later, and the rider sees the deletion banner meanwhile.
+- **R5:** failures log the step, request id and exception class only.
+- **Rollback:** `2026_11_22_100026` refuses to roll back once any redaction is recorded. Without redactions, it drops the triggers and the column and restores the session 26 function.
+
 **Decided and built in session 26** (addendum `docs/product/OWNER_DECISIONS_2026-11-22_ADDENDUM.md`):
 - **O8:** contribution text in the audit history is redacted by the privileged function `mrn_redact_audit_text` during the run, and each redaction is recorded as `audit.redacted`.
 - **D-10:** finished records keep choice categories and counts only, and are deleted after one year.

@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 27b: Header and save guards | My Ride Nepal</title>
+<style>
+  :root { --paper:#f2f0ec; --line:#d9d5cd; --muted:#5c5850; --ink:#17181b; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:62rem; margin:0 auto; padding:3rem 1rem 5rem; }
+  h1 { font-size:clamp(2rem,1.4rem + 3vw,3.1rem); line-height:1.08; text-wrap:balance; }
+  h2 { margin-top:2.5rem; }
+  table { border-collapse:collapse; width:100%; } td, th { border-bottom:1px solid var(--line); padding:.5rem; text-align:left; vertical-align:top; }
+  .muted { color:var(--muted); } code { font-size:.9em; overflow-wrap:anywhere; }
+  td:nth-child(n+2) { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 27b: homepage header, headings and staff double submits</h1>
+<p class="muted">2026-11-22, 22:09 to 22:45 (+0545). UI and tests only: no API, schema, data, dependency or permission change. Texture files untouched. No commit or push by this session.</p>
+
+<h2>Before starting: concurrency</h2>
+<ul>
+  <li>Two other Claude sessions were running. I checked their recent tool calls in the local session logs and the file modification times. No session was writing any of the six target files; the last write to them was 22 Nov 11:15.</li>
+  <li><code>b6054c60</code> had finished the read-only UI audit that found these three defects.</li>
+  <li><code>a581e2dd</code> was running the full E2E suites on 8011/4180/4181. My new E2E specs stayed in my scratch folder until those ports were free.</li>
+  <li><code>road-trip-7f</code> later claimed account-deletion files. They do not overlap with mine. We agreed the port order by message, and I told it when the ports were released.</li>
+</ul>
+
+<h2>Problems fixed</h2>
+<table>
+  <tr><th>Problem</th><th>Fix</th></tr>
+  <tr><td>The home header was transparent (light text) whenever the route said so, even with no hero: almost invisible while loading, on an API failure, or after staff removed the hero.</td><td><code>heroesOnScreen</code> (<code>lib/site.ts</code>) counts mounted heroes (<code>HeroSection</code> onMounted / onBeforeUnmount). The header is transparent only when the route allows it <em>and</em> the count is above zero. A count rather than a boolean stays correct if an old hero unmounts after a new one mounts.</td></tr>
+  <tr><td>The homepage loading and error states had no h1.</td><td>Visually hidden h1s: "My Ride Nepal: loading the home page" and "My Ride Nepal: the home page could not be loaded". When a successful page has no hero, a hidden "My Ride Nepal". The states are exclusive <code>v-if</code> branches, so there is never more than one. The look is unchanged.</td></tr>
+  <tr><td>Staff create forms could send two requests on a double click. A service point has no unique field, so that made a real duplicate row.</td><td>Guide, destination, CMS entry and service point forms: a saving flag, a handler guard (<code>if (saving) return</code>), a disabled button with <code>aria-busy</code> and "Saving…", and restore in <code>finally</code>. Only the submit buttons are disabled; Cancel, Close, Preview, Delete and Publish are untouched. Validation, messages and error handling are unchanged.</td></tr>
+</table>
+
+<h2>Files changed</h2>
+<ul>
+  <li>Public (<code>web/frontend</code>): <code>src/components/navigation/SiteHeader.vue</code>, <code>src/lib/site.ts</code>, <code>src/features/home/pages/HomePage.vue</code>, <code>src/features/home/sections/HeroSection.vue</code>, <code>tsconfig.vitest.json</code>; new <code>src/features/home/__tests__/homeHeader.spec.ts</code> and <code>e2e/home-header.spec.ts</code>.</li>
+  <li>Staff (<code>admin</code>): <code>src/features/guides/pages/GuidesPage.vue</code>, <code>src/features/content/pages/DestinationsPage.vue</code>, <code>src/features/cms/content/pages/ContentPage.vue</code>, <code>src/features/content/pages/RouteEditorPage.vue</code>, <code>tsconfig.vitest.json</code>; new <code>src/features/content/__tests__/saveGuards.spec.ts</code> and <code>e2e/save-guards.spec.ts</code>.</li>
+  <li>Docs: <code>docs/handoff.md</code> (entries inserted, nobody else's removed) and this report.</li>
+  <li><strong>Test config:</strong> both <code>tsconfig.vitest.json</code> files overrode <code>lib</code> to <code>[]</code>. These are the first component tests in either app, and they compile the <code>.vue</code> files, which use ES2022 (<code>Array.prototype.at</code> in <code>HeroSection.vue</code> and <code>RouteEditorPage.vue</code>). The override is removed, so tests inherit the app's ES2022 + DOM lib; jsdom provides the DOM.</li>
+</ul>
+
+<h2>Tests and exact results</h2>
+<table>
+  <tr><th>Command</th><th>Exit</th><th>Passed</th><th>Failed</th><th>Skipped</th></tr>
+  <tr><td><code>web/frontend: pnpm type-check</code></td><td>0</td><td>–</td><td>–</td><td>–</td></tr>
+  <tr><td><code>web/frontend: pnpm lint</code></td><td>0</td><td>–</td><td>–</td><td>–</td></tr>
+  <tr><td><code>web/frontend: pnpm test:unit</code> (7 files)</td><td>0</td><td>36</td><td>0</td><td>0</td></tr>
+  <tr><td><code>web/frontend: pnpm build</code></td><td>0</td><td>–</td><td>–</td><td>–</td></tr>
+  <tr><td><code>web/frontend: pnpm audit --prod</code></td><td>0</td><td colspan="3">No known vulnerabilities found</td></tr>
+  <tr><td><code>admin: pnpm type-check</code></td><td>0</td><td>–</td><td>–</td><td>–</td></tr>
+  <tr><td><code>admin: pnpm lint</code></td><td>0</td><td>–</td><td>–</td><td>–</td></tr>
+  <tr><td><code>admin: pnpm test:unit</code> (5 files)</td><td>0</td><td>21</td><td>0</td><td>0</td></tr>
+  <tr><td><code>admin: pnpm build</code></td><td>0</td><td>–</td><td>–</td><td>–</td></tr>
+  <tr><td><code>admin: pnpm audit --prod</code></td><td>0</td><td colspan="3">No known vulnerabilities found</td></tr>
+  <tr><td><code>web/frontend: npx playwright test e2e/home-header.spec.ts e2e/home.spec.ts --project=chromium --project=firefox --project=mobile</code></td><td>0</td><td>18</td><td>0</td><td>0</td></tr>
+  <tr><td><code>admin: npx playwright test e2e/save-guards.spec.ts e2e/route-tracks.spec.ts --project=chromium --project=firefox</code> (second run)</td><td>0</td><td>6</td><td>0</td><td>0</td></tr>
+  <tr><td>Same, first run</td><td>1</td><td>4</td><td>2</td><td>0</td></tr>
+</table>
+<p>The first staff run's 2 failures were in my cleanup only. The test body passed, but <code>afterAll</code> deleted the route before its service point, and check <code>service_points_place</code> refuses a point with neither segment nor destination. Cleanup now deletes the service points first. The rerun passed and left 0 <code>e2e-guard-%</code> routes.</p>
+
+<h3>What the tests cover</h3>
+<ul>
+  <li><strong>Header and headings</strong> (unit, <code>homeHeader.spec.ts</code>, 6 tests: the real header and home page, with the API mocked):
+    <ul>
+      <li>loading, API failure, rendered hero, and hero removed: header state and exactly one h1 in each;</li>
+      <li>leaving the home page restores the normal header;</li>
+      <li>a retry after an error keeps one h1 throughout.</li>
+    </ul>
+    <strong>Proof:</strong> with the old header condition restored, 3 of the 6 tests fail (loading, failure, no hero).</li>
+  <li><strong>Header and headings in real browsers</strong> (E2E, <code>home-header.spec.ts</code>, 4 tests × Chromium, Firefox, mobile): the home API is intercepted (held, a 500, or the hero removed), so no database rows change. Loading also checks the switch to transparent once the hero arrives. The hero case also checks that <code>/explore</code> keeps its normal header.</li>
+  <li><strong>Staff double submits</strong> (unit, <code>saveGuards.spec.ts</code>, 8 tests: 4 forms × success and failure):
+    <ul>
+      <li>three submit events while the request is held give one service call;</li>
+      <li>the button reads "Saving…", is disabled and has <code>aria-busy="true"</code>;</li>
+      <li>after success or failure, the label, enabled state and <code>aria-busy="false"</code> come back and a second request can go out.</li>
+    </ul>
+    <strong>Proof:</strong> with the four guards removed, all 8 fail.</li>
+  <li><strong>Staff service point in a real browser</strong> (E2E, <code>save-guards.spec.ts</code>, Chromium and Firefox): a real staff sign-in, the POST held, a double click on Add; "Saving…" is disabled and busy; exactly one POST and one database row; the button is restored.</li>
+</ul>
+
+<h2>Browser coverage and limitations</h2>
+<ul>
+  <li>Public: Chromium, Firefox and the project's <code>mobile</code> Playwright project. Staff: Chromium and Firefox, signed in through the existing staff E2E helper (a real staff account in <code>myridenepal_e2e</code>).</li>
+  <li>Staff guide, destination and CMS forms are verified by component tests only. The service point form, the one with real duplicate risk, is also verified in browsers.</li>
+  <li>Not run: WebKit (missing system libraries), the full E2E suites, and the Laravel suite (no backend change).</li>
+</ul>
+
+<h2>Remaining issues</h2>
+<ul>
+  <li>Staff can add two hero sections; that would give two h1s. Owner decision: should the CMS allow only one hero?</li>
+  <li>Finding: hard-deleting a route that has service points fails (<code>service_points_place</code>). Routes are soft-deleted in the product, so only hard deletes and purges are affected.</li>
+</ul>
+
+<h2>Git status</h2>
+<ul>
+  <li>The owner commits "fix system" (web <code>9ba251e</code> at 22:41, admin <code>4fcd155</code> at 22:40) already contain this session's source and unit-test changes.</li>
+  <li><strong>Untracked from this session:</strong> <code>web/frontend/e2e/home-header.spec.ts</code> and <code>admin/e2e/save-guards.spec.ts</code> (with its cleanup fix), plus this report and the handoff edit.</li>
+  <li>The other uncommitted web changes (<code>app/Actions/Accounts/*</code>, <code>config/mrn.php</code>, <code>routes/console.php</code>, migration <code>100026</code>, <code>AccountDeletionTest.php</code> and others) belong to session <code>road-trip-7f</code>. This session did not touch them.</li>
+</ul>
+</main>
+</body>
+</html>

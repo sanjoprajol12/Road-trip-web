@@ -1,6 +1,6 @@
 # Handoff
 
-Last updated: 2026-11-22, session 27 (independent review of session 26: O8 and D-10 verified with conditions; D-11 defect found (moderator confirmation date reset); H11 back to Partial, progress 178/261). Earlier: 2026-11-22, session 26 (owner addendum built: O8 audit text redaction through a privileged audited database function, D-10 deletion records kept one year with categories and counts only, D-11 corroboration recalculated; append-only audit privilege restored in dev and E2E). Session 25 (account deletion step 2: request with per-contribution choices, 30-day cooling-off, explicit cancel, export, event and trip handover by acceptance with cancel/delete fallback, restricted 30-day moderation evidence, retryable file cleanup; tested; `web/CLAUDE.md` restored). Session 24 upload safety switch (central upload policy: production never accepts uploads on the local disk, staff and environment pause switches, critical alert, no orphans; tested; no storage provider configured). Session 24 owner decisions (recorded: Q9 option D, 30-day cooling-off, event and trip transfers, 30-day moderation hold, contact retention periods, mandatory staff MFA, P1 hosting candidate with no budget; four plans updated, no code). Session 23 (infrastructure and privacy readiness: plans for hosting, uploads, account deletion and export, staff MFA, contact retention; CI workflows updated). Session 22 (production-readiness audit: accessibility, performance, browsers, security, infrastructure, data; 2 accessibility defects fixed). Session 21 (complete verification; homepage shows the product: specific headline, working route planner with a real route preview, tools list). Session 20 (F4 and F15: trip days, overnight stops, planned and spent costs, checklist and notes; recorded tracks on the trip map). Session 19 (F3: whole routes, stretches and checkpoints in trips; stop reordering). Session 18 (route planning: plan table, fuel gaps, riding time per stretch, route filters, service markers with details; verification and audit closure). Session 17 follow-up (places.review for moderators; correction of the session 17 test report). Session 17 (places in trips and trip maps; real route tracks drawn on destination and route maps; place permission audit). Session 16 (places of interest: staff management, rider suggestions and corrections, public pages, maps, journeys, saved items, experiences; map stacking fix). Session 15 (destination maps: staff map picker, public map and nearby lists; progress measurement baseline; edit-form crash fixed). Session 14 (PostGIS pre-activation audit, inspection only: nothing changed). Session 13 (CMS modules and contact inbox; mail, maps, security, trust settings; trip invitations with consent; journey add-to-trip; corroboration threshold; contribution-only suspensions; event removal and postponement dates; accessibility and Web Vitals checks). Session 12 (Stage 4 trust pipeline; saved services; Explore Along My Route in curated mode). Session 11 (one command for API + public website: `npm run dev` in `web`). Session 10 (migration stages A1–A8 done: Option A layout, independent apps, deployment config, route split, separate staff authentication, feature services, dynamic homepage and CMS foundation). Session 9: architecture investigation. Session 8: roadmap Stages 1, 2 and 3 done (Stage 3 for the local disk only). Earlier sessions: 1 foundation, 2 Supabase auth and verification, 3 removed shared package, 4 Laravel and product areas, 5 Vercel container prep, 6 requirements audit, 7 scope expansion + architecture Option B.
+Last updated: 2026-11-22, session 30 (database-level deletion security design review: F1 owner credentials in the production runtime template; Option B recommended; nothing implemented). Earlier: 2026-11-22, session 29 (final verification: full public 173 passed / 0 failed; deletion requests proven own-account only; evidence job verified; production checklist). Earlier: 2026-11-22, session 28 (review follow-up: R8 moderator date kept, R1/R2 database guards, R5 safe logging, independent deletion and purge switches default off, R9 kept; H11 complete again, 179/261). Earlier: 2026-11-22, session 27b (homepage header follows the rendered hero; one h1 in every homepage state; staff create forms guarded against double submits). Session 27 (independent review of session 26: O8 and D-10 verified with conditions; D-11 defect found (moderator confirmation date reset); H11 back to Partial, progress 178/261). Earlier: 2026-11-22, session 26 (owner addendum built: O8 audit text redaction through a privileged audited database function, D-10 deletion records kept one year with categories and counts only, D-11 corroboration recalculated; append-only audit privilege restored in dev and E2E). Session 25 (account deletion step 2: request with per-contribution choices, 30-day cooling-off, explicit cancel, export, event and trip handover by acceptance with cancel/delete fallback, restricted 30-day moderation evidence, retryable file cleanup; tested; `web/CLAUDE.md` restored). Session 24 upload safety switch (central upload policy: production never accepts uploads on the local disk, staff and environment pause switches, critical alert, no orphans; tested; no storage provider configured). Session 24 owner decisions (recorded: Q9 option D, 30-day cooling-off, event and trip transfers, 30-day moderation hold, contact retention periods, mandatory staff MFA, P1 hosting candidate with no budget; four plans updated, no code). Session 23 (infrastructure and privacy readiness: plans for hosting, uploads, account deletion and export, staff MFA, contact retention; CI workflows updated). Session 22 (production-readiness audit: accessibility, performance, browsers, security, infrastructure, data; 2 accessibility defects fixed). Session 21 (complete verification; homepage shows the product: specific headline, working route planner with a real route preview, tools list). Session 20 (F4 and F15: trip days, overnight stops, planned and spent costs, checklist and notes; recorded tracks on the trip map). Session 19 (F3: whole routes, stretches and checkpoints in trips; stop reordering). Session 18 (route planning: plan table, fuel gaps, riding time per stretch, route filters, service markers with details; verification and audit closure). Session 17 follow-up (places.review for moderators; correction of the session 17 test report). Session 17 (places in trips and trip maps; real route tracks drawn on destination and route maps; place permission audit). Session 16 (places of interest: staff management, rider suggestions and corrections, public pages, maps, journeys, saved items, experiences; map stacking fix). Session 15 (destination maps: staff map picker, public map and nearby lists; progress measurement baseline; edit-form crash fixed). Session 14 (PostGIS pre-activation audit, inspection only: nothing changed). Session 13 (CMS modules and contact inbox; mail, maps, security, trust settings; trip invitations with consent; journey add-to-trip; corroboration threshold; contribution-only suspensions; event removal and postponement dates; accessibility and Web Vitals checks). Session 12 (Stage 4 trust pipeline; saved services; Explore Along My Route in curated mode). Session 11 (one command for API + public website: `npm run dev` in `web`). Session 10 (migration stages A1–A8 done: Option A layout, independent apps, deployment config, route split, separate staff authentication, feature services, dynamic homepage and CMS foundation). Session 9: architecture investigation. Session 8: roadmap Stages 1, 2 and 3 done (Stage 3 for the local disk only). Earlier sessions: 1 foundation, 2 Supabase auth and verification, 3 removed shared package, 4 Laravel and product areas, 5 Vercel container prep, 6 requirements audit, 7 scope expansion + architecture Option B.
 
 ## 1. Goal
 My Ride Nepal, a motorcycle travel platform for Nepal: public website + rider platform, Laravel API, staff portal and CMS, all requirements in `docs/architecture/REQUIREMENTS_GAP_ANALYSIS.md` (261 rows). **Architecture Option A** (owner direction 2026-11-18, replaces Option B):
@@ -10,6 +10,63 @@ My Ride Nepal, a motorcycle travel platform for Nepal: public website + rider pl
 - Supabase = local Postgres + Mailpit only. No code shared between repos. Hosting target Vercel (nothing deployed).
 
 ## 2. Current State
+- **Session 30 (design review only; no code, schema, privilege or data change):**
+  - **Design:** `docs/security/ACCOUNT_DELETION_DB_SECURITY_DESIGN.md`. **Report:** `docs/sessions/2026-11-22-session-30-db-deletion-security-review.html`.
+  - **Findings:**
+    - **F1 (high):** `.env.production.example` and `config/database.php` put the owner credentials (`DB_MIGRATION_*`) in the web runtime. Whoever reads that environment bypasses every database protection: the append-only audit log, the guard triggers and the redaction checks.
+    - **F2:** `mrn_app` can delete from 57 tables, including `users`; only the deletion run needs to.
+    - **F3:** it can also delete `account_deletion_requests` (only the purge needs that) and `moderation_evidence` (never needed).
+    - **F4:** it has full DML on `migrations` (never needed), so it could make a future migration be skipped.
+  - **Recommended (Option B):**
+    - keep the owner credentials out of the runtime (deploy-step secret);
+    - revoke DELETE on `users`, `account_deletion_requests` and `moderation_evidence`, and writes on `migrations`;
+    - two definer functions: `mrn_delete_account(request)`, which checks a due request by the database clock, and `mrn_purge_deletion_records()`.
+    - Options A (no change), C (a separate jobs role) and D (all in SQL) were assessed and not recommended.
+  - **Production checklist:** gains §0 (no owner credentials in the runtime, with a check that does not print secrets) and blocker 12.
+  - **Progress unchanged:** 179/261.
+- **Session 29 (final verification of session 28; tests and docs only, no application code changed):**
+  - **Report:** `docs/sessions/2026-11-22-session-29-final-verification.html`.
+  - **Full public browser suite after the final trigger fix:** 173 passed, 0 failed, 10 skipped (Chromium, Firefox, mobile; exit 0). Staff: 57 passed, 1 skipped (exit 0).
+  - **Deletion requests:**
+    - Over HTTP a rider can only schedule their own deletion: the route takes no user parameter and the action uses the signed-in rider. Tested:
+      - guest 401;
+      - a staff session is refused (401);
+      - a body naming another rider schedules only the caller, and the other rider's account, sessions and mail are untouched;
+      - the audit actor is the caller;
+      - cancel acts on the caller's request only.
+    - At the database level, the application role cannot be tied to a signed-in rider. A compromised app role can still insert a request naming another rider: it can't be used for 30 days and changes nothing on that rider's account (tested). Closing that further needs an architectural change (blocker list in the checklist).
+  - **Evidence job (`expire-evidence`):**
+    - Kept through day 29, expired exactly at `held_until`. Earlier removal only through the release endpoint (moderator without the permission: 403).
+    - Repeated runs are safe (one `moderation.evidence_expired` entry).
+    - A photo still shown by an anonymised contribution is kept.
+    - A failed removal stays queued and is completed by the next run.
+    - Logs hold no contribution text.
+  - **Production checklist:** `docs/architecture/PRODUCTION_PRIVACY_CHECKLIST.md` (role, privileges, triggers, function, switches, cron, mail, backup and restore, 11 blockers). Its queries were validated on all three local databases.
+  - **Progress unchanged** at 179/261 = 68.6%, coverage 82.5%.
+- **Session 28 (follow-up to the session 27 review; code, tested):**
+  - **Report:** `docs/sessions/2026-11-22-session-28-review-follow-up.html`.
+  - **Migrations:** `2026_11_22_100026_harden_account_deletion` and `2026_11_22_100027_guard_privilege_by_owner_membership` (dev and E2E migrated).
+  - **R8 (complete):** `contributions.staff_confirmed_on` (set by the staff confirm action; backfilled from `contribution.confirmed` audit entries). The deletion run lowers `last_confirmed_on` only when the leaving rider's confirmation could have set it, and never below the moderator's date.
+  - **R1 (complete):** trigger `audit_logs_system_guard`. Only the owner role or its members (and so the definer function) may write `audit.redacted` or actor type `system`.
+  - **R2 (complete):** `mrn_redact_audit_text(entry, request)` checks:
+    - the request: scheduled, due by the database clock, and at least 30 days after it was made;
+    - the account: marked for deletion;
+    - the subject: the contribution's author or the unreviewed place's submitter equals the account.
+    - Trigger `account_deletion_requests_guard` stops the app role backdating, re-dating, re-pointing or reviving a request.
+  - **R5 (complete):** the run and the commands log the step, request id and exception class only.
+  - **Switches (complete):** `ACCOUNT_DELETION_PROCESSING_ENABLED` and `ACCOUNT_DELETION_RECORDS_PURGE_ENABLED`, independent, both default false.
+    - Three commands: `process-deletions` (gated), `purge-deletion-records` (gated), and `expire-evidence` (ungated: 30-day evidence end and file retry only).
+  - **R9 (confirmed and tested).**
+  - **Low priority, done:** `place.suggested` is redactable; the staff audit page and two docs reworded; the Firefox focus test stubs the external map tiles (same assertions).
+  - **Deferred by the owner:** the account-id HMAC.
+  - **Residual risk:** a compromised app role can create a deletion request for another rider. It is usable only 30 real days later, and the rider sees the deletion banner meanwhile.
+  - **Progress:** 179/261 = 68.6% (was 68.2%), coverage 82.5%. H11 is complete, tested again; the denominator is unchanged.
+- **Session 27b (three UI fixes from the read-only UI audit; code, tested):** report `docs/sessions/2026-11-22-session-27b-header-headings-save-guards.html`.
+  - **Header:** transparent only while a home hero is mounted (`heroesOnScreen` in `lib/site.ts`, counted by `HeroSection`). Loading, API failure, a hero removed by staff and other pages get the normal header.
+  - **Headings:** the homepage has exactly one h1 in every state: hidden ones for loading, error and no-hero; the hero keeps its own.
+  - **Staff double submits:** guide, destination, CMS entry and route service point forms each have a saving flag, a handler guard, a disabled "Saving…" button, and restore in `finally`. Service points have no unique field, so this one prevented real duplicate rows.
+  - **Test config:** both `tsconfig.vitest.json` files no longer override `lib` to `[]`. These are the first component tests, and they compile the `.vue` files, which use ES2022 (`.at()`).
+  - The owner commits "fix system" (web `9ba251e`, admin `4fcd155`) include these source and unit-test changes. The two new E2E specs are still untracked.
 - **Session 27 (independent review of session 26; no code changed):** report `docs/sessions/2026-11-22-session-27-independent-review.html`.
   - **Verdict: accepted with conditions.**
     - O8 and D-10 are verified. D-11 is accepted except for defect R8.
@@ -288,6 +345,18 @@ My Ride Nepal, a motorcycle travel platform for Nepal: public website + rider pl
 - Nothing committed. The owner's `composer dev` (Laravel :8010) and `vite --mode public` (:5180) were running; this session left no server of its own running. Recovery archive of the pre-Option-B layout still in `/var/www/html/Road-trip/_backups/2026-11-18-pre-option-b/` until the owner commits.
 
 ## 3. Active Files
+- Session 30: `docs/security/ACCOUNT_DELETION_DB_SECURITY_DESIGN.md` (new), `docs/architecture/PRODUCTION_PRIVACY_CHECKLIST.md` (§0, blocker 12), the report.
+- Session 29: `tests/Feature/AccountDeletionTest.php` (5 new tests, 30 in all); `docs/architecture/PRODUCTION_PRIVACY_CHECKLIST.md` (new); the report.
+- Session 28:
+  - **Laravel:**
+    - migrations `100026`, `100027`;
+    - `app/Actions/Accounts/ProcessAccountDeletion.php`, `Admin/ContributionController.php` (confirm), `Models/Contribution.php`;
+    - `routes/console.php`, `config/mrn.php`, `.env.example`, `.env.production.example`;
+    - `tests/Feature/AccountDeletionTest.php` (25 tests).
+  - **E2E:** `frontend/e2e/account-deletion.spec.ts`, `frontend/e2e/production-audit.spec.ts` (focus test).
+  - **Staff:** `admin/src/features/audit/pages/AuditLogPage.vue`.
+  - **Docs:** `OWNER_DECISIONS_2026-11-22_ADDENDUM.md`, `ACCOUNT_DELETION_AND_EXPORT.md`, `DATABASE_DESIGN.md`, `BACKEND_ARCHITECTURE.md`, `COMPLETE_PRODUCT_REQUIREMENTS_AUDIT.md` (H11).
+- Session 27b: public `components/navigation/SiteHeader.vue`, `lib/site.ts`, `features/home/{pages/HomePage.vue,sections/HeroSection.vue,__tests__/homeHeader.spec.ts}`, `e2e/home-header.spec.ts`, `tsconfig.vitest.json`. Staff `features/{guides/pages/GuidesPage,content/pages/DestinationsPage,cms/content/pages/ContentPage,content/pages/RouteEditorPage}.vue`, `features/content/__tests__/saveGuards.spec.ts`, `e2e/save-guards.spec.ts`, `tsconfig.vitest.json`.
 - Session 27: `docs/audits/COMPLETE_PRODUCT_REQUIREMENTS_AUDIT.md` (H11 row); the report. Review probes in the session scratchpad (`review/*.php`; read-only, or a single rolled-back transaction as `mrn_app`).
 - Session 26:
   - Migration `2026_11_22_100025_add_audit_redaction.php`.
@@ -357,6 +426,17 @@ My Ride Nepal, a motorcycle travel platform for Nepal: public website + rider pl
 - Stage 2 frontend: `admin/src/apps/admin/{app/navigation.ts,app/router/index.ts,app/layouts/AdminLayout.vue,features/users/pages/{PeoplePage,RolesPage,AcceptInvitationPage}.vue,features/authentication/staffAccess.ts,types/api.ts}`, `admin/e2e/admin/roles.spec.ts`, `admin/playwright.config.ts` (`E2E_API_PORT`, `ADMIN_URL`).
 
 ## 4. Changes Made
+- Session 30: documentation only. Privileges were inspected read-only on the dev database.
+- Session 29: tests and documentation only. No application code, migration, dependency or data change; the jobs were not activated; no commit or push.
+- Session 28: as in §2. Two migrations: one column, two triggers, and the redaction function's signature changed to `(bigint, uuid)`.
+  - **Rollback:** `100026` refuses once any redaction exists; otherwise it restores the session 26 function. `100027` restores the owner-or-superuser exemption.
+  - No dependency, remote service, deployment, production change, commit or push. The jobs were not activated anywhere.
+- Session 27b: as in §2. UI and tests only; no API, schema, data, dependency or permission change. Texture files untouched.
+  - Checks:
+    - Public and staff type-check, lint, unit (36 and 21), build and `pnpm audit --prod`: all exit 0.
+    - E2E public `home-header` + `home` (Chromium, Firefox, mobile): 18 passed.
+    - E2E staff `save-guards` + `route-tracks` (Chromium, Firefox): 6 passed.
+    - Laravel not run (no backend change).
 - Session 27: documentation only (H11 status, handoff, report).
   - `scripts/setup-local-db.sh` was run twice on the local databases to verify it; nothing changed.
   - Probes wrote nothing that persisted (rolled back).
@@ -412,6 +492,22 @@ My Ride Nepal, a motorcycle travel platform for Nepal: public website + rider pl
 - Session 5: Vercel container preparation. Session 4: Laravel 12 API for all areas.
 
 ## 5. List of Failed Attempts
+- Session 30: none. My first draft of the checklist command printed the owner password; it now prints only whether one is set.
+- Session 29: none. The full public suite passed on the first run.
+- Session 28 (all fixed):
+  - The migration's jsonb `?` was read as a bind placeholder; it now uses `DB::unprepared`.
+  - `migrate:fresh` keeps functions, so a re-created function clashed; the migration now uses `create or replace`.
+  - **First full public E2E:** exit 1 (166 passed, 7 failed, 10 skipped).
+    - Six failures were the deletion journey: its psql date shift was refused, because local `postgres` is a member of the owner role, not a superuser. Migration `100027` exempts members.
+    - One Firefox `route-services` failure passed on rerun.
+  - A test compared timestamps that the database stores in whole seconds; it now allows one second.
+- Session 27b (all fixed):
+  - The vitest tsconfig `lib: []` broke type-checking once tests imported components.
+  - Lint refused untyped `vi.fn()` and conditional expects.
+  - A test router lacked the named route `cms-content`, and a route fixture lacked `services`.
+  - The first staff E2E cleanup deleted routes before their service points (check `service_points_place` refuses a point with neither segment nor destination); the rows were removed on the rerun.
+  - A zsh `$F` word-splitting slip aborted a bisect before it changed anything.
+  - My port-wait loop matched its own command line in `pgrep -f`.
 - Session 27:
   - **Another session was active:** it ran public E2E and edited frontend styling (sessions 26b and 26c) during the review. The frontend and E2E runs waited until it had been quiet for 5 minutes.
   - **Full public E2E:** exit 1 (158 passed, 3 failed, 10 skipped). The rerun of the failing specs gave exit 1 (5 passed, 1 failed, 4 skipped).
@@ -483,6 +579,28 @@ My Ride Nepal, a motorcycle travel platform for Nepal: public website + rider pl
 - Earlier: `.env.local` trap, `whereILike`, Fortify reset-link binding, route-name prefix, CSP for the SPA page, pnpm 12 audit config, Kong, rate-limiter bucket.
 
 ## 6. Next Steps
+0. **After session 30, owner decisions:**
+   1. Approve F1 as a deployment rule.
+   2. Approve Option B for an implementation session (about half a session; plan in the design §6).
+   3. Whether to start a separate account-takeover review (§8).
+0. **After session 29:** the production blockers are listed in `docs/architecture/PRODUCTION_PRIVACY_CHECKLIST.md` §9:
+   - hosting, privilege verification, cron, mail, durable storage;
+   - a restore-and-replay tool;
+   - staff MFA, contact retention;
+   - WebKit/CI, the account-id hash, log retention.
+   - **Optional hardening (owner decision):** revoke DELETE on `users` from `mrn_app` and remove accounts only through a definer function that checks a due request, so that even a compromised app role needs 30 days.
+0. **After session 28:**
+   - **Before production:**
+     - verify in the production database: `has_table_privilege('mrn_app', 'audit_logs', 'update')` and `delete` are false, both triggers exist, and `mrn_app` is not a member of the owner role;
+     - set the cron;
+     - get owner approval, then set `ACCOUNT_DELETION_PROCESSING_ENABLED` and later `ACCOUNT_DELETION_RECORDS_PURGE_ENABLED`.
+   - **Owner, deferred:** the account-id HMAC, with a restore-replay design and key lifecycle.
+   - **Low:** R6 (handover counts), R7 (system actor label).
+   - **Next in the decision record:** contact retention, then staff MFA.
+0. **After session 27b:**
+   - Owner: commit `web/frontend/e2e/home-header.spec.ts` and `admin/e2e/save-guards.spec.ts`.
+   - Open edge: staff can add two hero sections, which would give two h1s. Decide whether the CMS should allow only one hero.
+   - Finding: deleting a route that has service points fails (`service_points_place`). Staff routes are soft-deleted, so only hard deletes are affected; check before any route purge.
 0. **After session 27: one focused implementation task (not started):**
    - **Must:**
      - R8: keep the moderator's `last_confirmed_on`. Recompute only when the leaving rider's confirmation set it, taking the later of the remaining confirmations and the latest `contribution.confirmed`.

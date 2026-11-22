@@ -191,6 +191,10 @@ test('contrast meets WCAG AA on public, detail and signed-in pages', async ({ pa
 
 test('keyboard focus is visible and never hidden under the sticky header', async ({ page }, info) => {
   test.skip(info.project.name === 'mobile', 'no hardware keyboard on the phone profile')
+  // Map tiles come from an external server; their speed decided whether "network idle" arrived in time (Firefox).
+  // Tiles hold no focusable element, so a blank local tile leaves every focus check exactly as strict.
+  const blankTile = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64')
+  await page.route('https://tile.openstreetmap.org/**', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: blankTile }))
   const found: Record<string, string[]> = {}
   for (const path of ['/', `/routes/${routeSlug}`, '/journey', '/sign-in']) {
     await page.goto(path)

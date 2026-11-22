@@ -20,6 +20,7 @@ use App\Support\Audit;
 use App\Support\PendingFiles;
 use App\Support\Settings;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Throwable;
 
@@ -46,7 +47,7 @@ final class ProcessAccountDeletion
                     return 'skipped';
                 }
                 $user = User::whereKey($req->user_id)->lockForUpdate()->first();
-                $counts = $user ? $this->erase($user, $req->choices ?? [], $notices) : ['already_gone' => 1];
+                $counts = $user ? $this->erase($user, $req, $notices) : ['already_gone' => 1];
                 $mail = $user?->email;
                 // D-10: only choice categories stay, never which contribution got which choice.
                 $req->update(['status' => 'done', 'completed_at' => now(), 'counts' => $counts, 'choices' => (object) array_count_values($req->choices ?? []), 'last_error' => null]);
@@ -55,9 +56,10 @@ final class ProcessAccountDeletion
                 return 'done';
             });
         } catch (Throwable $e) {
-            // Rolled back: nothing was deleted. Only the exception class is kept (never data); the next run retries.
+            // Rolled back: nothing was deleted; the next run retries. R5: only the exception class and the request id are
+            // kept or logged, never the message, which can hold SQL with bound values (emails, contribution text).
             AccountDeletionRequest::whereKey($request->id)->update(['attempts' => DB::raw('attempts + 1'), 'last_error' => mb_substr($e::class, 0, 200), 'updated_at' => now()]);
-            report($e);
+            Log::error('Account deletion run failed; nothing was deleted and it will be retried.', ['request_id' => $request->id, 'exception' => $e::class]);
 
             return 'failed';
         }
@@ -73,10 +75,10 @@ final class ProcessAccountDeletion
         return $result;
     }
 
-    /** @param array<string, string> $choices */
-    private function erase(User $user, array $choices, array &$notices): array
+    private function erase(User $user, AccountDeletionRequest $req, array &$notices): array
     {
         $id = $user->id;
+        $choices = $req->choices ?? [];
         $counts = [];
         // Offers that nobody answered lapse; accepted ones already moved the event or trip.
         $handed = OwnershipTransfer::where(['from_user_id' => $id, 'status' => 'accepted'])->pluck('subject_type');
@@ -116,14 +118,16 @@ final class ProcessAccountDeletion
         // O8: the text of this rider's contributions, and of the place suggestions deleted below, is redacted in the
         // audit history by the privileged database function (ids, dates, actions and actors stay; each redaction is
         // itself recorded as `audit.redacted`). Moderation evidence keeps its own restricted copy for 30 days.
+        // R2: the function checks this request and that each entry's subject still belongs to this account, so it runs
+        // before the contributions are anonymised or deleted.
         $counts['audit_entries_redacted'] = 0;
         $subjects = ['contributions' => Contribution::where('author_id', $id)->pluck('id'),
             'places' => DB::table('places')->where('submitted_by', $id)->whereIn('status', self::UNREVIEWED_PLACES)->pluck('id')];
         foreach ($subjects as $type => $ids) {
             $entries = DB::table('audit_logs')->where('subject_type', $type)->whereIn('subject_id', $ids)
-                ->whereIn('action', ['contribution.edited', 'contribution.correction_added', 'place.resubmitted'])->pluck('id');
+                ->whereIn('action', $type === 'contributions' ? ['contribution.edited', 'contribution.correction_added'] : ['place.suggested', 'place.resubmitted'])->pluck('id');
             foreach ($entries as $entry) {
-                $counts['audit_entries_redacted'] += DB::selectOne('select mrn_redact_audit_text(?, ?) as n', [$entry, 'account_deletion'])->n > 0 ? 1 : 0;
+                $counts['audit_entries_redacted'] += DB::selectOne('select mrn_redact_audit_text(?, ?) as n', [$entry, $req->id])->n > 0 ? 1 : 0;
             }
         }
 
@@ -171,14 +175,25 @@ final class ProcessAccountDeletion
         // riders still confirming it fall below the threshold. Counted: every remaining distinct confirmer other than
         // the author, without the time window or other riders' current standing, so only this removal can change the
         // outcome. A status a moderator set is a staff decision and is kept; the report itself stays published.
-        $confirmed = DB::table('contribution_confirmations')->where('user_id', $id)->distinct()->pluck('contribution_id');
+        // R8: `last_confirmed_on` may also hold a moderator's "still accurate" date (`staff_confirmed_on`, no rider row).
+        // It is lowered only when this rider's confirmation could have set it, and never below the moderator's date.
+        $confirmed = DB::table('contribution_confirmations')->where('user_id', $id)->groupBy('contribution_id')
+            ->selectRaw('contribution_id, max(confirmed_on) as mine')->pluck('mine', 'contribution_id');
         $counts['confirmations_deleted'] = DB::table('contribution_confirmations')->where('user_id', $id)->delete();
         $counts['corroborations_withdrawn'] = 0;
         $threshold = (int) Settings::get('trust.corroboration_threshold');
-        foreach ($confirmed as $cid) {
-            $last = DB::table('contribution_confirmations')->where('contribution_id', $cid)->max('confirmed_on');
-            Contribution::whereKey($cid)->update(['last_confirmed_on' => $last]);
+        foreach ($confirmed as $cid => $mine) {
             $c = Contribution::whereKey($cid)->lockForUpdate()->first();
+            if (! $c) {
+                continue;
+            }
+            $current = $c->last_confirmed_on?->toDateString();
+            if ($current === null || $current <= $mine) {
+                $riders = DB::table('contribution_confirmations')->where('contribution_id', $cid)->max('confirmed_on');
+                $dates = array_filter([$riders, $c->staff_confirmed_on?->toDateString()]);
+                $last = $dates ? max($dates) : null;
+                $c->forceFill(['last_confirmed_on' => $last])->save();
+            }
             if ($c?->status !== ContributionStatus::CommunityCorroborated || ! $this->corroboratedByThreshold($c)) {
                 continue;
             }
@@ -202,7 +217,9 @@ final class ProcessAccountDeletion
 
         // The user row: cascades sessions, emergency contacts, saved items, verifications, roles, memberships, invitations,
         // registrations, place corrections and contribution suspensions; sets the remaining actor links to null.
-        $user->delete();
+        // Session 31: the application role has no DELETE on users. Only this database function removes the row, and only
+        // after checking the request itself (scheduled, due by the database clock after 30 days, this account).
+        DB::selectOne('select mrn_delete_account(?, ?, ?) as n', [$req->id, $user->id, now()->toDateTimeString()]);
         foreach (Event::whereIn('id', $joined)->whereIn('status', ['published', 'full'])->get() as $event) {
             \App\Actions\Events\EventCapacity::settle($event);
         }

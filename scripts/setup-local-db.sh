@@ -34,10 +34,18 @@ alter default privileges in schema public grant select, insert, update, delete o
 alter default privileges in schema public grant usage, select on sequences to mrn_app;
 grant select, insert, update, delete on all tables in schema public to mrn_app;
 grant usage, select on all sequences in schema public to mrn_app;
--- The audit log stays append-only for the app (migration 2026_11_18_100008): the blanket grant above must not undo it.
+-- The blanket grant above must not undo the narrower rights set by migrations: the audit log stays append-only for
+-- the app (2026_11_18_100008), and the Option B revokes stay in place (2026_11_23_100028).
 do \$\$ begin
   if to_regclass('public.audit_logs') is not null then
     revoke update, delete, truncate on audit_logs from mrn_app;
+  end if;
+  -- Option B (migration 2026_11_23_100028): deletions of these rows only through the definer functions.
+  if to_regclass('public.account_deletion_requests') is not null then
+    revoke delete on users, account_deletion_requests, moderation_evidence from mrn_app;
+  end if;
+  if to_regclass('public.migrations') is not null then
+    revoke insert, update, delete, truncate on migrations from mrn_app;
   end if;
 end \$\$;
 SQL

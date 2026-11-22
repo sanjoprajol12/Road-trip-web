@@ -34,6 +34,8 @@ class AccountDeletionTest extends TestCase
         parent::setUp();
         $this->freezeSecond(); // dates are compared to the second
         Storage::fake('local');
+        // Both jobs are off by default (production); these tests exercise them, so they switch them on.
+        config(['mrn.account_deletion.processing_enabled' => true, 'mrn.account_deletion.records_purge_enabled' => true]);
     }
 
     private function as(?\Illuminate\Contracts\Auth\Authenticatable $u)
@@ -80,8 +82,38 @@ class AccountDeletionTest extends TestCase
     private function runDue(int $days = 30): void
     {
         $this->travel($days)->days();
-        $this->artisan('mrn:accounts:process-deletions');
+        $this->runJobs();
         $this->flushSession(); // weeks later: earlier sign-ins have expired
+    }
+
+    /** The three daily jobs, in their scheduled order. */
+    private function runJobs(): void
+    {
+        $this->artisan('mrn:accounts:process-deletions');
+        $this->artisan('mrn:accounts:expire-evidence');
+        $this->artisan('mrn:accounts:purge-deletion-records');
+    }
+
+    /**
+     * Makes a rider's request due by the DATABASE clock (the redaction function checks the database's own now(),
+     * which PHP time travel does not move). Allowed here because tests use the owner role; the application role
+     * cannot move these dates (trigger account_deletion_requests_guard).
+     */
+    private function dueByDatabaseClock(User $u): AccountDeletionRequest
+    {
+        DB::update("update account_deletion_requests set requested_at = now() - interval '31 days', run_after = now() - interval '1 minute' where user_id = ? and status = 'scheduled'", [$u->id]);
+
+        return AccountDeletionRequest::where(['user_id' => $u->id, 'status' => 'scheduled'])->sole();
+    }
+
+    private function refusedByDatabase(callable $f, string $label): void
+    {
+        try {
+            DB::transaction(fn () => $f()); // savepoint: the test transaction survives the error
+            $this->fail("{$label} was allowed");
+        } catch (QueryException) {
+            $this->addToAssertionCount(1);
+        }
     }
 
     /** A trip with a viewer who accepted the invitation. @return array{0: string, 1: User} */
@@ -239,7 +271,7 @@ class AccountDeletionTest extends TestCase
         Notification::assertSentOnDemand(AccountDeletionMail::class, fn ($n, $ch, $notifiable) => $n->kind === 'completed' && $notifiable->routes['mail'] === $rider->email);
 
         // Idempotent: running again changes nothing.
-        $this->artisan('mrn:accounts:process-deletions')->assertSuccessful();
+        $this->runJobs();
         $this->assertSame(1, AuditLog::where('action', 'account.deleted')->count());
     }
 
@@ -560,7 +592,8 @@ class AccountDeletionTest extends TestCase
         $before = $edit->only(['id', 'actor_id', 'actor_type', 'action', 'subject_type', 'subject_id', 'ip_address', 'created_at']);
         $keys = [array_keys($edit->old_data), array_keys($edit->new_data)];
         $this->requestDeletion($rider, [$kept->id => 'anonymise']);
-        $this->runDue();
+        $req = $this->dueByDatabaseClock($rider);
+        $this->runJobs();
 
         // The entry keeps its id, actor, action, subject, IP and time; only the text fields carry the marker.
         $after = AuditLog::find($edit->id);
@@ -585,21 +618,13 @@ class AccountDeletionTest extends TestCase
         $this->assertContains('old_data.body', $mine->new_data['fields']);
         $this->assertSame(2, AccountDeletionRequest::sole()->counts['audit_entries_redacted']);
 
-        // Running it again changes nothing and records nothing.
-        $this->assertSame(0, DB::selectOne('select mrn_redact_audit_text(?, ?) as n', [$edit->id, 'account_deletion'])->n);
+        // After the run the request is done: the function refuses to touch anything for it again.
+        $this->refusedByDatabase(fn () => DB::select('select mrn_redact_audit_text(?, ?)', [$edit->id, $req->id]), 'a redaction for a finished request');
         $this->assertSame(2, AuditLog::where('action', 'audit.redacted')->count());
-        // Only allowed reasons and text-bearing entry types; anything else is refused by the database.
-        foreach ([[$edit->id, 'tidy_up'], [AuditLog::where('action', 'account.deleted')->value('id'), 'account_deletion']] as [$entry, $reason]) {
-            try {
-                DB::transaction(fn () => DB::select('select mrn_redact_audit_text(?, ?)', [$entry, $reason]));
-                $this->fail("redaction of {$entry} for {$reason} was allowed");
-            } catch (QueryException) {
-            }
-        }
         // The app role still cannot change audit rows itself; it may only call the function.
         $this->assertFalse(DB::selectOne("select has_table_privilege('mrn_app', 'audit_logs', 'update') as ok")->ok);
         $this->assertFalse(DB::selectOne("select has_table_privilege('mrn_app', 'audit_logs', 'delete') as ok")->ok);
-        $this->assertTrue(DB::selectOne("select has_function_privilege('mrn_app', 'mrn_redact_audit_text(bigint, text)', 'execute') as ok")->ok);
+        $this->assertTrue(DB::selectOne("select has_function_privilege('mrn_app', 'mrn_redact_audit_text(bigint, uuid)', 'execute') as ok")->ok);
     }
 
     public function test_d10_deletion_records_keep_only_categories_and_counts_and_go_after_one_year(): void
@@ -625,12 +650,12 @@ class AccountDeletionTest extends TestCase
 
         // Finished records go one year after they finished; a scheduled request is never purged.
         $this->travel(364)->days(); // the cancelled one finished 394 days ago, the done one 364
-        $this->artisan('mrn:accounts:process-deletions');
+        $this->runJobs();
         $this->assertSame(['done'], AccountDeletionRequest::pluck('status')->all());
         $later = $this->rider();
         $this->requestDeletion($later);
         $this->travel(2)->days();
-        $this->artisan('mrn:accounts:process-deletions');
+        $this->runJobs();
         $this->assertSame(['scheduled'], AccountDeletionRequest::pluck('status')->all());
         $this->assertSame([1, 1], AuditLog::where('action', 'account.deletion_records_purged')->orderBy('id')->get()->map(fn ($a) => $a->new_data['records'])->all());
     }
@@ -672,5 +697,549 @@ class AccountDeletionTest extends TestCase
         $withdrawn = AuditLog::where(['action' => 'contribution.corroboration_withdrawn', 'subject_id' => $falls->id])->sole();
         $this->assertEquals(['status' => 'published', 'reason' => 'confirmations_removed_on_account_deletion', 'riders' => $threshold - 1, 'threshold' => $threshold], $withdrawn->new_data);
         $this->assertSame(1, AccountDeletionRequest::sole()->counts['corroborations_withdrawn']);
+    }
+
+    // ---------------------------------------------------------------- session 28: review follow-up (R8, R2, R1, R5, switches, R9)
+
+    public function test_r8_a_moderators_still_accurate_date_survives_the_deletion_of_a_rider_who_confirmed_later(): void
+    {
+        Notification::fake();
+        $report = $this->contribution($this->rider());
+        $moderator = $this->staff('moderator');
+        $leaving = $this->rider();
+
+        // 1. A moderator marks the report still accurate.
+        $this->as($moderator)->postJson("/api/v1/admin/contributions/{$report->id}/confirm")->assertOk();
+        $staffDate = today()->toDateString();
+        // 2. Two days later a rider confirms it (the shown date moves to theirs).
+        $this->travel(2)->days();
+        $this->as($leaving)->postJson("/api/v1/contributions/{$report->id}/confirmations")->assertOk();
+        $this->assertSame(today()->toDateString(), Contribution::find($report->id)->last_confirmed_on->toDateString());
+        // 3. That rider deletes their account. 4. The run removes their confirmation.
+        $this->requestDeletion($leaving);
+        $this->runDue();
+        $this->assertSame(0, DB::table('contribution_confirmations')->where('contribution_id', $report->id)->count());
+
+        // 5. The moderator's date is intact (not erased to null). 6. The status is unchanged.
+        $fresh = Contribution::find($report->id);
+        $this->assertSame($staffDate, $fresh->last_confirmed_on->toDateString());
+        $this->assertSame($staffDate, $fresh->staff_confirmed_on->toDateString());
+        $this->assertSame('published', $fresh->status->value);
+        $this->as(null)->getJson("/api/v1/contributions/{$report->id}")->assertOk()
+            ->assertJsonPath('data.last_confirmed_on', $staffDate)->assertJsonPath('data.status', 'published');
+        // Repeated processing changes nothing.
+        $this->runJobs();
+        $this->assertSame($staffDate, Contribution::find($report->id)->last_confirmed_on->toDateString());
+    }
+
+    public function test_r8_a_later_moderator_date_is_never_touched_and_rider_only_dates_still_recalculate(): void
+    {
+        Notification::fake();
+        $leaving = $this->rider();
+        $other = $this->rider();
+        $moderated = $this->contribution($this->rider());
+        $ridersOnly = $this->contribution($this->rider());
+        $this->as($leaving)->postJson("/api/v1/contributions/{$moderated->id}/confirmations")->assertOk();
+        DB::table('contribution_confirmations')->insert(['contribution_id' => $ridersOnly->id, 'user_id' => $other->id, 'confirmed_on' => now()->subDays(6)->toDateString(), 'created_at' => now()]);
+        $this->as($leaving)->postJson("/api/v1/contributions/{$ridersOnly->id}/confirmations")->assertOk();
+        $this->travel(3)->days();
+        $this->flushSession(); // days later: the rider's earlier sign-in has expired
+        $this->as($this->staff('moderator'))->postJson("/api/v1/admin/contributions/{$moderated->id}/confirm")->assertOk();
+        $staffDate = today()->toDateString();
+        $expectedRiders = now()->subDays(9)->toDateString(); // the other rider confirmed 6 days before the travel
+        $this->requestDeletion($leaving);
+        $this->runDue();
+
+        $this->assertSame($staffDate, Contribution::find($moderated->id)->last_confirmed_on->toDateString());
+        $this->assertSame($expectedRiders, Contribution::find($ridersOnly->id)->last_confirmed_on->toDateString());
+        $this->assertNull(Contribution::find($ridersOnly->id)->staff_confirmed_on);
+    }
+
+    public function test_r2_the_redaction_function_accepts_only_entries_of_the_account_whose_deletion_is_due(): void
+    {
+        Notification::fake();
+        $leaving = $this->rider();
+        $active = $this->rider();
+        $mine = $this->contribution($leaving, 'pending_review');
+        $theirs = $this->contribution($active, 'pending_review');
+        \App\Support\Audit::record('contribution.edited', $mine, ['body' => 'Leaving rider old text.'], ['body' => 'Leaving rider new text.']);
+        \App\Support\Audit::record('contribution.edited', $theirs, ['body' => 'Active rider old text.'], ['body' => 'Active rider new text.']);
+        $placeId = (string) Str::uuid();
+        DB::table('places')->insert(['id' => $placeId, 'slug' => 'r2-suggestion-'.Str::lower(Str::random(6)), 'name' => 'My uncle\'s tea shop', 'category' => 'rest_stop', 'latitude' => 28.2, 'longitude' => 83.9, 'status' => 'pending_review', 'submitted_by' => $leaving->id, 'created_at' => now(), 'updated_at' => now()]);
+        \App\Support\Audit::record('place.suggested', 'places', null, ['name' => 'My uncle\'s tea shop', 'status' => 'pending_review'], $placeId);
+        $entry = fn ($action, $subject) => AuditLog::where(['action' => $action, 'subject_id' => $subject])->value('id');
+        [$eMine, $eTheirs, $ePlace] = [$entry('contribution.edited', $mine->id), $entry('contribution.edited', $theirs->id), $entry('place.suggested', $placeId)];
+        $redact = fn ($e, $r) => DB::selectOne('select mrn_redact_audit_text(?, ?) as n', [$e, $r])->n;
+
+        $this->requestDeletion($leaving);
+        $req = AccountDeletionRequest::where('user_id', $leaving->id)->sole();
+        // Not due yet (by the database clock): refused.
+        $this->refusedByDatabase(fn () => $redact($eMine, $req->id), 'a request still in its cooling-off');
+        $req = $this->dueByDatabaseClock($leaving);
+
+        // Due: the leaving rider's own entries, including the first version of a place suggestion.
+        $this->assertSame(2, $redact($eMine, $req->id));
+        $this->assertSame(1, $redact($ePlace, $req->id));
+        $this->assertSame('[redacted]', AuditLog::find($ePlace)->new_data['name']);
+        // Idempotent: no second change and no second record.
+        $this->assertSame(0, $redact($eMine, $req->id));
+        $this->assertSame(1, AuditLog::where(['action' => 'audit.redacted', 'subject_id' => (string) $eMine])->count());
+
+        // Wrong account, active account, unrelated or mismatched records, unsupported types: refused.
+        $this->refusedByDatabase(fn () => $redact($eTheirs, $req->id), 'another (active) rider\'s contribution under this request');
+        $this->refusedByDatabase(fn () => $redact($eTheirs, (string) Str::uuid()), 'an unknown request');
+        $this->refusedByDatabase(fn () => $redact(-1, $req->id), 'an unknown entry');
+        $this->refusedByDatabase(fn () => $redact(AuditLog::where('action', 'account.deletion_requested')->value('id'), $req->id), 'an unsupported entry type');
+        \App\Support\Audit::record('contribution.edited', 'places', ['body' => 'x'], ['body' => 'y'], $placeId); // right id, wrong subject type
+        $this->refusedByDatabase(fn () => $redact($entry('contribution.edited', $placeId), $req->id), 'a mismatched subject type');
+        $this->requestDeletion($active);
+        $activeReq = AccountDeletionRequest::where('user_id', $active->id)->sole();
+        $this->refusedByDatabase(fn () => $redact($eTheirs, $activeReq->id), 'an account still in its cooling-off');
+        // A request whose dates were moved without a full cooling-off, or whose account is not marked: refused.
+        DB::update("update account_deletion_requests set run_after = now() - interval '1 minute' where id = ?", [$activeReq->id]);
+        $this->refusedByDatabase(fn () => $redact($eTheirs, $activeReq->id), 'a request shortened below 30 days');
+        DB::update("update account_deletion_requests set requested_at = now() - interval '31 days' where id = ?", [$activeReq->id]);
+        $active->forceFill(['deletion_scheduled_for' => null])->save();
+        $this->refusedByDatabase(fn () => $redact($eTheirs, $activeReq->id), 'an account that is not marked for deletion');
+        $this->assertStringContainsString('Active rider new text.', json_encode(AuditLog::find($eTheirs)->new_data));
+    }
+
+    public function test_r1_and_r2_the_application_role_cannot_fabricate_redactions_or_due_requests(): void
+    {
+        // The real application role, on its own connection and in its own transaction (rolled back below).
+        $app = DB::connection('pgsql');
+        $this->assertSame('mrn_app', $app->selectOne('select current_user as u')->u);
+        $refused = function (callable $f, string $label) use ($app) {
+            try {
+                $app->transaction(fn () => $f());
+                $this->fail("{$label} was allowed for the application role");
+            } catch (QueryException $e) {
+                $this->assertSame('42501', $e->getCode(), $label.': '.$e->getMessage());
+            }
+        };
+        $app->beginTransaction();
+        try {
+            $insert = fn (array $row) => $app->table('audit_logs')->insert($row + ['subject_type' => 'audit_logs', 'subject_id' => '1', 'created_at' => now()]);
+            $refused(fn () => $insert(['action' => 'audit.redacted', 'actor_type' => 'user', 'new_data' => json_encode(['reason' => 'account_deletion'])]), 'a fabricated redaction record');
+            $refused(fn () => $insert(['action' => 'anything.else', 'actor_type' => 'system']), 'a fabricated system entry');
+            $refused(fn () => $app->update('update audit_logs set action = ? where id = (select min(id) from audit_logs)', ['tampered']), 'a direct update');
+            $refused(fn () => $app->delete('delete from audit_logs where id = (select min(id) from audit_logs)'), 'a direct delete');
+            $insert(['action' => 'probe.normal_entry', 'actor_type' => 'user']); // ordinary audit writes still work
+            $this->assertSame(1, $app->table('audit_logs')->where('action', 'probe.normal_entry')->count());
+
+            // A request inserted with dates in the past gets the database clock and a full cooling-off instead.
+            $uid = (string) Str::uuid();
+            $app->table('users')->insert(['id' => $uid, 'display_name' => 'Probe', 'email' => "probe-{$uid}@example.test", 'password' => 'x', 'deletion_scheduled_for' => '2020-01-01', 'created_at' => now(), 'updated_at' => now()]);
+            $rid = (string) Str::uuid();
+            $app->table('account_deletion_requests')->insert(['id' => $rid, 'user_id' => $uid, 'status' => 'scheduled', 'requested_at' => '2020-01-01', 'run_after' => '2020-01-31', 'choices' => '{}', 'created_at' => now(), 'updated_at' => now()]);
+            // (the columns hold whole seconds, so allow the rounding)
+            $r = $app->selectOne('select requested_at > now() - interval \'1 minute\' as fresh, run_after >= now() + interval \'30 days\' - interval \'1 second\' as cooled from account_deletion_requests where id = ?', [$rid]);
+            $this->assertTrue($r->fresh && $r->cooled, 'the trigger fixes the dates');
+            $refused(fn () => $app->update("update account_deletion_requests set run_after = now() - interval '1 day' where id = ?", [$rid]), 'moving the deletion date');
+            $refused(fn () => $app->update("update account_deletion_requests set requested_at = '2020-01-01' where id = ?", [$rid]), 'moving the request date');
+            $refused(fn () => $app->update('update account_deletion_requests set user_id = ? where id = ?', [(string) Str::uuid(), $rid]), 'changing the account');
+            $refused(fn () => $app->table('account_deletion_requests')->insert(['id' => (string) Str::uuid(), 'user_id' => $uid, 'status' => 'done', 'requested_at' => now(), 'run_after' => now(), 'choices' => '{}', 'created_at' => now(), 'updated_at' => now()]), 'inserting a finished request');
+            $app->update("update account_deletion_requests set status = 'cancelled' where id = ?", [$rid]); // a legitimate move
+            $refused(fn () => $app->update("update account_deletion_requests set status = 'scheduled' where id = ?", [$rid]), 'reviving a cancelled request');
+            // So the function has no due request to accept.
+            try {
+                $app->transaction(fn () => $app->select('select mrn_redact_audit_text(?, ?)', [1, $rid]));
+                $this->fail('redaction under a fabricated request was allowed');
+            } catch (QueryException $e) {
+                $this->assertStringContainsString('is not due for final deletion', $e->getMessage());
+            }
+        } finally {
+            $app->rollBack();
+        }
+    }
+
+    public function test_r5_a_failing_run_logs_no_sensitive_detail_and_stays_retryable(): void
+    {
+        Notification::fake();
+        $logged = [];
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Log\Events\MessageLogged::class, function ($e) use (&$logged) {
+            $logged[] = $e->level.' '.$e->message.' '.json_encode($e->context);
+        });
+        $rider = $this->rider(['email' => 'secret-rider@example.test']);
+        $c = $this->contribution($rider);
+        $this->requestDeletion($rider, [$c->id => 'delete']);
+        Contribution::deleting(function () {
+            throw new \RuntimeException('SQL: delete from contributions where email = secret-rider@example.test; body "My very private text"');
+        });
+        $this->travel(30)->days();
+        $this->artisan('mrn:accounts:process-deletions')->assertFailed();
+        // And a failure outside the per-request handler (the evidence step), with an equally sensitive message.
+        ModerationEvidence::forceCreate(['contribution_id' => (string) Str::uuid(), 'reason' => 'open_case_on_author_deletion', 'snapshot' => [], 'files' => [],
+            'created_at' => now()->subDays(40), 'held_until' => now()->subDays(10)]);
+        ModerationEvidence::updating(function () {
+            throw new \RuntimeException('secret-rider@example.test My very private text');
+        });
+        $this->artisan('mrn:accounts:expire-evidence')->assertFailed();
+
+        $all = implode("\n", $logged);
+        $this->assertStringNotContainsString('secret-rider@example.test', $all);
+        $this->assertStringNotContainsString('My very private text', $all);
+        $this->assertStringNotContainsString('delete from contributions', $all);
+        $req = AccountDeletionRequest::sole();
+        $this->assertStringContainsString($req->id, $all, 'staff can still tell which request failed');
+        $this->assertStringContainsString('RuntimeException', $all);
+        $this->assertStringContainsString('expire-evidence', $all);
+        $this->assertSame(['scheduled', 1], [$req->status, $req->attempts]);
+
+        Contribution::flushEventListeners();
+        ModerationEvidence::flushEventListeners();
+        $this->artisan('mrn:accounts:process-deletions')->assertSuccessful();
+        $this->assertSame('done', $req->refresh()->status);
+    }
+
+    public function test_the_two_job_switches_default_off_and_work_independently(): void
+    {
+        Notification::fake();
+        $defaults = (require base_path('config/mrn.php'))['account_deletion'];
+        $this->assertSame(['processing_enabled' => false, 'records_purge_enabled' => false], $defaults, 'both off unless the environment enables them');
+        $rider = $this->rider();
+        $this->requestDeletion($rider);
+        $old = AccountDeletionRequest::forceCreate(['user_id' => (string) Str::uuid(), 'status' => 'done', 'requested_at' => now()->subYears(2), 'run_after' => now()->subYears(2)->addDays(30), 'completed_at' => now()->subYears(2)->addDays(30), 'choices' => (object) [], 'counts' => []]);
+        $this->travel(31)->days();
+        $state = fn () => [User::whereKey($rider->id)->exists(), AccountDeletionRequest::whereKey($old->id)->exists()];
+
+        config(['mrn.account_deletion.processing_enabled' => false, 'mrn.account_deletion.records_purge_enabled' => false]);
+        $this->artisan('mrn:accounts:process-deletions')->expectsOutputToContain('switched off')->assertSuccessful();
+        $this->artisan('mrn:accounts:purge-deletion-records')->expectsOutputToContain('switched off')->assertSuccessful();
+        $this->assertSame([true, true], $state(), 'both off: nothing changes');
+
+        config(['mrn.account_deletion.records_purge_enabled' => true]);
+        $this->artisan('mrn:accounts:process-deletions')->assertSuccessful();
+        $this->artisan('mrn:accounts:purge-deletion-records')->assertSuccessful();
+        $this->assertSame([true, false], $state(), 'purging on does not process deletions');
+
+        $old2 = AccountDeletionRequest::forceCreate(['user_id' => (string) Str::uuid(), 'status' => 'cancelled', 'requested_at' => now()->subYears(2), 'run_after' => now()->subYears(2)->addDays(30), 'cancelled_at' => now()->subYears(2), 'choices' => (object) []]);
+        config(['mrn.account_deletion.processing_enabled' => true, 'mrn.account_deletion.records_purge_enabled' => false]);
+        $this->artisan('mrn:accounts:process-deletions')->assertSuccessful();
+        $this->artisan('mrn:accounts:purge-deletion-records')->assertSuccessful();
+        $this->assertFalse(User::whereKey($rider->id)->exists(), 'processing on runs the deletion');
+        $this->assertTrue(AccountDeletionRequest::whereKey($old2->id)->exists(), 'processing on does not purge records');
+    }
+
+    public function test_r9_the_recount_uses_every_remaining_confirmation_without_the_window_or_a_standing_check(): void
+    {
+        Notification::fake();
+        $leaving = $this->rider();
+        $threshold = (int) \App\Support\Settings::get('trust.corroboration_threshold');
+        $window = (int) \App\Support\Settings::get('trust.corroboration_window_days');
+        $others = collect(range(1, $threshold))->map(fn () => $this->rider());
+        $others->first()->forceFill(['suspended_until' => now()->addDays(60)])->save(); // standing is not re-checked
+        $report = $this->contribution($this->rider(), 'community_corroborated');
+        foreach ([$leaving, ...$others] as $r) {
+            DB::table('contribution_confirmations')->insert(['contribution_id' => $report->id, 'user_id' => $r->id,
+                'confirmed_on' => now()->subDays($window + 100)->toDateString(), 'created_at' => now()]); // all outside the window
+        }
+        \App\Support\Audit::record('contribution.community_corroborated', $report, ['status' => 'published'], ['status' => 'community_corroborated', 'reason' => 'threshold', 'riders' => $threshold + 1, 'threshold' => $threshold]);
+        $this->requestDeletion($leaving);
+        $this->runDue();
+
+        $this->assertSame('community_corroborated', Contribution::find($report->id)->status->value, "{$threshold} remaining confirmations still meet the threshold");
+        $this->assertSame(0, AccountDeletionRequest::sole()->counts['corroborations_withdrawn']);
+    }
+
+    // ---------------------------------------------------------------- session 29: request ownership and the evidence job
+
+    public function test_s29_a_deletion_can_only_be_requested_for_the_signed_in_riders_own_account(): void
+    {
+        Notification::fake();
+        $a = $this->rider();
+        $b = $this->rider();
+        DB::table('sessions')->insert(['id' => 'b-device', 'user_id' => $b->id, 'payload' => '', 'last_activity' => time()]);
+        $url = '/api/v1/users/me/deletion';
+
+        // Guest: refused, nothing written.
+        $this->as(null)->postJson($url, ['password' => self::PW, 'confirm' => true, 'choices' => (object) [], 'user_id' => $b->id])->assertUnauthorized();
+        // A staff session never reaches rider routes.
+        $this->as($this->staff('admin'))->postJson($url, ['password' => self::STAFF_PASSWORD, 'confirm' => true, 'choices' => (object) [], 'user_id' => $b->id])->assertUnauthorized();
+        // B's password through A's session is simply A's wrong password.
+        $this->as($a)->postJson($url, ['password' => 'not-a-password', 'confirm' => true, 'choices' => (object) [], 'user_id' => $b->id])->assertStatus(422);
+        $this->assertSame(0, AccountDeletionRequest::count());
+
+        // A tampered body naming B schedules A only.
+        $this->as($a)->postJson($url, ['password' => self::PW, 'confirm' => true, 'choices' => (object) [], 'user_id' => $b->id, 'email' => $b->email])->assertCreated();
+        $this->assertSame([$a->id], AccountDeletionRequest::pluck('user_id')->all());
+        $this->assertNull($b->refresh()->deletion_scheduled_for);
+        $this->assertDatabaseHas('sessions', ['id' => 'b-device']); // B's devices stay signed in
+        Notification::assertSentTo($a, AccountDeletionMail::class);
+        Notification::assertNotSentTo($b, AccountDeletionMail::class);
+        $audit = AuditLog::where('action', 'account.deletion_requested')->sole();
+        $this->assertSame([$a->id, 'user', AccountDeletionRequest::sole()->id], [$audit->actor_id, $audit->actor_type, $audit->subject_id]);
+
+        // B schedules their own; A cannot cancel it (A's cancel acts on A's request only).
+        $this->requestDeletion($b);
+        $this->as($a)->deleteJson($url, ['password' => self::PW, 'user_id' => $b->id])->assertOk();
+        $this->assertSame('cancelled', AccountDeletionRequest::where('user_id', $a->id)->sole()->status);
+        $this->assertSame('scheduled', AccountDeletionRequest::where('user_id', $b->id)->sole()->status);
+        $this->assertNotNull($b->refresh()->deletion_scheduled_for);
+        $this->as($a)->deleteJson($url, ['password' => self::PW, 'user_id' => $b->id])->assertStatus(422); // nothing of A's left to cancel
+        $this->assertSame('scheduled', AccountDeletionRequest::where('user_id', $b->id)->sole()->status);
+    }
+
+    public function test_s29_a_request_fabricated_by_the_application_role_does_not_touch_the_targets_account(): void
+    {
+        $app = DB::connection('pgsql'); // the real application role
+        $app->beginTransaction();
+        try {
+            $uid = (string) Str::uuid();
+            $app->table('users')->insert(['id' => $uid, 'display_name' => 'Target', 'email' => "target-{$uid}@example.test", 'password' => 'x', 'created_at' => now(), 'updated_at' => now()]);
+            $before = (array) $app->table('users')->where('id', $uid)->first();
+            $app->table('account_deletion_requests')->insert(['id' => (string) Str::uuid(), 'user_id' => $uid, 'status' => 'scheduled', 'requested_at' => '2020-01-01', 'run_after' => '2020-01-31', 'choices' => '{}', 'created_at' => now(), 'updated_at' => now()]);
+            $this->assertEquals($before, (array) $app->table('users')->where('id', $uid)->first(), 'the account row is untouched');
+            $r = $app->table('account_deletion_requests')->where('user_id', $uid)->first();
+            $this->assertTrue($app->selectOne('select ?::timestamp >= now() + interval \'30 days\' - interval \'1 second\' as ok', [$r->run_after])->ok, 'not usable for 30 days');
+        } finally {
+            $app->rollBack();
+        }
+    }
+
+    /** An evidence row for a deleted rider's flagged report with one photo; returns [evidence, photo path]. */
+    private function heldEvidence(string $choice = 'delete'): array
+    {
+        $leaving = $this->rider();
+        $c = $this->contribution($leaving, $choice === 'delete' ? 'flagged' : 'published', 1);
+        if ($choice !== 'delete') {
+            ContributionReport::create(['contribution_id' => $c->id, 'reporter_id' => $this->rider()->id, 'reason' => 'Please check this report again.', 'category' => 'other']);
+        }
+        $path = $c->media->first()->path;
+        $this->requestDeletion($leaving, $choice === 'delete' ? [] : [$c->id => $choice]);
+        $this->runDue();
+
+        return [ModerationEvidence::where('contribution_id', $c->id)->sole(), $path, $c];
+    }
+
+    public function test_s29_evidence_is_kept_until_its_expiry_then_removed_once(): void
+    {
+        Notification::fake();
+        [$e, $path] = $this->heldEvidence();
+        $this->assertTrue($e->held_until->equalTo(now()->addDays(30)), 'held exactly 30 days from the deletion');
+
+        $this->travel(29)->days();
+        $this->artisan('mrn:accounts:expire-evidence')->assertSuccessful();
+        $this->assertNotNull($e->refresh()->snapshot);
+        Storage::disk('local')->assertExists($path);
+        // Earlier removal only through the release endpoint, with the permission.
+        $this->as($this->staff('moderator'))->postJson("/api/v1/admin/moderation-evidence/{$e->id}/release")->assertForbidden();
+        $this->assertNull($e->refresh()->disposed_at);
+
+        $this->travel(1)->days(); // exactly held_until
+        $this->artisan('mrn:accounts:expire-evidence')->assertSuccessful();
+        $e->refresh();
+        $this->assertSame(['expired', null, null], [$e->disposition, $e->snapshot, $e->files]);
+        Storage::disk('local')->assertMissing($path);
+        // Repeated runs are safe: nothing changes and nothing is recorded twice.
+        $this->artisan('mrn:accounts:expire-evidence')->assertSuccessful();
+        $this->artisan('mrn:accounts:expire-evidence')->assertSuccessful();
+        $this->assertSame(1, AuditLog::where(['action' => 'moderation.evidence_expired', 'subject_id' => $e->id])->count());
+        $this->assertSame('expired', $e->refresh()->disposition);
+    }
+
+    public function test_s29_a_photo_still_shown_by_an_anonymised_contribution_is_never_removed_with_the_evidence(): void
+    {
+        Notification::fake();
+        [$e, $path, $c] = $this->heldEvidence('anonymise');
+        $this->assertDatabaseHas('contributions', ['id' => $c->id, 'author_id' => null]);
+        $this->travel(31)->days();
+        $this->artisan('mrn:accounts:expire-evidence')->assertSuccessful();
+
+        $this->assertSame('expired', $e->refresh()->disposition);
+        Storage::disk('local')->assertExists($path);
+        $this->assertDatabaseHas('contribution_media', ['contribution_id' => $c->id, 'path' => $path]);
+        $this->assertSame(0, DB::table('pending_file_deletions')->count());
+    }
+
+    public function test_s29_a_failed_removal_at_expiry_stays_queued_and_the_next_run_completes_it_without_logging_content(): void
+    {
+        Notification::fake();
+        $logged = [];
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Log\Events\MessageLogged::class, function ($e) use (&$logged) {
+            $logged[] = $e->message.' '.json_encode($e->context);
+        });
+        [$e, $path] = $this->heldEvidence();
+        $real = Storage::disk('local');
+        $broken = \Mockery::mock($real)->makePartial();
+        $broken->shouldReceive('delete')->andReturn(false);
+        Storage::set('local', $broken);
+        $this->travel(31)->days();
+        $this->artisan('mrn:accounts:expire-evidence')->assertFailed();
+
+        $this->assertSame('expired', $e->refresh()->disposition); // the database step is done
+        $this->assertDatabaseHas('pending_file_deletions', ['path' => $path, 'attempts' => 1]);
+        $this->assertTrue($real->exists($path));
+
+        Storage::set('local', $real);
+        $this->artisan('mrn:accounts:expire-evidence')->assertSuccessful();
+        $this->assertFalse($real->exists($path));
+        $this->assertSame(0, DB::table('pending_file_deletions')->count());
+        $all = implode("\n", $logged);
+        foreach (['Loose stones above the river bend', 'Stones on the inner lane', 'Stones on the road'] as $text) {
+            $this->assertStringNotContainsString($text, $all);
+        }
+    }
+
+    // ---------------------------------------------------------------- session 31: Option B (least privilege for deletion)
+
+    private function appRefused($app, callable $f, string $label): void
+    {
+        try {
+            $app->transaction(fn () => $f());
+            $this->fail("{$label} was allowed for the application role");
+        } catch (QueryException $e) {
+            $this->assertSame('42501', $e->getCode(), $label.': '.$e->getMessage());
+        }
+    }
+
+    public function test_s31_the_application_role_cannot_delete_riders_records_or_evidence_or_write_migrations(): void
+    {
+        $app = DB::connection('pgsql');
+        $this->assertSame('mrn_app', $app->selectOne('select current_user as u')->u);
+        $app->beginTransaction();
+        try {
+            $this->appRefused($app, fn () => $app->delete('delete from users where id = ?', [(string) Str::uuid()]), 'DELETE on users');
+            $this->appRefused($app, fn () => $app->statement('truncate users cascade'), 'TRUNCATE users');
+            $this->appRefused($app, fn () => $app->delete('delete from account_deletion_requests where id = ?', [(string) Str::uuid()]), 'DELETE on account_deletion_requests');
+            $this->appRefused($app, fn () => $app->delete('delete from moderation_evidence where id = ?', [(string) Str::uuid()]), 'DELETE on moderation_evidence');
+            $this->appRefused($app, fn () => $app->insert("insert into migrations (migration, batch) values ('2099_01_01_000000_skip_me', 999)"), 'INSERT on migrations');
+            $this->appRefused($app, fn () => $app->update('update migrations set batch = batch where id = (select min(id) from migrations)'), 'UPDATE on migrations');
+            $this->appRefused($app, fn () => $app->delete('delete from migrations where id = (select max(id) from migrations)'), 'DELETE on migrations');
+            $this->assertGreaterThan(0, $app->table('migrations')->count(), 'reading the migrations table still works');
+            // What the app legitimately does is unchanged: creating and updating these rows.
+            $uid = (string) Str::uuid();
+            $app->table('users')->insert(['id' => $uid, 'display_name' => 'Still works', 'email' => "ok-{$uid}@example.test", 'password' => 'x', 'created_at' => now(), 'updated_at' => now()]);
+            $app->table('users')->where('id', $uid)->update(['display_name' => 'Still updates']);
+            $this->assertSame('Still updates', $app->table('users')->where('id', $uid)->value('display_name'));
+        } finally {
+            $app->rollBack();
+        }
+    }
+
+    public function test_s31_the_deletion_and_purge_functions_accept_only_valid_due_work_from_the_application_role(): void
+    {
+        // Fixtures must be visible to the application role's own connection, so they are COMMITTED through a second
+        // owner connection (outside this test's transaction) and removed again in `finally`.
+        config(['database.connections.s31_owner' => config('database.connections.pgsql_owner')]);
+        $owner = DB::connection('s31_owner');
+        $app = DB::connection('pgsql');
+        $users = $requests = [];
+        $user = function (bool $marked) use ($owner, &$users) {
+            $id = (string) Str::uuid();
+            $owner->table('users')->insert(['id' => $id, 'display_name' => 'S31 fixture', 'email' => "s31-{$id}@example.test", 'password' => 'x',
+                'deletion_scheduled_for' => $marked ? $owner->selectOne('select localtimestamp as t')->t : null, 'created_at' => now(), 'updated_at' => now()]);
+
+            return $users[] = $id;
+        };
+        $request = function (string $uid, string $status, string $requested, string $runAfter, ?string $finished = null) use ($owner, &$requests) {
+            $id = (string) Str::uuid();
+            $owner->insert("insert into account_deletion_requests (id, user_id, status, requested_at, run_after, cancelled_at, completed_at, choices, attempts, created_at, updated_at)
+                values (?, ?, ?, localtimestamp + ?::interval, localtimestamp + ?::interval, case when ? = 'cancelled' then localtimestamp + ?::interval end, case when ? = 'done' then localtimestamp + ?::interval end, '{}', 0, now(), now())",
+                [$id, $uid, $status, $requested, $runAfter, $status, $finished ?? '0 days', $status, $finished ?? '0 days']);
+
+            return $requests[] = $id;
+        };
+        $call = fn (string $sql, array $b) => $app->selectOne($sql, $b)->n;
+        try {
+            $due = $user(true);
+            $other = $user(true);
+            $unmarked = $user(false);
+            $rDue = $request($due, 'scheduled', '-31 days', '-1 minute');
+            $rEarly = $request($other, 'scheduled', '-1 day', '+29 days');
+            $rShort = $request($other === $due ? $due : $user(true), 'scheduled', '-10 days', '-1 minute'); // due but under 30 days
+            $rCancelled = $request($user(true), 'cancelled', '-40 days', '-10 days', '-35 days');
+            $rUnmarked = $request($unmarked, 'scheduled', '-31 days', '-1 minute');
+            $del = 'select mrn_delete_account(?, ?, ?) as n';
+
+            // Refused: missing, mismatched, premature (also with a forged clock), short, not scheduled, not marked.
+            $this->appRefused($app, fn () => $call($del, [(string) Str::uuid(), $due, null]), 'a missing request');
+            $this->appRefused($app, fn () => $call($del, [$rDue, $other, null]), 'a request for another account');
+            $this->appRefused($app, fn () => $call($del, [$rEarly, $other, null]), 'a premature request');
+            $this->appRefused($app, fn () => $call($del, [$rEarly, $other, '2099-01-01 00:00:00']), 'a premature request with a forged clock');
+            $this->appRefused($app, fn () => $call($del, [$rShort, $owner->table('account_deletion_requests')->where('id', $rShort)->value('user_id'), null]), 'a request under 30 days');
+            $this->appRefused($app, fn () => $call($del, [$rCancelled, $owner->table('account_deletion_requests')->where('id', $rCancelled)->value('user_id'), null]), 'a cancelled request');
+            $this->appRefused($app, fn () => $call($del, [$rUnmarked, $unmarked, null]), 'an account not marked for deletion');
+            $this->assertSame(count($users), $owner->table('users')->whereIn('id', $users)->count(), 'nothing was deleted by the refused calls');
+
+            // A valid due deletion succeeds as the application role, and records itself.
+            $this->assertSame(1, $call($del, [$rDue, $due, null]));
+            $this->assertFalse($owner->table('users')->where('id', $due)->exists());
+            $this->assertTrue($owner->table('users')->where('id', $other)->exists());
+            $this->assertSame(1, $owner->table('audit_logs')->where(['action' => 'account.removed', 'actor_type' => 'system', 'subject_id' => $rDue])->count());
+            // Repeating it is refused and changes nothing.
+            $this->appRefused($app, fn () => $call($del, [$rDue, $due, null]), 'a repeated deletion');
+            $this->assertSame(1, $owner->table('audit_logs')->where(['action' => 'account.removed', 'subject_id' => $rDue])->count());
+
+            // The one-year purge: only records whose completion or cancellation is a year old by the database clock.
+            $keep = $user(false);
+            $old1 = $request($keep, 'done', '-2 years', '-2 years', '-1 year -1 minute');
+            $young = $request($keep, 'done', '-2 years', '-2 years', '-1 year +1 minute');
+            $old2 = $request($keep, 'cancelled', '-3 years', '-3 years', '-2 years');
+            $ancient = $request($keep, 'scheduled', '-3 years', '+1 day');
+            $purge = 'select mrn_purge_deletion_records(?) as n';
+            $before = $owner->table('account_deletion_requests')->whereNotIn('id', $requests)->count();
+            // The app passes a forged past clock (which would purge nothing): ignored, the database clock purges the two old ones.
+            $this->assertSame(2, $call($purge, ['1990-01-01 00:00:00']));
+            $this->assertSame(1, $owner->table('audit_logs')->where(['action' => 'account.deletion_records_purged', 'actor_type' => 'system'])
+                ->where('created_at', '>=', now()->subHour())->whereRaw("new_data->>'records' = '2'")->count());
+            $remaining = $owner->table('account_deletion_requests')->whereIn('id', [$old1, $old2, $young, $ancient])->pluck('id')->all();
+            $this->assertEqualsCanonicalizing([$young, $ancient], $remaining, 'the database clock decided, not the forged one');
+            $this->assertSame(0, $call($purge, ['2099-01-01 00:00:00']), 'a forged future clock cannot purge younger records');
+            $this->assertSame(0, $call($purge, [null]), 'repeating is safe');
+            $this->assertEqualsCanonicalizing([$young, $ancient], $owner->table('account_deletion_requests')->whereIn('id', [$old1, $old2, $young, $ancient])->pluck('id')->all());
+            $this->assertSame($before, $owner->table('account_deletion_requests')->whereNotIn('id', $requests)->count(), 'no other record was touched');
+        } finally {
+            $owner->table('account_deletion_requests')->whereIn('id', $requests)->delete();
+            $owner->table('users')->whereIn('id', $users)->delete();
+            $owner->table('audit_logs')->where('actor_type', 'system')->whereIn('action', ['account.removed', 'account.deletion_records_purged'])
+                ->where('created_at', '>=', now()->subHour())->delete(); // fixtures only: keep the other tests' audit counts exact
+            DB::purge('s31_owner');
+        }
+    }
+
+    public function test_s31_the_security_check_passes_as_the_application_role_and_prints_no_secret(): void
+    {
+        $exit = \Illuminate\Support\Facades\Artisan::call('mrn:security:check-database');
+        $out = \Illuminate\Support\Facades\Artisan::output();
+        $this->assertSame(0, $exit, $out);
+        $this->assertStringNotContainsString('FAIL', $out);
+        $this->assertSame(13, substr_count($out, 'PASS '));
+        foreach (['pgsql', 'pgsql_owner'] as $conn) {
+            $secret = (string) config("database.connections.{$conn}.password");
+            if ($secret !== '') {
+                $this->assertStringNotContainsString($secret, $out);
+            }
+        }
+    }
+
+    public function test_s31_a_production_web_request_drops_owner_credentials_and_alerts_once_without_the_secret(): void
+    {
+        $secret = (string) config('database.connections.pgsql_owner.password');
+        $this->assertNotSame('', $secret, 'tests run with owner credentials, as development does');
+        $logged = [];
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Log\Events\MessageLogged::class, function ($e) use (&$logged) {
+            $logged[] = $e->level.' '.$e->message.' '.json_encode($e->context);
+        });
+        \App\Support\DatabaseSecurity::guardRuntime(webRequest: true); // not production: nothing happens
+        $this->assertSame($secret, config('database.connections.pgsql_owner.password'));
+
+        $this->app['env'] = 'production';
+        try {
+            \App\Support\DatabaseSecurity::guardRuntime(webRequest: false); // console (release step): kept
+            $this->assertSame($secret, config('database.connections.pgsql_owner.password'));
+            \App\Support\DatabaseSecurity::guardRuntime(webRequest: true);
+            $this->assertNull(config('database.connections.pgsql_owner.password'));
+            $this->assertNull(config('database.connections.pgsql_owner.username'));
+            config(['database.connections.pgsql_owner.password' => $secret]);
+            \App\Support\DatabaseSecurity::guardRuntime(webRequest: true); // a second request in the hour: no second alert
+        } finally {
+            $this->app['env'] = 'testing';
+            config(['database.connections.pgsql_owner.password' => $secret]);
+        }
+        $critical = array_values(array_filter($logged, fn ($l) => str_starts_with($l, 'critical ')));
+        $this->assertCount(1, $critical);
+        $this->assertStringContainsString('Owner database credentials are set in the production web runtime', $critical[0]);
+        $this->assertStringNotContainsString($secret, implode("\n", $logged));
     }
 }
