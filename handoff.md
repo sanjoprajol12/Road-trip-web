@@ -72,3 +72,16 @@ All actually run on 2026-11-27:
 - TD-23: `backend/scripts/dev-infra.sh` instead of Docker Compose.
 - TD-01 (owner direction): three separate projects connected only through the API; no root `package.json`, no cross-project paths.
 - Health endpoints are also mounted under `/api/v1/health`, so the frontends can reach them through their `/api` proxy.
+
+## Repositories (2026-11-27, owner direction)
+Three separate git repositories, connected only through the HTTP API, checked out side by side in `/var/www/html/Road-trip-node/`:
+
+| Folder | Remote | `develop` | Notes |
+|---|---|---|---|
+| `backend/` | git@github.com:sanjoprajol12/Road-trip-web.git | 44f3495 | also holds docs, handoff, reports, CLAUDE.md |
+| `frontend/` | git@github.com:sanjoprajol12/Road-trip-front.git | d461b93 | new repository |
+| `admin/` | git@github.com:sanjoprajol12/Road-trip-admin.git | 8a8c7f5 | |
+
+- `develop` in Road-trip-web and Road-trip-admin was **replaced** (owner choice). Before that, the old heads were pushed to `laravel-develop-2026-11-27` (web c84ae88, admin 4fcd155), and `push --force-with-lease` was pinned to those commits. `main` is untouched in both (web 8f2638b, admin f4a5bf0). The local clones in `/var/www/html/Road-trip` are unchanged; the old admin clone still has 2 uncommitted changes that exist only there.
+- Each repository's CI is `.github/workflows/ci.yml`. The web apps' CI checks out Road-trip-web to start an API for browser tests. **If Road-trip-web is private**, add a `BACKEND_REPO_TOKEN` secret (fine-grained, read-only contents) to Road-trip-front and Road-trip-admin. CI has not been observed running yet (no `gh` CLI here).
+- The root folder is no longer a repository; it only has a pointer `CLAUDE.md`.
