@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 1: Discovery and Planning</title>
+<style>
+  :root { --paper:#ffffff; --surface:#f5f6f7; --line:#e1e4e8; --ink:#16181b; --muted:#575c63; --crimson:#a3202e; --warning:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.55 system-ui, sans-serif; }
+  main { max-width:56rem; margin:0 auto; padding:32px 16px 64px; }
+  h1 { font-size:2rem; line-height:1.15; margin:0 0 4px; }
+  h2 { font-size:1.25rem; margin:40px 0 12px; padding-top:16px; border-top:1px solid var(--line); }
+  .meta { color:var(--muted); margin:0 0 24px; }
+  table { width:100%; border-collapse:collapse; background:var(--surface); font-size:.9375rem; }
+  th, td { text-align:left; vertical-align:top; padding:8px 12px; border-bottom:1px solid var(--line); }
+  th { font-size:.75rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+  code { font-size:.875em; }
+  .note { border-left:3px solid var(--warning); padding:8px 12px; background:var(--surface); }
+  ul { padding-left:20px; }
+  @media (max-width: 640px) { table, thead, tbody, tr, th, td { display:block; } thead { display:none; } td { border:0; padding:4px 12px; } tr { border-bottom:1px solid var(--line); padding:8px 0; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Session 1: Discovery and Planning</h1>
+  <p class="meta">My Ride Nepal (Node rebuild) · <time datetime="2026-11-27">27 November 2026</time> · Phases 1–2 · no code written</p>
+
+  <h2>Objective</h2>
+  <p>Inspect the new project directory, find and read the requirements, and propose the architecture, database, authentication and authorization, API, frontend, design system, risks and roadmap. Stop before Phase 3 for owner approval.</p>
+
+  <h2>What was found</h2>
+  <ul>
+    <li><code>/var/www/html/Road-trip-node</code> was empty: no documents, no code, not a git repository.</li>
+    <li>The sibling <code>/var/www/html/Road-trip</code> holds the existing Laravel/Vue My Ride Nepal, with 45 documents and 261 tracked requirements. It describes a <strong>motorcycle travel platform</strong> that explicitly excludes bookings and payments.</li>
+    <li>The rebuild brief's suggested modules (bookings, payments, vehicles, reviews) conflict with that scope.</li>
+  </ul>
+
+  <h2>Owner decisions</h2>
+  <table>
+    <thead><tr><th>Question</th><th>Decision</th></tr></thead>
+    <tbody>
+      <tr><td>Which product is this?</td><td>A Node rebuild of the existing motorcycle travel product. The old docs are the requirements source (read only).</td></tr>
+      <tr><td>Do the old project's owner decisions carry over?</td><td>No, fresh start. They are listed as questions Q-01 to Q-28 with the earlier answer and a recommendation.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Work completed</h2>
+  <table>
+    <thead><tr><th>File</th><th>Content</th></tr></thead>
+    <tbody>
+      <tr><td><code>docs/architecture/REQUIREMENTS_INVENTORY.md</code></td><td>About 250 requirements by area, with roles, dependencies, stage, and Impl/Test columns (the traceability matrix); the brief's modules mapped to the product</td></tr>
+      <tr><td><code>docs/architecture/RISKS_AND_OPEN_QUESTIONS.md</code></td><td>28 questions (4 needed before Phase 3), 14 risks, lessons from the old project</td></tr>
+      <tr><td><code>docs/architecture/SYSTEM_ARCHITECTURE.md</code></td><td>Context, boundaries, the three apps, backend module layout, frontend structure, environments, deployment shape</td></tr>
+      <tr><td><code>docs/architecture/TECHNICAL_DECISIONS.md</code></td><td>23 proposed decisions with the options considered, and the dependency budget</td></tr>
+      <tr><td><code>docs/architecture/IMPLEMENTATION_ROADMAP.md</code></td><td>Phases 3–9; 15 vertical-slice stages in dependency order</td></tr>
+      <tr><td><code>docs/database/DATABASE_DESIGN.md</code></td><td>Tables by module, constraints, indexes, locking, migrations, backup and restore</td></tr>
+      <tr><td><code>docs/api/API_DESIGN.md</code></td><td>Conventions, route classes, error format, endpoint map per stage, rate limits</td></tr>
+      <tr><td><code>docs/security/SECURITY_ARCHITECTURE.md</code></td><td>Authentication, sessions, RBAC registry and roles, ownership rules, OWASP mapping, privacy, testing plan</td></tr>
+      <tr><td><code>docs/design/DESIGN_SYSTEM.md</code></td><td>"The road logbook" direction, measured colour tokens, type, spacing, components, states, accessibility</td></tr>
+      <tr><td><code>handoff.md</code>, <code>CLAUDE.md</code>, <code>README.md</code></td><td>Session state and working rules</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Main technical decisions (proposed)</h2>
+  <ul>
+    <li>Drizzle ORM over Prisma: CHECK constraints, partial indexes and row locks are central to this product.</li>
+    <li>Server-side sessions over JWT: suspensions and revocations must apply on the next request.</li>
+    <li>pg-boss on PostgreSQL for jobs: no Redis or extra infrastructure.</li>
+    <li>OpenAPI generated from the Zod schemas; each frontend generates its own types, so there is no shared package.</li>
+    <li>Same-origin proxy: cookies stay first-party and CORS stays closed.</li>
+    <li>Vertical slices: each stage ships the database, API, admin and public screens together.</li>
+  </ul>
+
+  <h2>Tests and checks performed</h2>
+  <table>
+    <thead><tr><th>Check</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td>Tool versions</td><td>Node 24.18.0, npm 12.0.2, psql 18.6, Docker 29.1.3</td></tr>
+      <tr><td>Port availability</td><td>4000, 5273, 5274, 5442, 8035, 1035 free</td></tr>
+      <tr><td>Colour contrast (WCAG formula)</td><td>Every text token ≥ 4.5:1 on its background; marigold restricted to night surfaces (1.98 on paper)</td></tr>
+      <tr><td>Application tests</td><td>None: no code exists yet</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Failures</h2>
+  <p>None that affect the work. One shell search failed because of zsh glob expansion and was not needed afterwards.</p>
+
+  <h2>Outstanding issues</h2>
+  <p class="note">The product's original master brief was never saved (RK-01). The inventory is now the written baseline, and the owner should review it for anything missing.</p>
+
+  <h2>Next steps</h2>
+  <ol>
+    <li>Owner reviews the documents and answers Q-01, Q-02, Q-20 and Q-22.</li>
+    <li>On approval: Phase 3, the project foundation (tasks 3.1–3.8).</li>
+    <li>Phase 4, the backend foundation, then stage S1 (identity and access).</li>
+  </ol>
+</main>
+</body>
+</html>

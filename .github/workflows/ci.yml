@@ -1,0 +1,33 @@
+name: ci
+on:
+  push:
+  pull_request:
+permissions: { contents: read }
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    services:
+      db:
+        image: postgis/postgis:18-3.6
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ['5442:5432']
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      PGHOST: localhost
+      PGPORT: 5442
+      PGPASSWORD: postgres
+      MRN_OWNER_PASSWORD: ci-owner-only
+      MRN_APP_PASSWORD: ci-app-only
+      NODE_ENV: test
+      LOG_LEVEL: silent
+      DATABASE_URL: postgres://mrn_app:ci-app-only@localhost:5442/myridenepal_test
+      APP_URL: http://localhost:5273
+      ADMIN_URL: http://localhost:5274
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: bash database/init.sh
+      - run: npm ci
+      - run: npm run check

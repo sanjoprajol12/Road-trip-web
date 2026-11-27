@@ -1,0 +1,10 @@
+dist
+coverage
+node_modules
+package-lock.json
+database/migrations
+docs
+reports
+handoff.md
+CLAUDE.md
+.github

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 2: Project Foundation</title>
+<style>
+  :root { --page:#ffffff; --surface:#f5f6f7; --line:#e1e4e8; --ink:#16181b; --muted:#575c63; --success:#2f6b3d; --warning:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--page); color:var(--ink); font:16px/1.55 system-ui, sans-serif; }
+  main { max-width:56rem; margin:0 auto; padding:32px 16px 64px; }
+  h1 { font-size:2rem; line-height:1.15; margin:0 0 4px; }
+  h2 { font-size:1.25rem; margin:40px 0 12px; padding-top:16px; border-top:1px solid var(--line); }
+  .meta { color:var(--muted); margin:0 0 24px; }
+  table { width:100%; border-collapse:collapse; font-size:.9375rem; }
+  th, td { text-align:left; vertical-align:top; padding:8px 12px; border-bottom:1px solid var(--line); }
+  th { font-size:.75rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); background:var(--surface); }
+  code { font-size:.875em; }
+  .ok { color:var(--success); font-weight:600; }
+  .warn { color:var(--warning); font-weight:600; }
+  ul, ol { padding-left:20px; }
+  @media (max-width: 640px) { table, thead, tbody, tr, th, td { display:block; } thead { display:none; } td { border:0; padding:4px 12px; } tr { border-bottom:1px solid var(--line); padding:8px 0; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Session 2: Project Foundation</h1>
+  <p class="meta">My Ride Nepal (Node rebuild) · <time datetime="2026-11-27">27 November 2026</time> · Phase 3 · planning updated with the owner's decisions</p>
+
+  <h2>Objective</h2>
+  <p>Apply the owner's decisions to the planning documents, verify every dependency before installation, and build the project foundation: three independent applications, local infrastructure, tests and CI.</p>
+
+  <h2>Owner decisions applied</h2>
+  <table>
+    <thead><tr><th>Decision</th><th>Where</th></tr></thead>
+    <tbody>
+      <tr><td>Q-01: no bookings or payments; motorcycle details on trips and reports only; no garage</td><td>Inventory caveats and §16; questions file</td></tr>
+      <tr><td>Q-02: separate rider and staff authentication</td><td>TD-07, inventory §11, security §2.1, database §3.2</td></tr>
+      <tr><td>Q-20: the old app stays as a reference; any import goes through an audit and plan approved by the owner</td><td>New roadmap stage S16, inventory row LM-1, architecture, CLAUDE.md</td></tr>
+      <tr><td>Q-22: white page background, neutral surfaces, minimal shadows</td><td>Design system §3, §5, §13; tokens in both apps</td></tr>
+      <tr><td>Architecture approved, on condition that dependencies are verified</td><td>TD-24</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Dependency verification (TD-24)</h2>
+  <table>
+    <thead><tr><th>Finding</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td><code>react-leaflet</code> uses the Hippocratic-2.1 licence (not OSI-approved)</td><td>Rejected; Leaflet (BSD-2) will be used directly</td></tr>
+      <tr><td>TypeScript 7 is not yet supported by <code>typescript-eslint</code> or <code>openapi-typescript</code></td><td>Backend 6.0.3, frontends 5.9.3</td></tr>
+      <tr><td>ESLint 9 deprecated; <code>eslint-plugin-jsx-a11y</code> does not support ESLint 10</td><td><code>eslint-plugin-jsx-a11y-x</code>, with a scoped <code>minimatch</code> override</td></tr>
+      <tr><td>drizzle-kit bundles an old esbuild (moderate advisory, dev server only)</td><td>Accepted as dev-only; production audit clean</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Work completed</h2>
+  <ul>
+    <li>Git initialised (no commit). Root <code>.gitignore</code>, <code>.env.example</code> and a scripts-only <code>package.json</code>.</li>
+    <li><code>scripts/dev-infra.sh</code>: PostgreSQL 18.6 + PostGIS 3.6 (5442) and Mailpit (8035/1035). <code>scripts/db/init.sh</code> creates the owner and app roles and three databases.</li>
+    <li>Backend: env validation, logging with redaction, security headers, request ids, the JSON error format, body limits, health endpoints, the Drizzle client, graceful shutdown.</li>
+    <li>Frontend and admin: React 19, Vite 8, React Router 8, TanStack Query, Tailwind 4 with the approved tokens, self-hosted fonts, the API client, a live service-status view, lazy routes, a not-found page. Admin has the staff sidebar, a skip link and <code>noindex</code>.</li>
+    <li>CI workflow and <code>scripts/ci-local.sh</code>; Playwright E2E against production builds and the isolated E2E database.</li>
+  </ul>
+
+  <h2>Tests performed</h2>
+  <table>
+    <thead><tr><th>Check</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td>Backend lint, type-check, format, build, prod audit</td><td class="ok">ok</td></tr>
+      <tr><td>Backend tests (real PostgreSQL)</td><td class="ok">10 passed</td></tr>
+      <tr><td>Frontend: lint, type-check, format, build, prod audit; 3 component tests</td><td class="ok">ok; 3 passed</td></tr>
+      <tr><td>Admin: lint, type-check, format, build, prod audit; 3 component tests</td><td class="ok">ok; 3 passed</td></tr>
+      <tr><td>E2E frontend (chromium, firefox, mobile)</td><td class="ok">9 passed</td></tr>
+      <tr><td>E2E admin (chromium, firefox, mobile)</td><td class="ok">9 passed</td></tr>
+      <tr><td>E2E WebKit</td><td class="warn">not run: system libraries need sudo</td></tr>
+      <tr><td>Independence: stop each app, the others keep working</td><td class="ok">verified</td></tr>
+      <tr><td>Database role restrictions (app role cannot create tables)</td><td class="ok">verified</td></tr>
+      <tr><td>CI on GitHub</td><td class="warn">not run: no remote</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Failures and fixes</h2>
+  <ul>
+    <li>Docker Compose plugin missing → plain <code>docker run</code> script.</li>
+    <li>The a11y lint plugin's config export differs from the original plugin → fixed the reference.</li>
+    <li>E2E TypeScript lacked DOM types → added.</li>
+    <li>Admin E2E timeout: a failed text edit plus an orphaned test server had masked the problem. Both fixed; both suites re-run from a clean state.</li>
+    <li>A local development password appeared in the transcript. Rotate before any real data exists.</li>
+  </ul>
+
+  <h2>Outstanding issues</h2>
+  <ul>
+    <li>WebKit system libraries (owner, sudo).</li>
+    <li>First commit and remote (owner approval).</li>
+    <li>Per-app deployment configuration waits for the host decision (Q-19).</li>
+  </ul>
+
+  <h2>Next steps</h2>
+  <ol>
+    <li>Phase 4: migrations with grants, the append-only audit log, reference data, sessions, CSRF, rate limits, the permission registry with the route-matrix test, OpenAPI and type generation, the worker.</li>
+    <li>Before S1: answer Q-17 (languages) and Q-27 (password and session policy).</li>
+  </ol>
+</main>
+</body>
+</html>
